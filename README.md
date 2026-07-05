@@ -51,6 +51,65 @@ Facebook Ads via Make.com, sans jamais toucher à un CSV.
 - Le CSV import manuel fonctionne toujours en complément, pour les leads d'autres sources
   (salons, formulaire Webador, etc.).
 
+## Étape 4 — Le "cerveau" WhatsApp (réponse automatique par IA)
+
+Cette fonction reçoit chaque message WhatsApp entrant, répond intelligemment via l'IA
+(explique les prestations, pose les bonnes questions, propose le catalogue et le lien devis),
+et garde tout l'historique dans Supabase.
+
+### 4.1 — Créer les tables Supabase pour les conversations
+
+Dans Supabase → SQL Editor, exécute le contenu de `supabase-whatsapp-setup.sql`.
+
+### 4.2 — Récupérer tes accès WhatsApp Business
+
+1. Va sur https://developers.facebook.com/apps → sélectionne (ou crée) ton app liée à WhatsApp Business
+2. Dans le menu de gauche : **WhatsApp → Configuration de l'API**
+3. Note :
+   - **Phone number ID** (l'identifiant du numéro, pas le numéro lui-même)
+   - **Temporary access token** (valide 24h) — pour une utilisation durable, génère plutôt un
+     **token permanent** via **Système d'utilisateurs** dans les paramètres de l'app (rôle "Admin",
+     permissions `whatsapp_business_messaging` + `whatsapp_business_management`)
+
+### 4.3 — Ajouter les variables d'environnement sur Vercel
+
+Dans ton projet Vercel → **Settings → Environment Variables**, ajoute :
+
+| Nom | Valeur |
+|---|---|
+| `SUPABASE_URL` | `https://wklddwumirkdjkbxvzyj.supabase.co` |
+| `SUPABASE_SERVICE_KEY` | ta clé **secret** Supabase (Project Settings → API Keys → Secret keys) |
+| `WHATSAPP_TOKEN` | le token récupéré à l'étape 4.2 |
+| `WHATSAPP_PHONE_NUMBER_ID` | le Phone number ID récupéré à l'étape 4.2 |
+| `WHATSAPP_VERIFY_TOKEN` | invente une phrase secrète, ex. `ecosky-verif-2026` |
+| `ANTHROPIC_API_KEY` | ta clé API Anthropic (depuis console.anthropic.com) |
+
+Après ajout, redéploie le projet (Vercel → Deployments → ⋮ → Redeploy) pour que les
+variables soient prises en compte.
+
+### 4.4 — Connecter le webhook dans Meta
+
+1. Toujours dans developers.facebook.com → ton app → **WhatsApp → Configuration**
+2. Section **Webhook** → clique **Modifier**
+3. **URL de rappel** : `https://salesflow-ecosky.vercel.app/api/whatsapp-webhook`
+4. **Jeton de vérification** : la même phrase secrète que `WHATSAPP_VERIFY_TOKEN` ci-dessus
+5. Clique **Vérifier et enregistrer**
+6. Abonne-toi au champ **messages** (bouton "Gérer" à côté du champ, coche "messages")
+
+### 4.5 — Tester
+
+Envoie un message WhatsApp depuis ton téléphone personnel vers le numéro WhatsApp Business
+de RMS ECOSKY. L'IA doit répondre en quelques secondes. Consulte les tables `wa_messages` et
+`wa_conversations` dans Supabase pour voir la conversation enregistrée.
+
+### Important à savoir
+
+- Ceci gère les réponses aux messages **reçus**. Pour envoyer un premier message toi-même
+  (relance automatique), Meta impose un **modèle de message pré-approuvé** — à soumettre
+  séparément dans Meta Business Manager (validation en quelques jours).
+- Le "cerveau" (`SYSTEM_PROMPT` dans `api/whatsapp-webhook.js`) peut être ajusté à tout moment :
+  modifie le texte, redéploie, et le ton/comportement de l'assistant change immédiatement.
+
 ## Développement local (optionnel)
 
 ```
