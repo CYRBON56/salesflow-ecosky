@@ -11,6 +11,10 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 const CATALOGUE_URL = "https://www.ecoskybyrms.fr/nos-services-et-prestations/catalogue";
 const DEVIS_URL = "https://www.ecoskybyrms.fr/devis";
+const CATALOGUE_PDF_URL =
+  "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-gum.pdf";
+const VIDEO_URL =
+  "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/v24044gl0000d49h467og65puhaukhig.mp4";
 
 const SYSTEM_PROMPT = `Tu es l'assistant commercial WhatsApp de RMS ECOSKY (EcoSky by RMS), une entreprise
 basée à Brech (56400, Bretagne, France), spécialisée dans les sols résine EPDM drainants
@@ -26,7 +30,10 @@ Ton rôle dans cette conversation WhatsApp :
    - Support actuel (béton existant, terre, dallage...)
    - Délai souhaité
    - Coloris envisagé si pertinent (la gamme EcoSky'Gum propose plusieurs teintes)
-3. Propose le catalogue quand c'est pertinent : ${CATALOGUE_URL}
+3. Juste après ta toute première réponse, le système envoie automatiquement le catalogue PDF
+   (photos et coloris) et une courte vidéo de présentation — tu n'as donc pas besoin de décrire
+   le catalogue en détail ni de coller de lien vers lui, contente-toi d'annoncer que tu les envoies
+   ("Je vous partage justement notre catalogue et une petite vidéo pour vous donner des idées !").
 4. Dès que tu as une idée claire du projet, encourage le client à envoyer des photos ou une courte
    vidéo de la zone concernée via ce lien pour un chiffrage précis : ${DEVIS_URL}
 5. Reste bref, chaleureux, professionnel, en français. Pas de longs pavés — c'est une conversation
@@ -134,6 +141,71 @@ async function sendWhatsAppMessage(to, text) {
   }
 }
 
+async function sendWhatsAppDocument(to, link, filename, caption) {
+  const res = await fetch(
+    `https://graph.facebook.com/v20.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "document",
+        document: { link, filename, caption },
+      }),
+    }
+  );
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("WhatsApp document send error:", errText);
+  }
+}
+
+async function sendWhatsAppVideo(to, link, caption) {
+  const res = await fetch(
+    `https://graph.facebook.com/v20.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "video",
+        video: { link, caption },
+      }),
+    }
+  );
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("WhatsApp video send error:", errText);
+  }
+}
+
+async function sendCatalogueAndVideo(phone) {
+  await sendWhatsAppDocument(
+    phone,
+    CATALOGUE_PDF_URL,
+    "Catalogue-EcoSky-Gum.pdf",
+    "📘 Notre catalogue de réalisations EcoSky'Gum"
+  );
+  await sendWhatsAppVideo(
+    phone,
+    VIDEO_URL,
+    "🎥 Découvrez nos réalisations en vidéo !"
+  );
+  await supabaseRequest(`wa_conversations?phone=eq.${phone}`, {
+    method: "PATCH",
+    body: JSON.stringify({ media_sent: true }),
+    prefer: "return=minimal",
+  });
+}
+
 export default async function handler(req, res) {
   // Vérification du webhook par Meta (première connexion)
   if (req.method === "GET") {
@@ -167,7 +239,7 @@ export default async function handler(req, res) {
       message.text?.body || message.button?.text || "[message non textuel reçu]";
     const contactName = value?.contacts?.[0]?.profile?.name || "";
 
-    await getConversation(phone);
+    const conversation = await getConversation(phone);
     if (contactName) {
       await supabaseRequest(`wa_conversations?phone=eq.${phone}`, {
         method: "PATCH",
@@ -181,6 +253,11 @@ export default async function handler(req, res) {
     const reply = await askClaude(history);
     await saveMessage(phone, "assistant", reply);
     await sendWhatsAppMessage(phone, reply);
+
+    // Envoie le catalogue PDF + la vidéo une seule fois, juste après le premier échange
+    if (!conversation.media_sent) {
+      await sendCatalogueAndVideo(phone);
+    }
 
     return res.status(200).send("EVENT_RECEIVED");
   } catch (err) {
