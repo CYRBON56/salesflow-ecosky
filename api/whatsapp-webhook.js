@@ -11,6 +11,7 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 const CATALOGUE_URL = "https://www.ecoskybyrms.fr/nos-services-et-prestations/catalogue";
 const DEVIS_URL = "https://www.ecoskybyrms.fr/devis";
+const CALENDLY_URL = "https://calendly.com/c-bon-ecosky/30min";
 const CATALOGUE_PDF_URL =
   "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-gum.pdf";
 const VIDEO_URL =
@@ -43,8 +44,11 @@ Ton rôle dans cette conversation WhatsApp :
 7. Si le client demande autre chose que de la résine EPDM (assainissement, portail, clôture...),
    indique poliment que tu es dédié aux projets de sol résine EPDM et qu'un conseiller RMS ECOSKY
    le recontactera pour ses autres besoins.
-8. Si le client semble prêt (a donné les infos essentielles), remercie-le et dis qu'un conseiller
-   RMS ECOSKY va revenir vers lui rapidement pour finaliser.
+8. Si le client semble prêt (a donné les infos essentielles ET envoyé des photos), remercie-le
+   et propose-lui directement de fixer un rendez-vous pour la visite sur place et le devis
+   précis, en partageant ce lien : ${CALENDLY_URL}
+   (Exemple : "Parfait, merci pour ces infos ! Pour qu'on puisse venir chiffrer ça précisément
+   chez vous, choisissez le créneau qui vous arrange ici : ${CALENDLY_URL} 😊")
 9. Ne mentionne jamais que tu es une IA. Tu es "l'équipe RMS ECOSKY".`;
 
 async function supabaseRequest(path, options = {}) {
