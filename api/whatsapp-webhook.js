@@ -1,6 +1,7 @@
 // Webhook WhatsApp Business Cloud API — le "cerveau" du système.
 // Reçoit les messages entrants, fait répondre l'IA, envoie la réponse sur WhatsApp,
-// et garde tout l'historique dans Supabase.
+// garde tout l'historique dans Supabase, et peut réserver un rendez-vous Calendly
+// directement dans la conversation (sans lien externe).
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -8,10 +9,11 @@ const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const CALENDLY_TOKEN = process.env.CALENDLY_TOKEN;
+const CALENDLY_EVENT_TYPE_URI = process.env.CALENDLY_EVENT_TYPE_URI;
 
 const CATALOGUE_URL = "https://www.ecoskybyrms.fr/nos-services-et-prestations/catalogue";
 const DEVIS_URL = "https://www.ecoskybyrms.fr/devis";
-const CALENDLY_URL = "https://calendly.com/c-bon-ecosky/30min";
 const CATALOGUE_PDF_URL =
   "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-gum.pdf";
 const VIDEO_URL =
@@ -38,18 +40,16 @@ Ton rôle dans cette conversation WhatsApp :
    support, délai...) qu'il n'a pas explicitement mentionné dans la conversation. Base-toi
    uniquement sur ce que le client a réellement écrit, mot pour mot. Si une information manque,
    est ambiguë, ou si tu as un doute sur ce que le client a dit précédemment, pose la question
-   au lieu de l'affirmer, de la deviner ou de la reformuler avec des valeurs différentes. Ne
-   confonds jamais les informations sur l'entreprise (ex : sa localisation à Brech) avec des
-   informations sur le projet du client.
+   au lieu de l'affirmer ou de la deviner. Ne confonds jamais les informations sur l'entreprise
+   (ex : sa localisation à Brech) avec des informations sur le projet du client.
 
 3. Juste après ta toute première réponse, le système envoie automatiquement le catalogue PDF
    (photos et coloris) et une courte vidéo de présentation — tu n'as donc pas besoin de décrire
    le catalogue en détail ni de coller de lien vers lui, contente-toi d'annoncer que tu les envoies
    ("Je vous partage justement notre catalogue et une petite vidéo pour vous donner des idées !").
 
-4. Dès que tu as une idée claire du projet (uniquement à partir de ce que le client a réellement
-   dit), encourage le client à envoyer des photos ou une courte vidéo de la zone concernée via ce
-   lien pour un chiffrage précis : ${DEVIS_URL}
+4. Dès que tu as une idée claire du projet, encourage le client à envoyer des photos ou une courte
+   vidéo de la zone concernée via ce lien pour un chiffrage précis : ${DEVIS_URL}
 
 5. Reste bref, chaleureux, professionnel, en français. Pas de longs pavés — c'est une conversation
    WhatsApp, pas un email. 2-4 phrases maximum par message.
@@ -61,13 +61,52 @@ Ton rôle dans cette conversation WhatsApp :
    indique poliment que tu es dédié aux projets de sol résine EPDM et qu'un conseiller RMS ECOSKY
    le recontactera pour ses autres besoins.
 
-8. Si le client semble prêt (a donné les infos essentielles ET envoyé des photos), remercie-le
-   et propose-lui directement de fixer un rendez-vous pour la visite sur place et le devis
-   précis, en partageant ce lien : ${CALENDLY_URL}
-   (Exemple : "Parfait, merci pour ces infos ! Pour qu'on puisse venir chiffrer ça précisément
-   chez vous, choisissez le créneau qui vous arrange ici : ${CALENDLY_URL} 😊")
+8. PRISE DE RENDEZ-VOUS — Si le client demande explicitement un rendez-vous, une visite sur place,
+   ou si le projet est suffisamment qualifié (infos essentielles données) et que le client semble
+   prêt, utilise l'outil "get_available_slots" pour consulter les VRAIS créneaux disponibles.
+   Propose 2 ou 3 créneaux max, dans un langage naturel (ex : "Jeudi 15 à 14h ou vendredi 16 à
+   10h, ça vous irait ?"). Une fois que le client choisit un créneau, demande-lui son prénom, nom
+   et email s'il ne les a pas déjà donnés, puis utilise l'outil "book_appointment" pour réserver
+   directement. Ne propose ou n'invente JAMAIS un créneau qui ne vient pas de get_available_slots.
+   Confirme ensuite le rendez-vous avec la date/heure exacte une fois la réservation réussie.
 
 9. Ne mentionne jamais que tu es une IA. Tu es "l'équipe RMS ECOSKY".`;
+
+const TOOLS = [
+  {
+    name: "get_available_slots",
+    description:
+      "Récupère les vrais créneaux disponibles dans l'agenda pour un rendez-vous de visite sur place (30 minutes), sur les 7 prochains jours.",
+    input_schema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "book_appointment",
+    description:
+      "Réserve définitivement un rendez-vous de visite sur place à un créneau précis, une fois que le client a choisi son horaire et donné son nom et son email.",
+    input_schema: {
+      type: "object",
+      properties: {
+        start_time_iso: {
+          type: "string",
+          description:
+            "Date et heure de début du rendez-vous au format ISO 8601 UTC, ex: 2026-07-17T12:00:00Z. Doit correspondre exactement à un créneau retourné par get_available_slots.",
+        },
+        name: {
+          type: "string",
+          description: "Prénom et nom du client.",
+        },
+        email: {
+          type: "string",
+          description: "Adresse email du client, pour la confirmation du rendez-vous.",
+        },
+      },
+      required: ["start_time_iso", "name", "email"],
+    },
+  },
+];
 
 async function supabaseRequest(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -118,27 +157,62 @@ async function saveMessage(phone, role, content) {
   });
 }
 
-async function askClaude(history) {
-  const messages = history.map((m) => ({ role: m.role, content: m.content }));
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
+// ---- Calendly ----
+
+async function calendlyRequest(path, options = {}) {
+  const res = await fetch(`https://api.calendly.com${path}`, {
+    ...options,
     headers: {
+      Authorization: `Bearer ${CALENDLY_TOKEN}`,
       "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
+      ...(options.headers || {}),
     },
-    body: JSON.stringify({
-      model: "claude-sonnet-5",
-      max_tokens: 400,
-      system: SYSTEM_PROMPT,
-      messages,
-    }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(`Anthropic error: ${JSON.stringify(data)}`);
-  const textBlock = data.content.find((b) => b.type === "text");
-  return textBlock ? textBlock.text : "Merci pour votre message, on revient vers vous rapidement !";
+  if (!res.ok) {
+    console.error("Calendly error:", JSON.stringify(data));
+    throw new Error(data.message || `Calendly error ${res.status}`);
+  }
+  return data;
 }
+
+async function getAvailableSlots() {
+  const now = new Date();
+  const start = new Date(now.getTime() + 60 * 60 * 1000); // à partir d'1h à partir de maintenant
+  const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 jours
+
+  const params = new URLSearchParams({
+    event_type: CALENDLY_EVENT_TYPE_URI,
+    start_time: start.toISOString(),
+    end_time: end.toISOString(),
+  });
+
+  const data = await calendlyRequest(`/event_type_available_times?${params}`);
+  const slots = (data.collection || []).slice(0, 8).map((s) => s.start_time);
+  return slots;
+}
+
+async function bookAppointment(startTimeIso, name, email) {
+  const body = {
+    event_type: CALENDLY_EVENT_TYPE_URI,
+    start_time: startTimeIso,
+    invitee: {
+      name,
+      email,
+      timezone: "Europe/Paris",
+    },
+    location: {
+      kind: "physical",
+    },
+  };
+  const data = await calendlyRequest("/invitees", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return data;
+}
+
+// ---- WhatsApp ----
 
 async function sendWhatsAppMessage(to, text) {
   const res = await fetch(
@@ -228,6 +302,96 @@ async function sendCatalogueAndVideo(phone) {
   });
 }
 
+// ---- Claude avec function calling (outils) ----
+
+async function callAnthropic(messages) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-5",
+      max_tokens: 500,
+      system: SYSTEM_PROMPT,
+      tools: TOOLS,
+      messages,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Anthropic error: ${JSON.stringify(data)}`);
+  return data;
+}
+
+async function executeTool(toolName, toolInput) {
+  try {
+    if (toolName === "get_available_slots") {
+      const slots = await getAvailableSlots();
+      if (slots.length === 0) {
+        return "Aucun créneau disponible dans les 7 prochains jours.";
+      }
+      return JSON.stringify({ available_slots_utc: slots });
+    }
+    if (toolName === "book_appointment") {
+      const result = await bookAppointment(
+        toolInput.start_time_iso,
+        toolInput.name,
+        toolInput.email
+      );
+      return JSON.stringify({
+        success: true,
+        confirmed_time: result.resource?.event?.start_time,
+        cancel_url: result.resource?.cancel_url,
+        reschedule_url: result.resource?.reschedule_url,
+      });
+    }
+    return JSON.stringify({ error: "Outil inconnu" });
+  } catch (err) {
+    console.error(`Tool error (${toolName}):`, err.message);
+    return JSON.stringify({
+      error: true,
+      message:
+        "La réservation ou la consultation des disponibilités a échoué. Propose au client de réessayer dans un instant, ou de préciser un autre horaire.",
+    });
+  }
+}
+
+async function askClaude(history) {
+  let messages = history.map((m) => ({ role: m.role, content: m.content }));
+
+  // Boucle d'utilisation d'outils : max 4 aller-retours pour éviter une boucle infinie
+  for (let i = 0; i < 4; i++) {
+    const data = await callAnthropic(messages);
+
+    if (data.stop_reason !== "tool_use") {
+      const textBlock = data.content.find((b) => b.type === "text");
+      return textBlock
+        ? textBlock.text
+        : "Merci pour votre message, on revient vers vous rapidement !";
+    }
+
+    // L'IA veut utiliser un ou plusieurs outils
+    messages.push({ role: "assistant", content: data.content });
+
+    const toolResults = [];
+    for (const block of data.content) {
+      if (block.type === "tool_use") {
+        const result = await executeTool(block.name, block.input);
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: block.id,
+          content: result,
+        });
+      }
+    }
+    messages.push({ role: "user", content: toolResults });
+  }
+
+  return "Merci pour votre message ! Un conseiller RMS ECOSKY revient vers vous rapidement.";
+}
+
 export default async function handler(req, res) {
   // Vérification du webhook par Meta (première connexion)
   if (req.method === "GET") {
@@ -239,30 +403,24 @@ export default async function handler(req, res) {
     }
     return res.status(403).send("Forbidden");
   }
-
   if (req.method !== "POST") {
     return res.status(405).send("Method not allowed");
   }
-
   try {
     const body = req.body;
     const entry = body.entry?.[0];
     const change = entry?.changes?.[0];
     const value = change?.value;
     const message = value?.messages?.[0];
-
     if (!message) {
       // Peut être un accusé de statut (delivered/read), on ignore silencieusement
       return res.status(200).send("EVENT_RECEIVED");
     }
-
     const phone = message.from;
     const incomingText =
       message.text?.body || message.button?.text || "[message non textuel reçu]";
     const contactName = value?.contacts?.[0]?.profile?.name || "";
-
     const conversation = await getConversation(phone);
-
     if (contactName) {
       await supabaseRequest(`wa_conversations?phone=eq.${phone}`, {
         method: "PATCH",
@@ -270,18 +428,15 @@ export default async function handler(req, res) {
         prefer: "return=minimal",
       });
     }
-
     await saveMessage(phone, "user", incomingText);
     const history = await getHistory(phone);
     const reply = await askClaude(history);
     await saveMessage(phone, "assistant", reply);
     await sendWhatsAppMessage(phone, reply);
-
     // Envoie le catalogue PDF + la vidéo une seule fois, juste après le premier échange
     if (!conversation.media_sent) {
       await sendCatalogueAndVideo(phone);
     }
-
     return res.status(200).send("EVENT_RECEIVED");
   } catch (err) {
     console.error("Webhook error:", err);
