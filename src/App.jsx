@@ -80,6 +80,10 @@ function settingsToRow(s) {
     templates: s.templates,
   };
 }
+// La table Supabase utilise la colonne "statut", tandis que l'app utilise "stage" en interne.
+function mapRowToLead(row) {
+  return { ...row, stage: row.statut };
+}
 export default function SalesFlowSystem() {
   const [leads, setLeads] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -90,7 +94,7 @@ export default function SalesFlowSystem() {
   const [showSettings, setShowSettings] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [csvPreview, setCsvPreview] = useState(null);
-  const [mapping, setMapping] = useState({ nom: "", telephone: "", email: "", source: "" });
+  const [mapping, setMapping] = useState({ nom: "", telephone: "", source: "" });
   const [expandedLead, setExpandedLead] = useState(null);
   const [waData, setWaData] = useState({}); // { [telephone]: { loading, conversation, messages } }
   const fileInputRef = useRef(null);
@@ -102,7 +106,7 @@ export default function SalesFlowSystem() {
           .select("*")
           .order("created_at", { ascending: false });
         if (leadErr) throw leadErr;
-        setLeads(leadRows || []);
+        setLeads((leadRows || []).map(mapRowToLead));
       } catch (e) {
         setError("Impossible de charger les leads depuis Supabase. Vérifie ton URL/clé dans supabaseClient.js.");
       }
@@ -122,9 +126,11 @@ export default function SalesFlowSystem() {
       .channel("leads-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "leads" }, (payload) => {
         if (payload.eventType === "INSERT") {
-          setLeads((prev) => (prev.some((l) => l.id === payload.new.id) ? prev : [payload.new, ...prev]));
+          const lead = mapRowToLead(payload.new);
+          setLeads((prev) => (prev.some((l) => l.id === lead.id) ? prev : [lead, ...prev]));
         } else if (payload.eventType === "UPDATE") {
-          setLeads((prev) => prev.map((l) => (l.id === payload.new.id ? payload.new : l)));
+          const lead = mapRowToLead(payload.new);
+          setLeads((prev) => prev.map((l) => (l.id === lead.id ? lead : l)));
         } else if (payload.eventType === "DELETE") {
           setLeads((prev) => prev.filter((l) => l.id !== payload.old.id));
         }
@@ -148,7 +154,6 @@ export default function SalesFlowSystem() {
         const guessed = {
           nom: guessColumn(headers, ["nom", "name", "prenom nom", "full name", "prenom"]),
           telephone: guessColumn(headers, ["telephone", "tel", "phone", "mobile", "numero"]),
-          email: guessColumn(headers, ["email", "e-mail", "mail"]),
           source: guessColumn(headers, ["campagne", "campaign", "source", "ad set", "ad name"]),
         };
         setMapping(guessed);
@@ -172,9 +177,8 @@ export default function SalesFlowSystem() {
         return {
           nom,
           telephone,
-          email: mapping.email ? (row[mapping.email] || "").trim() : "",
           source: mapping.source ? (row[mapping.source] || "").trim() : "",
-          stage: "nouveau",
+          statut: "nouveau",
           notes: "",
         };
       })
@@ -190,14 +194,19 @@ export default function SalesFlowSystem() {
       setError("Erreur lors de l'import dans Supabase : " + err.message);
       return;
     }
-    setLeads((prev) => [...(data || []), ...prev]);
+    setLeads((prev) => [...(data || []).map(mapRowToLead), ...prev]);
     setShowImport(false);
     setCsvPreview(null);
     setError("");
   };
   const updateLead = async (id, patch) => {
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
-    const { error: err } = await supabase.from("leads").update(patch).eq("id", id);
+    const dbPatch = { ...patch };
+    if ("stage" in dbPatch) {
+      dbPatch.statut = dbPatch.stage;
+      delete dbPatch.stage;
+    }
+    const { error: err } = await supabase.from("leads").update(dbPatch).eq("id", id);
     if (err) setError("Erreur de mise à jour du lead.");
   };
   const deleteLead = async (id) => {
@@ -268,7 +277,6 @@ export default function SalesFlowSystem() {
       leads.map((l) => ({
         Nom: l.nom,
         Telephone: l.telephone,
-        Email: l.email,
         Source: l.source,
         Etape: ALL_STAGES.find((s) => s.id === l.stage)?.label || l.stage,
         Notes: l.notes,
@@ -551,7 +559,6 @@ function ImportModal({ headers, mapping, setMapping, rowCount, onCancel, onConfi
       {[
         { key: "nom", label: "Nom du contact *" },
         { key: "telephone", label: "Téléphone *" },
-        { key: "email", label: "Email (optionnel)" },
         { key: "source", label: "Campagne / Source (optionnel)" },
       ].map((field) => (
         <div key={field.key} style={{ marginBottom: 12 }}>
