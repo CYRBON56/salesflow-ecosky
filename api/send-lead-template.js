@@ -11,6 +11,9 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const TEMPLATE_NAME = "nouveau_lead_epdm";
 const TEMPLATE_LANGUAGE = "fr"; // ajuster si Meta l'a validé sous un autre code (ex: "fr_FR")
 
+const OWNER_NOTIFICATION_TEMPLATE = "notif_nouveau_lead";
+const OWNER_PHONE = "33645688394"; // numéro WhatsApp de Cyrille, format international sans +
+
 async function supabaseRequest(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...options,
@@ -76,6 +79,43 @@ async function sendTemplateMessage(to, firstName) {
   return data;
 }
 
+async function notifyOwner(firstName) {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v20.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: OWNER_PHONE,
+          type: "template",
+          template: {
+            name: OWNER_NOTIFICATION_TEMPLATE,
+            language: { code: TEMPLATE_LANGUAGE },
+            components: [
+              {
+                type: "body",
+                parameters: [{ type: "text", text: firstName }],
+              },
+            ],
+          },
+        }),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("notifyOwner error:", JSON.stringify(data));
+    }
+  } catch (err) {
+    // Ne bloque jamais l'envoi du message client si la notif interne échoue
+    console.error("notifyOwner error:", err.message);
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -92,6 +132,7 @@ export default async function handler(req, res) {
     const firstName = (nom || "").split(" ")[0] || "là";
 
     const result = await sendTemplateMessage(normalizedPhone, firstName);
+    await notifyOwner(firstName);
 
     // Trace l'envoi dans wa_conversations pour que le webhook ne renvoie pas
     // le catalogue en double si le client répond ensuite normalement.
