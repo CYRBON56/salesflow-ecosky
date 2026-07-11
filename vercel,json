@@ -1,0 +1,8 @@
+json{
+  "crons": [
+    {
+      "path": "/api/send-relances",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}
