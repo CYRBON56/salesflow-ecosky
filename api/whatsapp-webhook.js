@@ -19,6 +19,15 @@ const CATALOGUE_PDF_URL =
 const VIDEO_URL =
   "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/v24044gl0000d49h467og65puhaukhig.mp4";
 
+// Départements dans la zone d'intervention EcoSky (Bretagne entière)
+const ALLOWED_DEPARTMENTS = ["56"];
+
+function isDepartmentAllowed(codePostal) {
+  if (!codePostal) return true; // pas encore de code postal connu → on laisse passer
+  const prefix = String(codePostal).trim().slice(0, 2);
+  return ALLOWED_DEPARTMENTS.includes(prefix);
+}
+
 const SYSTEM_PROMPT = `Tu es l'assistant commercial WhatsApp de RMS ECOSKY (EcoSky by RMS), une entreprise
 basée à Brech (56400, Bretagne, France), spécialisée dans les sols résine EPDM drainants
 (gamme EcoSky'Gum) : terrasses, tours de piscine, allées, plages de piscine.
@@ -160,6 +169,18 @@ async function ensureLeadExists(phone, contactName) {
   } catch (err) {
     // Ne bloque jamais la réponse au client si la création du lead échoue
     console.error("ensureLeadExists error:", err.message);
+  }
+}
+
+async function getLeadCodePostal(phone) {
+  try {
+    const rows = await supabaseRequest(
+      `leads?telephone=eq.${phone}&select=code_postal`
+    );
+    return rows && rows.length > 0 ? rows[0].code_postal : null;
+  } catch (err) {
+    console.error("getLeadCodePostal error:", err.message);
+    return null; // en cas d'erreur, on ne bloque pas
   }
 }
 
@@ -473,6 +494,13 @@ export default async function handler(req, res) {
     }
     await ensureLeadExists(phone, contactName);
     await saveMessage(phone, "user", incomingText);
+
+    const codePostal = await getLeadCodePostal(phone);
+    if (!isDepartmentAllowed(codePostal)) {
+      console.log(`Lead hors zone (${codePostal}) — pas de réponse pour ${phone}`);
+      return res.status(200).send("EVENT_RECEIVED");
+    }
+
     const history = await getHistory(phone);
     const reply = await askClaude(history);
     await saveMessage(phone, "assistant", reply);
