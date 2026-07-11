@@ -70,17 +70,16 @@ Ton rôle dans cette conversation WhatsApp :
    indique poliment que tu es dédié aux projets de sol résine EPDM et qu'un conseiller RMS ECOSKY
    le recontactera pour ses autres besoins.
 
-8. PRISE DE RENDEZ-VOUS — Si le client demande explicitement un rendez-vous, une visite sur place,
-   un appel, ou si le projet est suffisamment qualifié (infos essentielles données) et que le
-   client semble prêt, demande-lui d'abord s'il préfère une visite sur place (30 min, pour un
-   chiffrage précis sur site) ou un simple appel téléphonique (15 min). Utilise ensuite l'outil
-   "get_available_slots" avec le meeting_type correspondant ("sur place" ou "téléphonique") pour
-   consulter les VRAIS créneaux disponibles. Propose 2 ou 3 créneaux max, dans un langage naturel
-   (ex : "Jeudi 15 à 14h ou vendredi 16 à 10h, ça vous irait ?"). Une fois que le client choisit un
-   créneau, demande-lui son prénom, nom et email s'il ne les a pas déjà donnés, puis utilise
-   l'outil "book_appointment" (avec le même meeting_type) pour réserver directement. Ne propose ou
-   n'invente JAMAIS un créneau qui ne vient pas de get_available_slots. Confirme ensuite le
-   rendez-vous avec la date/heure exacte une fois la réservation réussie.
+8. PRISE DE RENDEZ-VOUS — Si le client demande explicitement un rendez-vous, ou si le projet est
+   suffisamment qualifié (infos essentielles données) et que le client semble prêt, propose-lui un
+   court appel téléphonique de 15 minutes avec l'équipe RMS ECOSKY pour affiner le projet ensemble
+   (ce premier échange permet ensuite, si besoin, d'organiser une visite sur place). Utilise
+   l'outil "get_available_slots" pour consulter les VRAIS créneaux disponibles. Propose 2 ou 3
+   créneaux max, dans un langage naturel (ex : "Jeudi 15 à 14h ou vendredi 16 à 10h, ça vous
+   irait ?"). Une fois que le client choisit un créneau, demande-lui son prénom, nom et email s'il
+   ne les a pas déjà donnés, puis utilise l'outil "book_appointment" pour réserver directement. Ne
+   propose ou n'invente JAMAIS un créneau qui ne vient pas de get_available_slots. Confirme ensuite
+   le rendez-vous avec la date/heure exacte une fois la réservation réussie.
 
 9. Ne mentionne jamais que tu es une IA. Tu es "l'équipe RMS ECOSKY".`;
 
@@ -88,24 +87,16 @@ const TOOLS = [
   {
     name: "get_available_slots",
     description:
-      "Récupère les vrais créneaux disponibles dans l'agenda pour un rendez-vous (30 min visite sur place, ou 15 min appel téléphonique), sur les 7 prochains jours.",
+      "Récupère les vrais créneaux disponibles dans l'agenda pour un appel téléphonique (15 minutes), sur les 7 prochains jours.",
     input_schema: {
       type: "object",
-      properties: {
-        meeting_type: {
-          type: "string",
-          enum: ["sur place", "téléphonique"],
-          description:
-            "Type de rendez-vous souhaité par le client : 'sur place' pour une visite au domicile/chantier, 'téléphonique' pour un simple appel.",
-        },
-      },
-      required: ["meeting_type"],
+      properties: {},
     },
   },
   {
     name: "book_appointment",
     description:
-      "Réserve définitivement un rendez-vous à un créneau précis, une fois que le client a choisi son horaire et donné son nom et son email.",
+      "Réserve définitivement un appel téléphonique à un créneau précis, une fois que le client a choisi son horaire et donné son nom et son email.",
     input_schema: {
       type: "object",
       properties: {
@@ -127,13 +118,8 @@ const TOOLS = [
           description:
             "Adresse ou ville du chantier/projet, si le client l'a déjà communiquée dans la conversation. Sinon, laisser vide.",
         },
-        meeting_type: {
-          type: "string",
-          enum: ["sur place", "téléphonique"],
-          description: "Doit correspondre au type utilisé lors de get_available_slots.",
-        },
       },
-      required: ["start_time_iso", "name", "email", "meeting_type"],
+      required: ["start_time_iso", "name", "email"],
     },
   },
 ];
@@ -271,11 +257,8 @@ async function findEventTypeUri(keyword) {
   return found ? found.uri : CALENDLY_EVENT_TYPE_URI; // repli sur l'ancien si non trouvé
 }
 
-async function getAvailableSlots(meetingType = "sur place") {
-  const eventTypeUri =
-    meetingType === "téléphonique"
-      ? await findEventTypeUri("téléphonique")
-      : await findEventTypeUri("sur place");
+async function getAvailableSlots() {
+  const eventTypeUri = await findEventTypeUri("téléphonique");
 
   const now = new Date();
   const start = new Date(now.getTime() + 60 * 60 * 1000); // à partir d'1h à partir de maintenant
@@ -292,11 +275,8 @@ async function getAvailableSlots(meetingType = "sur place") {
   return slots;
 }
 
-async function bookAppointment(startTimeIso, name, email, meetingType = "sur place") {
-  const eventTypeUri =
-    meetingType === "téléphonique"
-      ? await findEventTypeUri("téléphonique")
-      : await findEventTypeUri("sur place");
+async function bookAppointment(startTimeIso, name, email) {
+  const eventTypeUri = await findEventTypeUri("téléphonique");
 
   const body = {
     event_type: eventTypeUri,
@@ -433,7 +413,7 @@ async function callAnthropic(messages) {
 async function executeTool(toolName, toolInput) {
   try {
     if (toolName === "get_available_slots") {
-      const slots = await getAvailableSlots(toolInput.meeting_type);
+      const slots = await getAvailableSlots();
       if (slots.length === 0) {
         return "Aucun créneau disponible dans les 7 prochains jours.";
       }
@@ -443,8 +423,7 @@ async function executeTool(toolName, toolInput) {
       const result = await bookAppointment(
         toolInput.start_time_iso,
         toolInput.name,
-        toolInput.email,
-        toolInput.meeting_type
+        toolInput.email
       );
       return JSON.stringify({
         success: true,
