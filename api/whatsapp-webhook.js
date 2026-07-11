@@ -142,6 +142,28 @@ async function getConversation(phone) {
   return created[0];
 }
 
+async function ensureLeadExists(phone, contactName) {
+  try {
+    const existing = await supabaseRequest(`leads?telephone=eq.${phone}`);
+    if (existing && existing.length > 0) return;
+    await supabaseRequest("leads", {
+      method: "POST",
+      body: JSON.stringify({
+        nom: contactName || phone,
+        telephone: phone,
+        email: "",
+        source: "WhatsApp",
+        stage: "nouveau",
+        notes: "",
+      }),
+      prefer: "return=minimal",
+    });
+  } catch (err) {
+    // Ne bloque jamais la réponse au client si la création du lead échoue
+    console.error("ensureLeadExists error:", err.message);
+  }
+}
+
 async function getHistory(phone) {
   const rows = await supabaseRequest(
     `wa_messages?phone=eq.${phone}&order=created_at.asc&limit=30`
@@ -450,6 +472,7 @@ export default async function handler(req, res) {
         prefer: "return=minimal",
       });
     }
+    await ensureLeadExists(phone, contactName);
     await saveMessage(phone, "user", incomingText);
     const history = await getHistory(phone);
     const reply = await askClaude(history);
