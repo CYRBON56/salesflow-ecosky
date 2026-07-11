@@ -19,13 +19,22 @@ const CATALOGUE_PDF_URL =
 const VIDEO_URL =
   "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/v24044gl0000d49h467og65puhaukhig.mp4";
 
-// Départements dans la zone d'intervention EcoSky (Bretagne entière)
-const ALLOWED_DEPARTMENTS = ["22", "29", "35", "56"];
+// Départements dans la zone d'intervention EcoSky
+const ALLOWED_DEPARTMENTS = ["56"];
+
+// Départements limitrophes : le devis peut être possible selon la distance exacte du projet
+const BORDER_DEPARTMENTS = ["44", "22", "35", "29"];
 
 function isDepartmentAllowed(codePostal) {
   if (!codePostal) return true; // pas encore de code postal connu → on laisse passer
   const prefix = String(codePostal).trim().slice(0, 2);
   return ALLOWED_DEPARTMENTS.includes(prefix);
+}
+
+function isBorderDepartment(codePostal) {
+  if (!codePostal) return false;
+  const prefix = String(codePostal).trim().slice(0, 2);
+  return BORDER_DEPARTMENTS.includes(prefix);
 }
 
 const SYSTEM_PROMPT = `Tu es l'assistant commercial WhatsApp de RMS ECOSKY (EcoSky by RMS), une entreprise
@@ -545,6 +554,18 @@ export default async function handler(req, res) {
       await saveMessage(phone, "assistant", politeMessage);
       await sendWhatsAppMessage(phone, politeMessage);
       return res.status(200).send("EVENT_RECEIVED");
+    }
+
+    if (isBorderDepartment(codePostal) && !conversation.border_notice_sent) {
+      const borderMessage =
+        "Merci pour votre message ! Sachez que nous sommes basés dans le Morbihan (56) : selon la distance exacte de votre projet, une intervention peut être possible, à évaluer au cas par cas. N'hésitez pas à nous en dire plus, nous reviendrons vers vous pour confirmer si c'est réalisable 😊";
+      await saveMessage(phone, "assistant", borderMessage);
+      await sendWhatsAppMessage(phone, borderMessage);
+      await supabaseRequest(`wa_conversations?phone=eq.${phone}`, {
+        method: "PATCH",
+        body: JSON.stringify({ border_notice_sent: true }),
+        prefer: "return=minimal",
+      });
     }
 
     const history = await getHistory(phone);
