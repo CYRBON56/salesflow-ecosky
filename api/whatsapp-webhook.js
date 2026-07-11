@@ -173,7 +173,15 @@ async function calendlyRequest(path, options = {}) {
       ...(options.headers || {}),
     },
   });
-  const data = await res.json();
+  const text = await res.text();
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error("Calendly: réponse non-JSON:", text);
+    }
+  }
   if (!res.ok) {
     console.error("Calendly error:", JSON.stringify(data));
     throw new Error(data.message || `Calendly error ${res.status}`);
