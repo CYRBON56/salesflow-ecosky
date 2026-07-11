@@ -449,3 +449,5 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("Webhook error:", err);
     return res.status(200).send("EVENT_RECEIVED"); // toujours 200 pour éviter que Meta ne réessaie en boucle
+  }
+}
