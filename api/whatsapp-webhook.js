@@ -151,9 +151,8 @@ async function ensureLeadExists(phone, contactName) {
       body: JSON.stringify({
         nom: contactName || phone,
         telephone: phone,
-        email: "",
         source: "WhatsApp",
-        stage: "nouveau",
+        statut: "nouveau",
         notes: "",
       }),
       prefer: "return=minimal",
