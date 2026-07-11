@@ -197,7 +197,9 @@ async function getAvailableSlots() {
   return slots;
 }
 
-async function bookAppointment(startTimeIso, name, email, address) {
+const CALENDLY_PHYSICAL_LOCATION_TEXT = "À définir avec le client – déplacement sur site";
+
+async function bookAppointment(startTimeIso, name, email) {
   const body = {
     event_type: CALENDLY_EVENT_TYPE_URI,
     start_time: startTimeIso,
@@ -208,10 +210,7 @@ async function bookAppointment(startTimeIso, name, email, address) {
     },
     location: {
       kind: "physical",
-      location:
-        address && address.trim()
-          ? address.trim()
-          : "Adresse du chantier à confirmer avec le client",
+      location: CALENDLY_PHYSICAL_LOCATION_TEXT,
     },
   };
   const data = await calendlyRequest("/invitees", {
@@ -347,8 +346,7 @@ async function executeTool(toolName, toolInput) {
       const result = await bookAppointment(
         toolInput.start_time_iso,
         toolInput.name,
-        toolInput.email,
-        toolInput.address
+        toolInput.email
       );
       return JSON.stringify({
         success: true,
@@ -451,5 +449,3 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("Webhook error:", err);
     return res.status(200).send("EVENT_RECEIVED"); // toujours 200 pour éviter que Meta ne réessaie en boucle
-  }
-}
