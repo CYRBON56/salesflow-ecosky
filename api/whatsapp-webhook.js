@@ -102,6 +102,11 @@ const TOOLS = [
           type: "string",
           description: "Adresse email du client, pour la confirmation du rendez-vous.",
         },
+        address: {
+          type: "string",
+          description:
+            "Adresse ou ville du chantier/projet, si le client l'a déjà communiquée dans la conversation. Sinon, laisser vide.",
+        },
       },
       required: ["start_time_iso", "name", "email"],
     },
@@ -192,7 +197,7 @@ async function getAvailableSlots() {
   return slots;
 }
 
-async function bookAppointment(startTimeIso, name, email) {
+async function bookAppointment(startTimeIso, name, email, address) {
   const body = {
     event_type: CALENDLY_EVENT_TYPE_URI,
     start_time: startTimeIso,
@@ -203,6 +208,10 @@ async function bookAppointment(startTimeIso, name, email) {
     },
     location: {
       kind: "physical",
+      location:
+        address && address.trim()
+          ? address.trim()
+          : "Adresse du chantier à confirmer avec le client",
     },
   };
   const data = await calendlyRequest("/invitees", {
@@ -338,7 +347,8 @@ async function executeTool(toolName, toolInput) {
       const result = await bookAppointment(
         toolInput.start_time_iso,
         toolInput.name,
-        toolInput.email
+        toolInput.email,
+        toolInput.address
       );
       return JSON.stringify({
         success: true,
