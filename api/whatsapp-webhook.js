@@ -20,7 +20,7 @@ const VIDEO_URL =
   "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/v24044gl0000d49h467og65puhaukhig.mp4";
 
 // Départements dans la zone d'intervention EcoSky (Bretagne entière)
-const ALLOWED_DEPARTMENTS = ["56"];
+const ALLOWED_DEPARTMENTS = ["22", "29", "35", "56"];
 
 function isDepartmentAllowed(codePostal) {
   if (!codePostal) return true; // pas encore de code postal connu → on laisse passer
@@ -497,7 +497,11 @@ export default async function handler(req, res) {
 
     const codePostal = await getLeadCodePostal(phone);
     if (!isDepartmentAllowed(codePostal)) {
-      console.log(`Lead hors zone (${codePostal}) — pas de réponse pour ${phone}`);
+      console.log(`Lead hors zone (${codePostal}) — message de courtoisie pour ${phone}`);
+      const politeMessage =
+        "Merci pour votre message ! Malheureusement, RMS ECOSKY n'intervient pas dans votre secteur pour le moment. Nous sommes situés en Bretagne (Morbihan) et intervenons dans ce département. Bonne continuation dans votre projet !";
+      await saveMessage(phone, "assistant", politeMessage);
+      await sendWhatsAppMessage(phone, politeMessage);
       return res.status(200).send("EVENT_RECEIVED");
     }
 
