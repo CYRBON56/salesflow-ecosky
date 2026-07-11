@@ -6,7 +6,6 @@ import {
   Users, Filter, Download, RefreshCw, AlertCircle
 } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
-
 const STAGES = [
   { id: "nouveau", label: "Nouveau", color: "#64748b" },
   { id: "contacte", label: "Contacté", color: "#2563eb" },
@@ -17,23 +16,19 @@ const STAGES = [
 ];
 const PERDU = { id: "perdu", label: "Perdu", color: "#94a3b8" };
 const ALL_STAGES = [...STAGES, PERDU];
-
 const TEAL = "#0f5c56";
 const TEAL_DARK = "#0a3f3c";
 const SAND = "#f6f4ef";
-
 const DEFAULT_TEMPLATES = {
   intro: "Bonjour {nom}, ici RMS ECOSKY. Merci pour votre demande, on revient vers vous rapidement pour votre projet. À très vite !",
   catalogue: "Bonjour {nom}, voici notre catalogue EcoSky by RMS : {catalogue_url}\nN'hésitez pas à me dire ce qui vous intéresse, je reste dispo.",
   devis: "Bonjour {nom}, pour vous préparer un chiffrage précis, pourriez-vous nous envoyer quelques photos (ou une courte vidéo) de la zone concernée via ce lien : {devis_url}\nMerci, on revient vers vous rapidement !",
 };
-
 const DEFAULT_SETTINGS = {
   catalogueUrl: "https://www.ecoskybyrms.fr/nos-services-et-prestations/catalogue",
   devisUrl: "https://www.ecoskybyrms.fr/devis",
   templates: DEFAULT_TEMPLATES,
 };
-
 function normalizeHeader(h) {
   return h
     .toString()
@@ -42,7 +37,6 @@ function normalizeHeader(h) {
     .toLowerCase()
     .trim();
 }
-
 function guessColumn(headers, candidates) {
   const norm = headers.map((h) => ({ raw: h, n: normalizeHeader(h) }));
   for (const c of candidates) {
@@ -55,7 +49,6 @@ function guessColumn(headers, candidates) {
   }
   return null;
 }
-
 function normalizePhone(raw) {
   if (!raw) return "";
   let p = raw.toString().replace(/[^\d+]/g, "");
@@ -64,18 +57,15 @@ function normalizePhone(raw) {
   if (p.startsWith("33")) return p;
   return p;
 }
-
 function fillTemplate(tpl, lead, settings) {
   return tpl
     .replaceAll("{nom}", lead.nom || "")
     .replaceAll("{catalogue_url}", settings.catalogueUrl || "[lien catalogue à renseigner]")
     .replaceAll("{devis_url}", settings.devisUrl || "[lien devis à renseigner]");
 }
-
 function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
-
 function settingsFromRow(row) {
   return {
     catalogueUrl: row.catalogue_url || "",
@@ -83,7 +73,6 @@ function settingsFromRow(row) {
     templates: row.templates || DEFAULT_TEMPLATES,
   };
 }
-
 function settingsToRow(s) {
   return {
     catalogue_url: s.catalogueUrl,
@@ -91,7 +80,6 @@ function settingsToRow(s) {
     templates: s.templates,
   };
 }
-
 export default function SalesFlowSystem() {
   const [leads, setLeads] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -104,8 +92,8 @@ export default function SalesFlowSystem() {
   const [csvPreview, setCsvPreview] = useState(null);
   const [mapping, setMapping] = useState({ nom: "", telephone: "", email: "", source: "" });
   const [expandedLead, setExpandedLead] = useState(null);
+  const [waData, setWaData] = useState({}); // { [telephone]: { loading, conversation, messages } }
   const fileInputRef = useRef(null);
-
   useEffect(() => {
     (async () => {
       try {
@@ -129,7 +117,6 @@ export default function SalesFlowSystem() {
       } catch (e) {}
       setLoading(false);
     })();
-
     // Temps réel : un nouveau lead ajouté par Make.com (ou un autre utilisateur) apparaît instantanément
     const channel = supabase
       .channel("leads-changes")
@@ -143,18 +130,15 @@ export default function SalesFlowSystem() {
         }
       })
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
   }, []);
-
   const persistSettings = useCallback(async (next) => {
     setSettings(next);
     const { error: err } = await supabase.from("settings").update(settingsToRow(next)).eq("id", 1);
     if (err) setError("Erreur de sauvegarde des réglages.");
   }, []);
-
   const handleFile = (file) => {
     Papa.parse(file, {
       header: true,
@@ -174,7 +158,6 @@ export default function SalesFlowSystem() {
       error: (err) => setError("Erreur de lecture du CSV : " + err.message),
     });
   };
-
   const confirmImport = async () => {
     if (!mapping.nom || !mapping.telephone) {
       setError("Merci d'indiquer au minimum les colonnes Nom et Téléphone.");
@@ -197,13 +180,11 @@ export default function SalesFlowSystem() {
       })
       .filter(Boolean)
       .filter((l) => !existingPhones.has(l.telephone));
-
     if (imported.length === 0) {
       setShowImport(false);
       setCsvPreview(null);
       return;
     }
-
     const { data, error: err } = await supabase.from("leads").insert(imported).select();
     if (err) {
       setError("Erreur lors de l'import dans Supabase : " + err.message);
@@ -214,19 +195,44 @@ export default function SalesFlowSystem() {
     setCsvPreview(null);
     setError("");
   };
-
   const updateLead = async (id, patch) => {
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
     const { error: err } = await supabase.from("leads").update(patch).eq("id", id);
     if (err) setError("Erreur de mise à jour du lead.");
   };
-
   const deleteLead = async (id) => {
     setLeads((prev) => prev.filter((l) => l.id !== id));
     const { error: err } = await supabase.from("leads").delete().eq("id", id);
     if (err) setError("Erreur de suppression du lead.");
   };
-
+  const loadWhatsApp = useCallback(async (telephone) => {
+    setWaData((prev) => ({ ...prev, [telephone]: { ...(prev[telephone] || {}), loading: true } }));
+    try {
+      const { data: conversation } = await supabase
+        .from("wa_conversations")
+        .select("*")
+        .eq("phone", telephone)
+        .maybeSingle();
+      const { data: messages } = await supabase
+        .from("wa_messages")
+        .select("*")
+        .eq("phone", telephone)
+        .order("created_at", { ascending: true });
+      setWaData((prev) => ({
+        ...prev,
+        [telephone]: { loading: false, conversation: conversation || null, messages: messages || [] },
+      }));
+    } catch (e) {
+      setWaData((prev) => ({ ...prev, [telephone]: { loading: false, conversation: null, messages: [], error: true } }));
+    }
+  }, []);
+  const toggleLead = (lead) => {
+    const next = expandedLead === lead.id ? null : lead.id;
+    setExpandedLead(next);
+    if (next && !waData[lead.telephone]) {
+      loadWhatsApp(lead.telephone);
+    }
+  };
   const openWhatsApp = (lead, templateKey) => {
     const tpl = settings.templates[templateKey] || "";
     const text = fillTemplate(tpl, lead, settings);
@@ -239,7 +245,6 @@ export default function SalesFlowSystem() {
       updateLead(lead.id, { stage: "devis_envoye" });
     }
   };
-
   const filtered = useMemo(() => {
     return leads.filter((l) => {
       const matchesSearch =
@@ -250,7 +255,6 @@ export default function SalesFlowSystem() {
       return matchesSearch && matchesStage;
     });
   }, [leads, search, stageFilter]);
-
   const counts = useMemo(() => {
     const c = {};
     ALL_STAGES.forEach((s) => (c[s.id] = 0));
@@ -259,7 +263,6 @@ export default function SalesFlowSystem() {
     });
     return c;
   }, [leads]);
-
   const exportCsv = () => {
     const csv = Papa.unparse(
       leads.map((l) => ({
@@ -277,7 +280,6 @@ export default function SalesFlowSystem() {
     link.download = `ecosky-leads-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
   };
-
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: SAND, fontFamily: "Inter, system-ui, sans-serif", color: TEAL_DARK }}>
@@ -287,7 +289,6 @@ export default function SalesFlowSystem() {
       </div>
     );
   }
-
   return (
     <div style={{ minHeight: "100vh", background: SAND, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", color: "#1e2a28" }}>
       {/* Header */}
@@ -315,7 +316,6 @@ export default function SalesFlowSystem() {
           />
         </div>
       </div>
-
       {error && (
         <div style={{ background: "#fef2f2", color: "#b91c1c", padding: "10px 28px", display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
           <AlertCircle size={16} /> {error}
@@ -324,7 +324,6 @@ export default function SalesFlowSystem() {
           </button>
         </div>
       )}
-
       {/* Stage summary bar */}
       <div style={{ display: "flex", gap: 8, padding: "16px 28px 0", flexWrap: "wrap" }}>
         <button
@@ -339,7 +338,6 @@ export default function SalesFlowSystem() {
           </button>
         ))}
       </div>
-
       {/* Search */}
       <div style={{ padding: "16px 28px 0" }}>
         <div style={{ position: "relative", maxWidth: 340 }}>
@@ -355,7 +353,6 @@ export default function SalesFlowSystem() {
           />
         </div>
       </div>
-
       {/* Leads list */}
       <div style={{ padding: 28 }}>
         {leads.length === 0 ? (
@@ -371,17 +368,17 @@ export default function SalesFlowSystem() {
                 key={lead.id}
                 lead={lead}
                 expanded={expandedLead === lead.id}
-                onToggle={() => setExpandedLead(expandedLead === lead.id ? null : lead.id)}
+                onToggle={() => toggleLead(lead)}
                 onStageChange={(stage) => updateLead(lead.id, { stage })}
                 onNotesChange={(notes) => updateLead(lead.id, { notes })}
                 onDelete={() => deleteLead(lead.id)}
                 onWhatsApp={(key) => openWhatsApp(lead, key)}
+                wa={waData[lead.telephone]}
               />
             ))}
           </div>
         )}
       </div>
-
       {showImport && csvPreview && (
         <ImportModal
           headers={csvPreview.headers}
@@ -395,7 +392,6 @@ export default function SalesFlowSystem() {
           onConfirm={confirmImport}
         />
       )}
-
       {showSettings && (
         <SettingsModal
           settings={settings}
@@ -409,7 +405,6 @@ export default function SalesFlowSystem() {
     </div>
   );
 }
-
 function EmptyState({ onImport }) {
   return (
     <div style={{ textAlign: "center", padding: "60px 20px", color: "#5b6b69" }}>
@@ -422,8 +417,7 @@ function EmptyState({ onImport }) {
     </div>
   );
 }
-
-function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onDelete, onWhatsApp }) {
+function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onDelete, onWhatsApp, wa }) {
   const stageInfo = ALL_STAGES.find((s) => s.id === lead.stage) || ALL_STAGES[0];
   return (
     <div style={{ background: "white", borderRadius: 10, border: "1px solid #e7e3d8", overflow: "hidden" }}>
@@ -448,7 +442,6 @@ function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onDel
         </select>
         <ChevronDown size={16} style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s", color: "#94a3b8" }} />
       </div>
-
       {expanded && (
         <div style={{ padding: "0 16px 16px", borderTop: "1px solid #f1efe8" }}>
           <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
@@ -462,6 +455,7 @@ function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onDel
               <Send size={14} /> Demander un devis (photos/vidéo)
             </button>
           </div>
+          <WhatsAppHistory wa={wa} />
           <textarea
             value={lead.notes}
             onChange={(e) => onNotesChange(e.target.value)}
@@ -478,7 +472,76 @@ function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onDel
     </div>
   );
 }
-
+function WhatsAppHistory({ wa }) {
+  const [openThread, setOpenThread] = useState(false);
+  if (!wa || wa.loading) {
+    return (
+      <div style={{ marginTop: 14, fontSize: 12.5, color: "#94a3b8", display: "flex", alignItems: "center", gap: 6 }}>
+        <RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} />
+        Chargement des échanges WhatsApp...
+      </div>
+    );
+  }
+  if (wa.error) {
+    return (
+      <div style={{ marginTop: 14, fontSize: 12.5, color: "#b91c1c" }}>
+        Impossible de charger l'historique WhatsApp pour ce numéro.
+      </div>
+    );
+  }
+  if (!wa.conversation || wa.messages.length === 0) {
+    return (
+      <div style={{ marginTop: 14, fontSize: 12.5, color: "#94a3b8" }}>
+        Aucun échange WhatsApp pour ce numéro pour l'instant.
+      </div>
+    );
+  }
+  const lastMessage = wa.messages[wa.messages.length - 1];
+  const preview = lastMessage.content.length > 90 ? lastMessage.content.slice(0, 90) + "…" : lastMessage.content;
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div
+        onClick={() => setOpenThread((v) => !v)}
+        style={{
+          display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+          padding: "8px 10px", borderRadius: 8, background: "#f6faf9", border: "1px solid #e2f0ec",
+        }}
+      >
+        <MessageCircle size={14} style={{ color: TEAL, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: TEAL_DARK }}>
+            Échanges WhatsApp ({wa.messages.length} message{wa.messages.length > 1 ? "s" : ""})
+          </div>
+          <div style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {lastMessage.role === "assistant" ? "Vous : " : ""}{preview}
+          </div>
+        </div>
+        <ChevronDown size={14} style={{ transform: openThread ? "rotate(180deg)" : "none", transition: "transform 0.15s", color: "#94a3b8", flexShrink: 0 }} />
+      </div>
+      {openThread && (
+        <div style={{ marginTop: 8, padding: 12, borderRadius: 8, background: "#fbfaf7", border: "1px solid #f1efe8", maxHeight: 280, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+          {wa.messages.map((m) => (
+            <div key={m.id} style={{ display: "flex", justifyContent: m.role === "assistant" ? "flex-end" : "flex-start" }}>
+              <div
+                style={{
+                  maxWidth: "78%", padding: "7px 11px", borderRadius: 10, fontSize: 12.5, lineHeight: 1.4,
+                  background: m.role === "assistant" ? TEAL : "white",
+                  color: m.role === "assistant" ? "white" : "#1e2a28",
+                  border: m.role === "assistant" ? "none" : "1px solid #e7e3d8",
+                }}
+              >
+                {m.content}
+                <div style={{ fontSize: 10, opacity: 0.7, marginTop: 3 }}>
+                  {new Date(m.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 function ImportModal({ headers, mapping, setMapping, rowCount, onCancel, onConfirm }) {
   return (
     <Modal onClose={onCancel} title="Associer les colonnes du CSV">
@@ -512,7 +575,6 @@ function ImportModal({ headers, mapping, setMapping, rowCount, onCancel, onConfi
     </Modal>
   );
 }
-
 function SettingsModal({ settings, onClose, onSave }) {
   const [local, setLocal] = useState(settings);
   return (
@@ -560,7 +622,6 @@ function SettingsModal({ settings, onClose, onSave }) {
     </Modal>
   );
 }
-
 function Modal({ title, children, onClose }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,25,24,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }} onClick={onClose}>
@@ -576,10 +637,8 @@ function Modal({ title, children, onClose }) {
     </div>
   );
 }
-
 const labelStyle = { fontSize: 13, fontWeight: 600, color: TEAL_DARK, display: "block", marginBottom: 4 };
 const inputStyle = { width: "100%", padding: 9, borderRadius: 8, border: "1px solid #d9d5c9", fontSize: 14, boxSizing: "border-box" };
-
 const btnPrimary = {
   display: "flex", alignItems: "center", gap: 6, background: "white", color: TEAL,
   border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
