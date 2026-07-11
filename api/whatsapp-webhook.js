@@ -342,7 +342,9 @@ async function sendWhatsAppDocument(to, link, filename, caption) {
   if (!res.ok) {
     const errText = await res.text();
     console.error("WhatsApp document send error:", errText);
+    return false;
   }
+  return true;
 }
 
 async function sendWhatsAppVideo(to, link, caption) {
@@ -365,21 +367,31 @@ async function sendWhatsAppVideo(to, link, caption) {
   if (!res.ok) {
     const errText = await res.text();
     console.error("WhatsApp video send error:", errText);
+    return false;
   }
+  return true;
 }
 
 async function sendCatalogueAndVideo(phone) {
-  await sendWhatsAppDocument(
+  const documentSent = await sendWhatsAppDocument(
     phone,
     CATALOGUE_PDF_URL,
     "Catalogue-EcoSky-Gum.pdf",
     "📘 Notre catalogue de réalisations EcoSky'Gum"
   );
-  await sendWhatsAppVideo(
+  const videoSent = await sendWhatsAppVideo(
     phone,
     VIDEO_URL,
     "🎥 Découvrez nos réalisations en vidéo !"
   );
+
+  // On ne marque "envoyé" que si au moins le PDF est bien parti (le principal des deux).
+  // Sinon on retentera automatiquement au prochain message du client.
+  if (!documentSent) {
+    console.error(`Catalogue non envoyé pour ${phone} — sera retenté au prochain message.`);
+    return;
+  }
+
   await supabaseRequest(`wa_conversations?phone=eq.${phone}`, {
     method: "PATCH",
     body: JSON.stringify({ media_sent: true }),
