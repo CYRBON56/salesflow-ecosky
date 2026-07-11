@@ -197,8 +197,6 @@ async function getAvailableSlots() {
   return slots;
 }
 
-const CALENDLY_PHYSICAL_LOCATION_TEXT = "À définir avec le client – déplacement sur site";
-
 async function bookAppointment(startTimeIso, name, email) {
   const body = {
     event_type: CALENDLY_EVENT_TYPE_URI,
@@ -209,8 +207,7 @@ async function bookAppointment(startTimeIso, name, email) {
       timezone: "Europe/Paris",
     },
     location: {
-      kind: "physical",
-      location: CALENDLY_PHYSICAL_LOCATION_TEXT,
+      kind: "google_conference",
     },
   };
   const data = await calendlyRequest("/invitees", {
@@ -458,5 +455,5 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("Webhook error:", err);
     return res.status(200).send("EVENT_RECEIVED"); // toujours 200 pour éviter que Meta ne réessaie en boucle
+  }
 }
-   }
