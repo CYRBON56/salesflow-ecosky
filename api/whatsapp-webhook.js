@@ -369,6 +369,15 @@ async function executeTool(toolName, toolInput) {
 async function askClaude(history) {
   let messages = history.map((m) => ({ role: m.role, content: m.content }));
 
+  // Sécurité : l'API Anthropic exige que la conversation se termine par un message "user".
+  // On retire tout message assistant résiduel en fin d'historique, au cas où.
+  while (messages.length > 0 && messages[messages.length - 1].role !== "user") {
+    messages.pop();
+  }
+  if (messages.length === 0) {
+    return "Merci pour votre message, on revient vers vous rapidement !";
+  }
+
   // Boucle d'utilisation d'outils : max 4 aller-retours pour éviter une boucle infinie
   for (let i = 0; i < 4; i++) {
     const data = await callAnthropic(messages);
@@ -449,5 +458,3 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("Webhook error:", err);
     return res.status(200).send("EVENT_RECEIVED"); // toujours 200 pour éviter que Meta ne réessaie en boucle
-  }
-}
