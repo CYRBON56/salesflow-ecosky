@@ -1,7 +1,8 @@
 // Webhook WhatsApp Business Cloud API — le "cerveau" du système.
 // Reçoit les messages entrants, fait répondre l'IA, envoie la réponse sur WhatsApp,
-// garde tout l'historique dans Supabase, et peut réserver un rendez-vous Calendly
-// directement dans la conversation (sans lien externe).
+// garde tout l'historique dans Supabase, peut réserver un rendez-vous Calendly
+// directement dans la conversation (sans lien externe), et envoie un SMS
+// à chaque nouveau prospect via Twilio.
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -11,6 +12,12 @@ const WHATSAPP_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const CALENDLY_TOKEN = process.env.CALENDLY_TOKEN;
 const CALENDLY_EVENT_TYPE_URI = process.env.CALENDLY_EVENT_TYPE_URI;
+
+// Twilio — notification SMS au propriétaire à chaque nouveau prospect
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
+const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER;
 
 const CATALOGUE_URL = "https://www.ecoskybyrms.fr/nos-services-et-prestations/catalogue";
 const DEVIS_URL = "https://www.ecoskybyrms.fr/devis";
@@ -162,6 +169,41 @@ async function getConversation(phone) {
   return created[0];
 }
 
+// ---- Twilio (notification SMS) ----
+
+async function sendSmsNotification(phone, contactName) {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !TWILIO_TO_NUMBER) {
+    console.error("Twilio: variables d'environnement manquantes, SMS non envoyé.");
+    return;
+  }
+  try {
+    const body = new URLSearchParams({
+      To: TWILIO_TO_NUMBER,
+      From: TWILIO_FROM_NUMBER,
+      Body: `🔔 Nouveau prospect WhatsApp !\n${contactName ? contactName + " — " : ""}${phone}`,
+    });
+    const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: body.toString(),
+      }
+    );
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Twilio SMS error:", errText);
+    }
+  } catch (err) {
+    // Ne bloque jamais la réponse au client si le SMS échoue
+    console.error("sendSmsNotification error:", err.message);
+  }
+}
+
 async function ensureLeadExists(phone, contactName) {
   try {
     const existing = await supabaseRequest(`leads?telephone=eq.${phone}`);
@@ -177,6 +219,8 @@ async function ensureLeadExists(phone, contactName) {
       }),
       prefer: "return=minimal",
     });
+    // Nouveau prospect détecté pour la première fois : on prévient par SMS
+    await sendSmsNotification(phone, contactName);
   } catch (err) {
     // Ne bloque jamais la réponse au client si la création du lead échoue
     console.error("ensureLeadExists error:", err.message);
