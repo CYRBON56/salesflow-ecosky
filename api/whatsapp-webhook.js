@@ -523,6 +523,7 @@ export default async function handler(req, res) {
   }
   try {
     const body = req.body;
+    console.log("DEBUG webhook body:", JSON.stringify(body));
     const entry = body.entry?.[0];
     const change = entry?.changes?.[0];
     const value = change?.value;
