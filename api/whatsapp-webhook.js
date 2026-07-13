@@ -44,6 +44,12 @@ function isBorderDepartment(codePostal) {
   return BORDER_DEPARTMENTS.includes(prefix);
 }
 
+// catalogueStatus possibles :
+//  - "just_sent"          : PDF + vidéo envoyés avec succès à l'instant
+//  - "just_sent_no_video"  : PDF envoyé avec succès, mais la vidéo a échoué
+//  - "already_sent"        : PDF envoyé lors d'un message précédent (peu importe la vidéo)
+//  - "already_sent_no_video": PDF envoyé précédemment, mais la vidéo n'était jamais passée
+//  - "failed"               : le PDF lui-même a échoué (rien n'est parti)
 function buildSystemPrompt(catalogueStatus) {
   let catalogueInstruction;
   if (catalogueStatus === "just_sent") {
@@ -52,16 +58,26 @@ function buildSystemPrompt(catalogueStatus) {
    catalogue en détail ni de coller de lien vers lui. Annonce simplement que tu les envoies/viens
    de les envoyer ("Je vous partage justement notre catalogue et une petite vidéo pour vous donner
    des idées !").`;
-  } else if (catalogueStatus === "failed") {
+  } else if (catalogueStatus === "just_sent_no_video") {
+    catalogueInstruction = `3. Le système vient d'envoyer automatiquement le catalogue PDF (photos et coloris) — mentionne
+   bien que tu viens de le partager. En revanche, l'envoi de la vidéo de présentation a échoué
+   techniquement : ne mentionne AUCUNE vidéo dans ta réponse, ni ne dis que tu l'as envoyée ou que
+   tu vas l'envoyer.`;
+  } else if (catalogueStatus === "already_sent") {
+    catalogueInstruction = `3. Le catalogue PDF et la vidéo de présentation ont déjà été envoyés au client plus tôt dans
+   cette conversation. Ne les renvoie pas et ne propose pas de les renvoyer, sauf si le client te le
+   demande explicitement.`;
+  } else if (catalogueStatus === "already_sent_no_video") {
+    catalogueInstruction = `3. Le catalogue PDF a déjà été envoyé au client plus tôt dans cette conversation — ne le renvoie
+   pas et n'en reparle pas, sauf si le client le redemande. La vidéo de présentation, en revanche,
+   n'a jamais pu être envoyée (échec technique) : ne dis jamais que tu l'as envoyée ou que tu vas
+   l'envoyer, et ne la mentionne pas.`;
+  } else {
+    // "failed" : rien n'est parti (ni PDF, ni vidéo)
     catalogueInstruction = `3. IMPORTANT — L'envoi automatique du catalogue PDF et de la vidéo a échoué techniquement.
    Ne dis JAMAIS que tu envoies ou viens d'envoyer un catalogue ou une vidéo. N'en fais pas mention
    du tout dans ta réponse. Concentre-toi uniquement sur la conversation avec le client ; l'envoi
    sera retenté automatiquement en arrière-plan.`;
-  } else {
-    // "already_sent" : le catalogue a déjà été envoyé lors d'un message précédent
-    catalogueInstruction = `3. Le catalogue PDF et la vidéo de présentation ont déjà été envoyés au client plus tôt dans
-   cette conversation. Ne les renvoie pas et ne propose pas de les renvoyer, sauf si le client te le
-   demande explicitement.`;
   }
 
   return `Tu es l'assistant commercial WhatsApp de RMS ECOSKY (EcoSky by RMS), une entreprise
@@ -497,12 +513,16 @@ async function sendWhatsAppVideo(to, link, caption) {
   );
   if (!res.ok) {
     const errText = await res.text();
-    console.error("WhatsApp video send error:", errText);
+    // Log détaillé pour diagnostiquer précisément pourquoi la vidéo échoue
+    // (taille trop grande, format non supporté, lien inaccessible, etc.)
+    console.error(`WhatsApp video send error pour ${to}:`, errText);
     return false;
   }
   return true;
 }
 
+// Retourne désormais un objet détaillant le succès de CHAQUE média séparément,
+// pour que l'appelant sache précisément si la vidéo a échoué même si le PDF est parti.
 async function sendCatalogueAndVideo(phone) {
   const documentSent = await sendWhatsAppDocument(
     phone,
@@ -516,19 +536,26 @@ async function sendCatalogueAndVideo(phone) {
     "🎥 Découvrez nos réalisations en vidéo !"
   );
 
-  // On ne marque "envoyé" que si au moins le PDF est bien parti (le principal des deux).
-  // Sinon on retentera automatiquement au prochain message du client.
   if (!documentSent) {
     console.error(`Catalogue non envoyé pour ${phone} — sera retenté au prochain message.`);
-    return false;
+    // Le PDF étant le média principal, on ne marque rien comme envoyé du tout :
+    // tout sera retenté (PDF + vidéo) au prochain message.
+    return { documentSent: false, videoSent: false };
   }
 
+  if (!videoSent) {
+    console.error(`Vidéo non envoyée pour ${phone} — le catalogue PDF, lui, est bien parti.`);
+  }
+
+  // On marque le PDF comme envoyé dès qu'il est parti (c'est le principal),
+  // et on trace séparément si la vidéo est passée ou non, pour ne plus jamais
+  // laisser l'IA prétendre l'avoir envoyée si ce n'est pas le cas.
   await supabaseRequest(`wa_conversations?phone=eq.${phone}`, {
     method: "PATCH",
-    body: JSON.stringify({ media_sent: true }),
+    body: JSON.stringify({ media_sent: true, video_sent: videoSent }),
     prefer: "return=minimal",
   });
-  return true;
+  return { documentSent: true, videoSent };
 }
 
 // ---- Claude avec function calling (outils) ----
@@ -719,11 +746,21 @@ export default async function handler(req, res) {
 
     // On envoie le catalogue AVANT de générer la réponse texte, pour que l'IA
     // sache avec certitude si l'envoi a réussi, échoué, ou avait déjà eu lieu —
-    // et n'annonce jamais un envoi qui n'a pas eu lieu.
-    let catalogueStatus = "already_sent";
+    // et n'annonce jamais un envoi (PDF ou vidéo) qui n'a pas eu lieu.
+    let catalogueStatus;
     if (!conversation.media_sent) {
-      const sent = await sendCatalogueAndVideo(phone);
-      catalogueStatus = sent ? "just_sent" : "failed";
+      const { documentSent, videoSent } = await sendCatalogueAndVideo(phone);
+      if (!documentSent) {
+        catalogueStatus = "failed";
+      } else if (videoSent) {
+        catalogueStatus = "just_sent";
+      } else {
+        catalogueStatus = "just_sent_no_video";
+      }
+    } else {
+      // Le catalogue avait déjà été envoyé avant : on regarde si la vidéo,
+      // elle, avait fini par passer ou non lors de cet envoi précédent.
+      catalogueStatus = conversation.video_sent ? "already_sent" : "already_sent_no_video";
     }
 
     const history = await getHistory(phone);
