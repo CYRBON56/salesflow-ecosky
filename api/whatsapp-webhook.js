@@ -189,7 +189,7 @@ async function getConversation(phone) {
 
 // ---- Twilio (notification SMS) ----
 
-async function sendSmsNotification(phone, contactName) {
+async function sendSms(messageBody) {
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !TWILIO_TO_NUMBER) {
     console.error("Twilio: variables d'environnement manquantes, SMS non envoyé.");
     return;
@@ -198,7 +198,7 @@ async function sendSmsNotification(phone, contactName) {
     const body = new URLSearchParams({
       To: TWILIO_TO_NUMBER,
       From: TWILIO_FROM_NUMBER,
-      Body: `🔔 Nouveau prospect WhatsApp !\n${contactName ? contactName + " — " : ""}${phone}`,
+      Body: messageBody,
     });
     const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
     const res = await fetch(
@@ -218,8 +218,33 @@ async function sendSmsNotification(phone, contactName) {
     }
   } catch (err) {
     // Ne bloque jamais la réponse au client si le SMS échoue
-    console.error("sendSmsNotification error:", err.message);
+    console.error("sendSms error:", err.message);
   }
+}
+
+async function sendSmsNotification(phone, contactName) {
+  await sendSms(
+    `🔔 Nouveau prospect WhatsApp !\n${contactName ? contactName + " — " : ""}${phone}`
+  );
+}
+
+async function sendAppointmentSms(name, phone, startTimeIso) {
+  let formattedDate = startTimeIso;
+  try {
+    formattedDate = new Intl.DateTimeFormat("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Paris",
+    }).format(new Date(startTimeIso));
+  } catch (err) {
+    console.error("sendAppointmentSms: erreur de formatage de date:", err.message);
+  }
+  await sendSms(
+    `📅 Nouveau RDV téléphonique confirmé !\n${name} — ${phone}\n${formattedDate}`
+  );
 }
 
 async function ensureLeadExists(phone, contactName) {
@@ -519,9 +544,12 @@ async function executeTool(toolName, toolInput, phone) {
         toolInput.email,
         phone
       );
+      const confirmedTime = result.resource?.event?.start_time;
+      // Nouveau RDV confirmé : on prévient par SMS
+      await sendAppointmentSms(toolInput.name, phone, confirmedTime);
       return JSON.stringify({
         success: true,
-        confirmed_time: result.resource?.event?.start_time,
+        confirmed_time: confirmedTime,
         cancel_url: result.resource?.cancel_url,
         reschedule_url: result.resource?.reschedule_url,
       });
