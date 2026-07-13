@@ -44,7 +44,27 @@ function isBorderDepartment(codePostal) {
   return BORDER_DEPARTMENTS.includes(prefix);
 }
 
-const SYSTEM_PROMPT = `Tu es l'assistant commercial WhatsApp de RMS ECOSKY (EcoSky by RMS), une entreprise
+function buildSystemPrompt(catalogueStatus) {
+  let catalogueInstruction;
+  if (catalogueStatus === "just_sent") {
+    catalogueInstruction = `3. Le système vient d'envoyer automatiquement le catalogue PDF (photos et coloris) et une
+   courte vidéo de présentation, juste avant ta réponse — tu n'as donc pas besoin de décrire le
+   catalogue en détail ni de coller de lien vers lui. Annonce simplement que tu les envoies/viens
+   de les envoyer ("Je vous partage justement notre catalogue et une petite vidéo pour vous donner
+   des idées !").`;
+  } else if (catalogueStatus === "failed") {
+    catalogueInstruction = `3. IMPORTANT — L'envoi automatique du catalogue PDF et de la vidéo a échoué techniquement.
+   Ne dis JAMAIS que tu envoies ou viens d'envoyer un catalogue ou une vidéo. N'en fais pas mention
+   du tout dans ta réponse. Concentre-toi uniquement sur la conversation avec le client ; l'envoi
+   sera retenté automatiquement en arrière-plan.`;
+  } else {
+    // "already_sent" : le catalogue a déjà été envoyé lors d'un message précédent
+    catalogueInstruction = `3. Le catalogue PDF et la vidéo de présentation ont déjà été envoyés au client plus tôt dans
+   cette conversation. Ne les renvoie pas et ne propose pas de les renvoyer, sauf si le client te le
+   demande explicitement.`;
+  }
+
+  return `Tu es l'assistant commercial WhatsApp de RMS ECOSKY (EcoSky by RMS), une entreprise
 basée à Brech (56400, Bretagne, France), spécialisée dans les sols résine EPDM drainants
 (gamme EcoSky'Gum) : terrasses, tours de piscine, allées, plages de piscine.
 
@@ -68,10 +88,7 @@ Ton rôle dans cette conversation WhatsApp :
    au lieu de l'affirmer ou de la deviner. Ne confonds jamais les informations sur l'entreprise
    (ex : sa localisation à Brech) avec des informations sur le projet du client.
 
-3. Juste après ta toute première réponse, le système envoie automatiquement le catalogue PDF
-   (photos et coloris) et une courte vidéo de présentation — tu n'as donc pas besoin de décrire
-   le catalogue en détail ni de coller de lien vers lui, contente-toi d'annoncer que tu les envoies
-   ("Je vous partage justement notre catalogue et une petite vidéo pour vous donner des idées !").
+${catalogueInstruction}
 
 4. Dès que tu as une idée claire du projet, encourage le client à envoyer des photos ou une courte
    vidéo de la zone concernée via ce lien pour un chiffrage précis : ${DEVIS_URL}
@@ -98,6 +115,7 @@ Ton rôle dans cette conversation WhatsApp :
    le rendez-vous avec la date/heure exacte une fois la réservation réussie.
 
 9. Ne mentionne jamais que tu es une IA. Tu es "l'équipe RMS ECOSKY".`;
+}
 
 const TOOLS = [
   {
@@ -451,7 +469,7 @@ async function sendCatalogueAndVideo(phone) {
   // Sinon on retentera automatiquement au prochain message du client.
   if (!documentSent) {
     console.error(`Catalogue non envoyé pour ${phone} — sera retenté au prochain message.`);
-    return;
+    return false;
   }
 
   await supabaseRequest(`wa_conversations?phone=eq.${phone}`, {
@@ -459,11 +477,12 @@ async function sendCatalogueAndVideo(phone) {
     body: JSON.stringify({ media_sent: true }),
     prefer: "return=minimal",
   });
+  return true;
 }
 
 // ---- Claude avec function calling (outils) ----
 
-async function callAnthropic(messages) {
+async function callAnthropic(messages, systemPrompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -474,7 +493,7 @@ async function callAnthropic(messages) {
     body: JSON.stringify({
       model: "claude-sonnet-5",
       max_tokens: 500,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       tools: TOOLS,
       messages,
     }),
@@ -518,7 +537,8 @@ async function executeTool(toolName, toolInput, phone) {
   }
 }
 
-async function askClaude(history, phone) {
+async function askClaude(history, phone, catalogueStatus) {
+  const systemPrompt = buildSystemPrompt(catalogueStatus);
   let messages = history.map((m) => ({ role: m.role, content: m.content }));
 
   // Sécurité : l'API Anthropic exige que la conversation se termine par un message "user".
@@ -532,7 +552,7 @@ async function askClaude(history, phone) {
 
   // Boucle d'utilisation d'outils : max 4 aller-retours pour éviter une boucle infinie
   for (let i = 0; i < 4; i++) {
-    const data = await callAnthropic(messages);
+    const data = await callAnthropic(messages, systemPrompt);
 
     if (data.stop_reason !== "tool_use") {
       const textBlock = data.content.find((b) => b.type === "text");
@@ -622,14 +642,19 @@ export default async function handler(req, res) {
       });
     }
 
+    // On envoie le catalogue AVANT de générer la réponse texte, pour que l'IA
+    // sache avec certitude si l'envoi a réussi, échoué, ou avait déjà eu lieu —
+    // et n'annonce jamais un envoi qui n'a pas eu lieu.
+    let catalogueStatus = "already_sent";
+    if (!conversation.media_sent) {
+      const sent = await sendCatalogueAndVideo(phone);
+      catalogueStatus = sent ? "just_sent" : "failed";
+    }
+
     const history = await getHistory(phone);
-    const reply = await askClaude(history, phone);
+    const reply = await askClaude(history, phone, catalogueStatus);
     await saveMessage(phone, "assistant", reply);
     await sendWhatsAppMessage(phone, reply);
-    // Envoie le catalogue PDF + la vidéo une seule fois, juste après le premier échange
-    if (!conversation.media_sent) {
-      await sendCatalogueAndVideo(phone);
-    }
     return res.status(200).send("EVENT_RECEIVED");
   } catch (err) {
     console.error("Webhook error:", err);
