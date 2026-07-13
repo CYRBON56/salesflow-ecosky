@@ -264,9 +264,10 @@ async function sendSms(messageBody) {
   }
 }
 
-async function sendSmsNotification(phone, contactName) {
+async function sendSmsNotification(phone, contactName, referral) {
+  const adInfo = referral?.source_id ? `\n📢 Pub : ${referral.source_id}` : "";
   await sendSms(
-    `🔔 Nouveau prospect WhatsApp !\n${contactName ? contactName + " — " : ""}${phone}`
+    `🔔 Nouveau prospect WhatsApp !\n${contactName ? contactName + " — " : ""}${phone}${adInfo}`
   );
 }
 
@@ -289,23 +290,33 @@ async function sendAppointmentSms(name, phone, startTimeIso) {
   );
 }
 
-async function ensureLeadExists(phone, contactName) {
+async function ensureLeadExists(phone, contactName, referral) {
   try {
     const existing = await supabaseRequest(`leads?telephone=eq.${phone}`);
     if (existing && existing.length > 0) return;
+
+    // Si le message vient d'un clic sur une pub Click-to-WhatsApp, Meta fournit
+    // un objet "referral" avec l'ID de l'annonce et son texte — on le garde
+    // pour savoir précisément quelle pub a généré ce lead.
+    const adId = referral?.source_id || null;
+    const adHeadline = referral?.headline || null;
+    const source = adId ? `Facebook Ads (annonce ${adId})` : "WhatsApp";
+
     await supabaseRequest("leads", {
       method: "POST",
       body: JSON.stringify({
         nom: contactName || phone,
         telephone: phone,
-        source: "WhatsApp",
+        source,
+        ad_id: adId,
+        ad_headline: adHeadline,
         statut: "nouveau",
         notes: "",
       }),
       prefer: "return=minimal",
     });
     // Nouveau prospect détecté pour la première fois : on prévient par SMS
-    await sendSmsNotification(phone, contactName);
+    await sendSmsNotification(phone, contactName, referral);
   } catch (err) {
     // Ne bloque jamais la réponse au client si la création du lead échoue
     console.error("ensureLeadExists error:", err.message);
@@ -711,6 +722,8 @@ export default async function handler(req, res) {
     const incomingText =
       message.text?.body || message.button?.text || "[message non textuel reçu]";
     const contactName = value?.contacts?.[0]?.profile?.name || "";
+    // Présent uniquement si le message provient d'un clic sur une pub Click-to-WhatsApp
+    const referral = message.referral || null;
     const conversation = await getConversation(phone);
     if (contactName) {
       await supabaseRequest(`wa_conversations?phone=eq.${phone}`, {
@@ -719,7 +732,7 @@ export default async function handler(req, res) {
         prefer: "return=minimal",
       });
     }
-    await ensureLeadExists(phone, contactName);
+    await ensureLeadExists(phone, contactName, referral);
     await saveMessage(phone, "user", incomingText);
 
     const codePostal = await getLeadCodePostal(phone);
