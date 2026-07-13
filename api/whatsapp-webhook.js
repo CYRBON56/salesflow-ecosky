@@ -24,7 +24,7 @@ const DEVIS_URL = "https://www.ecoskybyrms.fr/devis";
 const CATALOGUE_PDF_URL =
   "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-gum.pdf";
 const VIDEO_URL =
-  "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/v24044gl0000d49h467og65puhaukhig.mp4";
+  "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/VIDEO-2026-07-13-22-59-06.mp4";
 
 // Départements dans la zone d'intervention EcoSky
 const ALLOWED_DEPARTMENTS = ["56"];
