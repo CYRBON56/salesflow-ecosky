@@ -328,7 +328,13 @@ async function getAvailableSlots() {
   return slots;
 }
 
-async function bookAppointment(startTimeIso, name, email) {
+// Formate un numéro WhatsApp brut (ex: "33645688394") en E.164 (+33645688394)
+function toE164(phone) {
+  const digits = String(phone).replace(/\D/g, "");
+  return digits.startsWith("+") ? digits : `+${digits}`;
+}
+
+async function bookAppointment(startTimeIso, name, email, phone) {
   const eventTypeUri = await findEventTypeUri("téléphonique");
 
   const body = {
@@ -339,8 +345,11 @@ async function bookAppointment(startTimeIso, name, email) {
       email,
       timezone: "Europe/Paris",
     },
+    // Vrai rendez-vous téléphonique : c'est RMS ECOSKY qui rappelle le client
+    // sur le numéro utilisé pour la conversation WhatsApp.
     location: {
-      kind: "google_conference",
+      kind: "outbound_call",
+      location: toE164(phone),
     },
   };
   const data = await calendlyRequest("/invitees", {
@@ -475,7 +484,7 @@ async function callAnthropic(messages) {
   return data;
 }
 
-async function executeTool(toolName, toolInput) {
+async function executeTool(toolName, toolInput, phone) {
   try {
     if (toolName === "get_available_slots") {
       const slots = await getAvailableSlots();
@@ -488,7 +497,8 @@ async function executeTool(toolName, toolInput) {
       const result = await bookAppointment(
         toolInput.start_time_iso,
         toolInput.name,
-        toolInput.email
+        toolInput.email,
+        phone
       );
       return JSON.stringify({
         success: true,
@@ -508,7 +518,7 @@ async function executeTool(toolName, toolInput) {
   }
 }
 
-async function askClaude(history) {
+async function askClaude(history, phone) {
   let messages = history.map((m) => ({ role: m.role, content: m.content }));
 
   // Sécurité : l'API Anthropic exige que la conversation se termine par un message "user".
@@ -537,7 +547,7 @@ async function askClaude(history) {
     const toolResults = [];
     for (const block of data.content) {
       if (block.type === "tool_use") {
-        const result = await executeTool(block.name, block.input);
+        const result = await executeTool(block.name, block.input, phone);
         toolResults.push({
           type: "tool_result",
           tool_use_id: block.id,
@@ -613,7 +623,7 @@ export default async function handler(req, res) {
     }
 
     const history = await getHistory(phone);
-    const reply = await askClaude(history);
+    const reply = await askClaude(history, phone);
     await saveMessage(phone, "assistant", reply);
     await sendWhatsAppMessage(phone, reply);
     // Envoie le catalogue PDF + la vidéo une seule fois, juste après le premier échange
