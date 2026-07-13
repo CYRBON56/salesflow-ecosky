@@ -529,10 +529,17 @@ async function executeTool(toolName, toolInput, phone) {
     return JSON.stringify({ error: "Outil inconnu" });
   } catch (err) {
     console.error(`Tool error (${toolName}):`, err.message);
+    if (toolName === "book_appointment") {
+      return JSON.stringify({
+        error: true,
+        message:
+          "La réservation a échoué — ce créneau vient probablement d'être pris entre-temps, ou une erreur technique est survenue. N'invente SURTOUT PAS un nouveau créneau toi-même : appelle à nouveau l'outil get_available_slots pour récupérer les VRAIS créneaux encore disponibles, puis reproposes-en 2 ou 3 au client avant de retenter une réservation.",
+      });
+    }
     return JSON.stringify({
       error: true,
       message:
-        "La réservation ou la consultation des disponibilités a échoué. Propose au client de réessayer dans un instant, ou de préciser un autre horaire.",
+        "La consultation des disponibilités a échoué techniquement. Explique au client qu'il y a un petit souci technique et qu'un conseiller RMS ECOSKY le recontactera pour fixer un horaire, sans inventer ni confirmer aucun créneau.",
     });
   }
 }
@@ -551,7 +558,7 @@ async function askClaude(history, phone, catalogueStatus) {
   }
 
   // Boucle d'utilisation d'outils : max 4 aller-retours pour éviter une boucle infinie
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     const data = await callAnthropic(messages, systemPrompt);
 
     if (data.stop_reason !== "tool_use") {
