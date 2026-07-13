@@ -76,7 +76,8 @@ Ton rôle dans cette conversation WhatsApp :
 2. Pose des questions utiles et naturelles, une ou deux à la fois maximum, jamais un interrogatoire :
    - Quel type de surface exactement (terrasse, tour de piscine, allée...)
    - Surface approximative (m²)
-   - Localisation du projet (ville)
+   - Localisation du projet : demande la VILLE et le CODE POSTAL à 5 chiffres (nécessaire pour
+     vérifier que le projet est bien dans notre zone d'intervention)
    - Support actuel (béton existant, terre, dallage...)
    - Délai souhaité
    - Coloris envisagé si pertinent (la gamme EcoSky'Gum propose plusieurs teintes)
@@ -87,6 +88,12 @@ Ton rôle dans cette conversation WhatsApp :
    est ambiguë, ou si tu as un doute sur ce que le client a dit précédemment, pose la question
    au lieu de l'affirmer ou de la deviner. Ne confonds jamais les informations sur l'entreprise
    (ex : sa localisation à Brech) avec des informations sur le projet du client.
+
+2ter. LOCALISATION DU PROJET — Dès que le client te communique le code postal (5 chiffres) du
+   lieu du projet, utilise IMMÉDIATEMENT l'outil "save_project_location" pour l'enregistrer, même
+   si tu n'as pas encore toutes les autres informations. Si le client donne seulement une ville
+   sans code postal, demande-lui le code postal pour confirmer (plusieurs villes peuvent avoir un
+   nom proche dans des régions différentes).
 
 ${catalogueInstruction}
 
@@ -118,6 +125,25 @@ ${catalogueInstruction}
 }
 
 const TOOLS = [
+  {
+    name: "save_project_location",
+    description:
+      "Enregistre le code postal (et optionnellement la ville) du lieu du projet dès que le client les communique, pour vérifier que le projet est dans la zone d'intervention de RMS ECOSKY.",
+    input_schema: {
+      type: "object",
+      properties: {
+        postal_code: {
+          type: "string",
+          description: "Code postal à 5 chiffres du lieu du projet, ex: 56400.",
+        },
+        city: {
+          type: "string",
+          description: "Ville du projet, si communiquée par le client.",
+        },
+      },
+      required: ["postal_code"],
+    },
+  },
   {
     name: "get_available_slots",
     description:
@@ -530,6 +556,20 @@ async function callAnthropic(messages, systemPrompt) {
 
 async function executeTool(toolName, toolInput, phone) {
   try {
+    if (toolName === "save_project_location") {
+      await supabaseRequest(`leads?telephone=eq.${phone}`, {
+        method: "PATCH",
+        body: JSON.stringify({ code_postal: toolInput.postal_code }),
+        prefer: "return=minimal",
+      });
+      const allowed = isDepartmentAllowed(toolInput.postal_code);
+      const border = isBorderDepartment(toolInput.postal_code);
+      return JSON.stringify({
+        success: true,
+        in_zone: allowed,
+        border_zone: border && !allowed,
+      });
+    }
     if (toolName === "get_available_slots") {
       const slots = await getAvailableSlots();
       if (slots.length === 0) {
