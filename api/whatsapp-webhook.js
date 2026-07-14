@@ -27,10 +27,10 @@ const VIDEO_URL =
   "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/VIDEO-2026-07-13-22-59-06.mp4";
 
 // Départements dans la zone d'intervention EcoSky
-const ALLOWED_DEPARTMENTS = ["56"];
+const ALLOWED_DEPARTMENTS = ["56", "29", "22", "35"];
 
 // Départements limitrophes : le devis peut être possible selon la distance exacte du projet
-const BORDER_DEPARTMENTS = ["44", "22", "35", "29"];
+const BORDER_DEPARTMENTS = ["44"];
 
 function isDepartmentAllowed(codePostal) {
   if (!codePostal) return true; // pas encore de code postal connu → on laisse passer
@@ -119,8 +119,22 @@ ${catalogueInstruction}
 5. Reste bref, chaleureux, professionnel, en français. Pas de longs pavés — c'est une conversation
    WhatsApp, pas un email. 2-4 phrases maximum par message.
 
-6. Tu ne donnes JAMAIS de prix précis toi-même — le chiffrage se fait après réception des photos.
-   Si on te demande un prix, explique que ça dépend du terrain et invite à envoyer des photos via le lien devis.
+6. ESTIMATION DE PRIX — En général, tu ne donnes PAS de prix précis toi-même : le chiffrage
+   définitif se fait après réception de photos. Il existe cependant deux exceptions précises où tu
+   peux donner une estimation indicative :
+   - Application sur une DALLE EXISTANTE, PROPRE, EN BON ÉTAT, SANS REPRISE NI RÉPARATION
+     nécessaire (hors baguette de contour, hors éventuels travaux préparatoires qui ne peuvent être
+     évalués qu'après photos) : estimation à 100€ HT/m².
+   - Application sur un PARKING CARROSSABLE : estimation à partir de 150€ HT/m².
+   Dans les deux cas, demande TOUJOURS l'âge du bâtiment avant de donner le prix TTC, car la TVA
+   applicable en dépend : 10% si le bâtiment a plus de 2 ans, 20% s'il a moins de 2 ans.
+   Ne donne cette estimation QUE si le client a confirmé explicitement que le support existant est
+   propre et ne nécessite ni reprise ni réparation — en cas de doute sur l'état du support (fissures,
+   désolidarisation, humidité...), NE donne PAS d'estimation et renvoie vers l'envoi de photos comme
+   d'habitude. Précise toujours que cette estimation reste indicative et sera confirmée par le devis
+   définitif après réception de photos. Pour tout autre cas de figure (dalle à réparer, terre, autre
+   support), n'invente aucun prix : explique que ça dépend du terrain et invite à envoyer des photos
+   via le lien devis.
 
 7. Si le client demande autre chose que de la résine EPDM (assainissement, portail, clôture...),
    indique poliment que tu es dédié aux projets de sol résine EPDM et qu'un conseiller RMS ECOSKY
@@ -739,7 +753,7 @@ export default async function handler(req, res) {
     if (!isDepartmentAllowed(codePostal)) {
       console.log(`Lead hors zone (${codePostal}) — message de courtoisie pour ${phone}`);
       const politeMessage =
-        "Merci pour votre message ! Malheureusement, RMS ECOSKY n'intervient pas dans votre secteur pour le moment. Nous sommes situés en Bretagne (Morbihan) et intervenons dans ce département. Bonne continuation dans votre projet !";
+        "Merci pour votre message ! Malheureusement, RMS ECOSKY n'intervient pas dans votre secteur pour le moment. Nous intervenons en Bretagne, dans le Morbihan (56), le Finistère (29), les Côtes-d'Armor (22) et l'Ille-et-Vilaine (35). Bonne continuation dans votre projet !";
       await saveMessage(phone, "assistant", politeMessage);
       await sendWhatsAppMessage(phone, politeMessage);
       return res.status(200).send("EVENT_RECEIVED");
