@@ -1,0 +1,243 @@
+<!--
+  WIDGET DE CHAT RMS ECOSKY
+  =========================
+  Comment l'installer sur ecoskybyrms.fr :
+  1. Copie tout ce bloc de code.
+  2. Colle-le juste avant la balise </body> de ton site (dans l'éditeur HTML de ton
+     hébergeur / CMS — WordPress : widget "HTML personnalisé" en pied de page ; Wix :
+     "Intégrer du code" ; site fait main : directement dans le fichier HTML).
+  3. Change la ligne "const API_URL" ci-dessous par l'URL réelle de ton endpoint,
+     ex : https://salesflow-ecosky.vercel.app/api/web-chat
+  4. C'est tout — une bulle de chat apparaît en bas à droite de chaque page.
+-->
+<style>
+  #ecosky-chat-bubble {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #1e6f4c;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    z-index: 9999;
+    font-size: 28px;
+    transition: transform 0.2s;
+  }
+  #ecosky-chat-bubble:hover { transform: scale(1.08); }
+
+  #ecosky-chat-window {
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    width: 340px;
+    max-width: 92vw;
+    height: 480px;
+    max-height: 75vh;
+    background: white;
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 9999;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  #ecosky-chat-window.open { display: flex; }
+
+  #ecosky-chat-header {
+    background: #1e6f4c;
+    color: white;
+    padding: 14px 16px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  #ecosky-chat-header span.subtitle {
+    display: block;
+    font-weight: 400;
+    font-size: 12px;
+    opacity: 0.85;
+    margin-top: 2px;
+  }
+  #ecosky-chat-close { cursor: pointer; font-size: 20px; line-height: 1; }
+
+  #ecosky-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    background: #f5f7f6;
+  }
+  .ecosky-msg {
+    max-width: 80%;
+    margin-bottom: 10px;
+    padding: 9px 12px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .ecosky-msg.assistant {
+    background: white;
+    border: 1px solid #e0e0e0;
+    align-self: flex-start;
+    margin-right: auto;
+  }
+  .ecosky-msg.user {
+    background: #1e6f4c;
+    color: white;
+    margin-left: auto;
+  }
+  #ecosky-chat-messages { display: flex; flex-direction: column; }
+
+  #ecosky-chat-input-row {
+    display: flex;
+    border-top: 1px solid #e0e0e0;
+    padding: 8px;
+    gap: 8px;
+  }
+  #ecosky-chat-input {
+    flex: 1;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    padding: 9px 14px;
+    font-size: 14px;
+    outline: none;
+  }
+  #ecosky-chat-send {
+    background: #1e6f4c;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 38px;
+    height: 38px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  #ecosky-chat-send:disabled { opacity: 0.5; cursor: default; }
+
+  .ecosky-typing {
+    font-size: 13px;
+    color: #888;
+    font-style: italic;
+    margin-bottom: 10px;
+  }
+</style>
+
+<div id="ecosky-chat-bubble" title="Discuter avec RMS EcoSky">💬</div>
+
+<div id="ecosky-chat-window">
+  <div id="ecosky-chat-header">
+    <div>
+      RMS EcoSky
+      <span class="subtitle">Réponse rapide, devis gratuit</span>
+    </div>
+    <div id="ecosky-chat-close">✕</div>
+  </div>
+  <div id="ecosky-chat-messages"></div>
+  <div id="ecosky-chat-input-row">
+    <input id="ecosky-chat-input" type="text" placeholder="Écrivez votre message..." />
+    <button id="ecosky-chat-send">➤</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ⚠️ À ADAPTER : remplace par l'URL réelle de ton endpoint Vercel une fois déployé
+  const API_URL = "https://salesflow-ecosky.vercel.app/api/web-chat";
+
+  const bubble = document.getElementById("ecosky-chat-bubble");
+  const win = document.getElementById("ecosky-chat-window");
+  const closeBtn = document.getElementById("ecosky-chat-close");
+  const messagesEl = document.getElementById("ecosky-chat-messages");
+  const input = document.getElementById("ecosky-chat-input");
+  const sendBtn = document.getElementById("ecosky-chat-send");
+
+  // Session persistante : le visiteur garde le fil de la conversation même s'il
+  // recharge la page ou revient plus tard (tant que c'est le même navigateur).
+  let sessionId = localStorage.getItem("ecosky_chat_session");
+  if (!sessionId) {
+    sessionId = "web_" + crypto.randomUUID();
+    localStorage.setItem("ecosky_chat_session", sessionId);
+  }
+
+  let hasGreeted = localStorage.getItem("ecosky_chat_greeted") === "1";
+
+  function addMessage(role, text) {
+    const div = document.createElement("div");
+    div.className = "ecosky-msg " + role;
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function showTyping() {
+    const div = document.createElement("div");
+    div.className = "ecosky-typing";
+    div.id = "ecosky-typing-indicator";
+    div.textContent = "RMS EcoSky écrit...";
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function hideTyping() {
+    const el = document.getElementById("ecosky-typing-indicator");
+    if (el) el.remove();
+  }
+
+  async function sendMessage(text) {
+    addMessage("user", text);
+    input.value = "";
+    sendBtn.disabled = true;
+    showTyping();
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, message: text }),
+      });
+      const data = await res.json();
+      hideTyping();
+      addMessage("assistant", data.reply || "Désolé, une erreur est survenue.");
+    } catch (err) {
+      hideTyping();
+      addMessage("assistant", "Désolé, une erreur de connexion est survenue. Réessayez dans un instant.");
+    } finally {
+      sendBtn.disabled = false;
+    }
+  }
+
+  bubble.addEventListener("click", () => {
+    win.classList.toggle("open");
+    if (win.classList.contains("open") && !hasGreeted) {
+      hasGreeted = true;
+      localStorage.setItem("ecosky_chat_greeted", "1");
+      addMessage(
+        "assistant",
+        "Bonjour ! 👋 Je suis l'équipe RMS EcoSky. Vous avez un projet de terrasse, tour de piscine ou allée en résine EPDM ? Dites-m'en un peu plus, je vous aide à avancer !"
+      );
+    }
+  });
+
+  closeBtn.addEventListener("click", () => win.classList.remove("open"));
+
+  sendBtn.addEventListener("click", () => {
+    const text = input.value.trim();
+    if (text) sendMessage(text);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      const text = input.value.trim();
+      if (text) sendMessage(text);
+    }
+  });
+})();
+</script>
