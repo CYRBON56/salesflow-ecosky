@@ -1,0 +1,541 @@
+// API du chat IA intégré sur ecoskybyrms.fr — même "cerveau" que le bot WhatsApp
+// (mêmes questions, même prise de rendez-vous Calendly), mais sans passer par WhatsApp.
+// Le visiteur discute directement sur le site ; chaque conversation est identifiée
+// par un "session_id" généré côté navigateur (au lieu d'un numéro de téléphone).
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const CALENDLY_TOKEN = process.env.CALENDLY_TOKEN;
+const CALENDLY_EVENT_TYPE_URI = process.env.CALENDLY_EVENT_TYPE_URI;
+
+// Twilio — notification SMS au propriétaire à chaque nouveau prospect
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
+const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER;
+
+const DEVIS_URL = "https://www.ecoskybyrms.fr/devis";
+const CATALOGUE_PDF_URL =
+  "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-gum.pdf";
+const VIDEO_URL =
+  "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/VIDEO-2026-07-13-22-59-06.mp4";
+
+// Mêmes départements que le bot WhatsApp
+const ALLOWED_DEPARTMENTS = ["56", "29", "22", "35"];
+const BORDER_DEPARTMENTS = ["44"];
+
+function isDepartmentAllowed(codePostal) {
+  if (!codePostal) return true;
+  const prefix = String(codePostal).trim().slice(0, 2);
+  return ALLOWED_DEPARTMENTS.includes(prefix);
+}
+
+function isBorderDepartment(codePostal) {
+  if (!codePostal) return false;
+  const prefix = String(codePostal).trim().slice(0, 2);
+  return BORDER_DEPARTMENTS.includes(prefix);
+}
+
+// Contrairement au bot WhatsApp, ici pas besoin de "sendCatalogueAndVideo" avec
+// suivi de succès/échec : sur un chat web, on donne simplement les liens directs
+// (catalogue PDF + vidéo), le navigateur les ouvre nativement en un clic.
+function buildSystemPrompt() {
+  return `Tu es l'assistant commercial du chat en ligne de RMS ECOSKY (EcoSky by RMS), une
+entreprise basée à Brech (56400, Bretagne, France), spécialisée dans les sols résine EPDM
+drainants (gamme EcoSky'Gum) : terrasses, tours de piscine, allées, plages de piscine.
+
+Ton rôle dans cette conversation sur le chat du site :
+
+1. Accueille chaleureusement le visiteur et comprends son projet de sol en résine EPDM
+   (terrasse, tour de piscine, allée, autre extérieur)
+
+2. Pose des questions utiles et naturelles, une ou deux à la fois maximum, jamais un interrogatoire :
+   - Quel type de surface exactement (terrasse, tour de piscine, allée...)
+   - Surface approximative (m²)
+   - Localisation du projet : demande la VILLE et le CODE POSTAL à 5 chiffres (nécessaire pour
+     vérifier que le projet est bien dans notre zone d'intervention)
+   - Support actuel (béton existant, terre, dallage...)
+   - Délai souhaité
+   - Coloris envisagé si pertinent (la gamme EcoSky'Gum propose plusieurs teintes)
+
+2bis. IMPORTANT — Ne suppose et n'invente JAMAIS un détail du projet du visiteur (surface, ville,
+   support, délai...) qu'il n'a pas explicitement mentionné dans la conversation. Base-toi
+   uniquement sur ce qu'il a réellement écrit, mot pour mot. Si une information manque, est
+   ambiguë, ou si tu as un doute, pose la question au lieu de l'affirmer ou de la deviner.
+
+2ter. LOCALISATION DU PROJET — Dès que le visiteur te communique le code postal (5 chiffres) du
+   lieu du projet, utilise IMMÉDIATEMENT l'outil "save_project_location" pour l'enregistrer.
+
+2quater. COORDONNÉES DE CONTACT — Assez tôt dans la conversation (une fois le projet évoqué),
+   demande le prénom et un numéro de téléphone pour pouvoir le recontacter même s'il quitte le
+   site. Utilise l'outil "save_contact_info" dès que tu as au moins un prénom ou un numéro.
+
+3. Le catalogue de réalisations (photos et coloris) est disponible ici : ${CATALOGUE_PDF_URL}
+   Une courte vidéo de présentation est disponible ici : ${VIDEO_URL}
+   Partage ces deux liens naturellement dans ta réponse dès que le sujet du style/coloris est
+   abordé, ou si le visiteur le demande. Ne les répète pas à chaque message si tu les as déjà
+   donnés plus tôt dans la conversation.
+
+4. Dès que tu as une idée claire du projet, encourage le visiteur à envoyer des photos ou une
+   courte vidéo de la zone concernée via ce lien pour un chiffrage précis : ${DEVIS_URL}
+
+5. Reste bref, chaleureux, professionnel, en français. Pas de longs pavés — c'est un chat en
+   direct, pas un email. 2-4 phrases maximum par message.
+
+6. Tu ne donnes JAMAIS de prix précis toi-même — le chiffrage se fait après réception des photos.
+   Si on te demande un prix, explique que ça dépend du terrain et invite à envoyer des photos via
+   le lien devis.
+
+7. Si le visiteur demande autre chose que de la résine EPDM (assainissement, portail, clôture...),
+   indique poliment que tu es dédié aux projets de sol résine EPDM et qu'un conseiller RMS ECOSKY
+   le recontactera pour ses autres besoins.
+
+8. PRISE DE RENDEZ-VOUS — Si le visiteur demande explicitement un rendez-vous, ou si le projet est
+   suffisamment qualifié et qu'il semble prêt, propose-lui un court appel téléphonique de 15
+   minutes avec l'équipe RMS ECOSKY. Utilise l'outil "get_available_slots" pour consulter les
+   VRAIS créneaux disponibles. Propose 2 ou 3 créneaux max, dans un langage naturel. Une fois que
+   le visiteur choisit un créneau, assure-toi d'avoir son prénom, nom, email ET numéro de
+   téléphone (pour que l'équipe puisse le rappeler), puis utilise l'outil "book_appointment". Ne
+   propose ou n'invente JAMAIS un créneau qui ne vient pas de get_available_slots.
+
+9. Ne mentionne jamais que tu es une IA. Tu es "l'équipe RMS ECOSKY".`;
+}
+
+const TOOLS = [
+  {
+    name: "save_project_location",
+    description:
+      "Enregistre le code postal (et optionnellement la ville) du lieu du projet dès que le visiteur les communique, pour vérifier que le projet est dans la zone d'intervention de RMS ECOSKY.",
+    input_schema: {
+      type: "object",
+      properties: {
+        postal_code: { type: "string", description: "Code postal à 5 chiffres, ex: 56400." },
+        city: { type: "string", description: "Ville du projet, si communiquée." },
+      },
+      required: ["postal_code"],
+    },
+  },
+  {
+    name: "save_contact_info",
+    description:
+      "Enregistre le prénom et/ou le numéro de téléphone du visiteur dès qu'il les communique, pour pouvoir le recontacter même s'il quitte le site avant la fin de la conversation.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Prénom (et nom si donné) du visiteur." },
+        phone: { type: "string", description: "Numéro de téléphone du visiteur." },
+      },
+    },
+  },
+  {
+    name: "get_available_slots",
+    description:
+      "Récupère les vrais créneaux disponibles dans l'agenda pour un appel téléphonique (15 minutes), sur les 7 prochains jours.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "book_appointment",
+    description:
+      "Réserve définitivement un appel téléphonique à un créneau précis, une fois que le visiteur a choisi son horaire et donné son nom, son email et son numéro de téléphone.",
+    input_schema: {
+      type: "object",
+      properties: {
+        start_time_iso: {
+          type: "string",
+          description:
+            "Date et heure de début au format ISO 8601 UTC, ex: 2026-07-17T12:00:00Z. Doit correspondre exactement à un créneau retourné par get_available_slots.",
+        },
+        name: { type: "string", description: "Prénom et nom du visiteur." },
+        email: { type: "string", description: "Adresse email du visiteur." },
+        phone: {
+          type: "string",
+          description: "Numéro de téléphone du visiteur, pour que l'équipe le rappelle.",
+        },
+      },
+      required: ["start_time_iso", "name", "email", "phone"],
+    },
+  },
+];
+
+async function supabaseRequest(path, options = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: options.prefer || "return=representation",
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase error ${res.status}: ${text}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function getConversation(sessionId) {
+  const rows = await supabaseRequest(`web_conversations?session_id=eq.${sessionId}`);
+  if (rows && rows.length > 0) return rows[0];
+  const created = await supabaseRequest("web_conversations", {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  return created[0];
+}
+
+async function getHistory(sessionId) {
+  const rows = await supabaseRequest(
+    `web_messages?session_id=eq.${sessionId}&order=created_at.asc&limit=30`
+  );
+  return rows || [];
+}
+
+async function saveMessage(sessionId, role, content) {
+  await supabaseRequest("web_messages", {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId, role, content }),
+    prefer: "return=minimal",
+  });
+  await supabaseRequest(`web_conversations?session_id=eq.${sessionId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ last_message_at: new Date().toISOString() }),
+    prefer: "return=minimal",
+  });
+}
+
+// ---- Twilio (notification SMS) ----
+
+async function sendSms(messageBody) {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !TWILIO_TO_NUMBER) {
+    console.error("Twilio: variables d'environnement manquantes, SMS non envoyé.");
+    return;
+  }
+  try {
+    const body = new URLSearchParams({
+      To: TWILIO_TO_NUMBER,
+      From: TWILIO_FROM_NUMBER,
+      Body: messageBody,
+    });
+    const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: body.toString(),
+      }
+    );
+    if (!res.ok) console.error("Twilio SMS error:", await res.text());
+  } catch (err) {
+    console.error("sendSms error:", err.message);
+  }
+}
+
+async function sendAppointmentSms(name, phone, startTimeIso) {
+  let formattedDate = startTimeIso;
+  try {
+    formattedDate = new Intl.DateTimeFormat("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Paris",
+    }).format(new Date(startTimeIso));
+  } catch (err) {
+    console.error("sendAppointmentSms: erreur de formatage de date:", err.message);
+  }
+  await sendSms(`📅 Nouveau RDV téléphonique confirmé (chat site) !\n${name} — ${phone}\n${formattedDate}`);
+}
+
+async function ensureLeadExists(sessionId) {
+  try {
+    const existing = await supabaseRequest(`leads?session_id=eq.${sessionId}`);
+    if (existing && existing.length > 0) return;
+    await supabaseRequest("leads", {
+      method: "POST",
+      body: JSON.stringify({
+        nom: "Visiteur site web",
+        telephone: null,
+        session_id: sessionId,
+        source: "Site web (Chat IA)",
+        statut: "nouveau",
+        notes: "",
+      }),
+      prefer: "return=minimal",
+    });
+    await sendSms(`🔔 Nouveau prospect via le chat du site !\nSession : ${sessionId}`);
+  } catch (err) {
+    console.error("ensureLeadExists error:", err.message);
+  }
+}
+
+async function updateLeadContactInfo(sessionId, name, phone) {
+  try {
+    const patch = {};
+    if (name) patch.nom = name;
+    if (phone) patch.telephone = phone;
+    if (Object.keys(patch).length === 0) return;
+    await supabaseRequest(`leads?session_id=eq.${sessionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+      prefer: "return=minimal",
+    });
+    if (phone) {
+      await sendSms(`📞 Coordonnées reçues via le chat du site !\n${name || ""} — ${phone}`);
+    }
+  } catch (err) {
+    console.error("updateLeadContactInfo error:", err.message);
+  }
+}
+
+async function getLeadCodePostal(sessionId) {
+  try {
+    const rows = await supabaseRequest(`leads?session_id=eq.${sessionId}&select=code_postal`);
+    return rows && rows.length > 0 ? rows[0].code_postal : null;
+  } catch (err) {
+    console.error("getLeadCodePostal error:", err.message);
+    return null;
+  }
+}
+
+// ---- Calendly (identique au bot WhatsApp) ----
+
+async function calendlyRequest(path, options = {}) {
+  const res = await fetch(`https://api.calendly.com${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${CALENDLY_TOKEN}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+  const text = await res.text();
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error("Calendly: réponse non-JSON:", text);
+    }
+  }
+  if (!res.ok) {
+    console.error("Calendly error:", JSON.stringify(data));
+    throw new Error(data.message || `Calendly error ${res.status}`);
+  }
+  return data;
+}
+
+const CALENDLY_USER_URI = "https://api.calendly.com/users/4945a47a-343c-41a1-92e1-0d08e6b5ed01";
+let eventTypesCache = null;
+
+async function getEventTypes() {
+  if (eventTypesCache) return eventTypesCache;
+  const data = await calendlyRequest(
+    `/event_types?user=${encodeURIComponent(CALENDLY_USER_URI)}&active=true`
+  );
+  eventTypesCache = data.collection || [];
+  return eventTypesCache;
+}
+
+async function findEventTypeUri(keyword) {
+  const types = await getEventTypes();
+  const found = types.find((t) => t.name.toLowerCase().includes(keyword.toLowerCase()));
+  return found ? found.uri : CALENDLY_EVENT_TYPE_URI;
+}
+
+async function getAvailableSlots() {
+  const eventTypeUri = await findEventTypeUri("téléphonique");
+  const now = new Date();
+  const start = new Date(now.getTime() + 60 * 60 * 1000);
+  const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const params = new URLSearchParams({
+    event_type: eventTypeUri,
+    start_time: start.toISOString(),
+    end_time: end.toISOString(),
+  });
+  const data = await calendlyRequest(`/event_type_available_times?${params}`);
+  return (data.collection || []).slice(0, 8).map((s) => s.start_time);
+}
+
+function toE164(phone) {
+  const digits = String(phone).replace(/\D/g, "");
+  return digits.startsWith("+") ? digits : `+${digits}`;
+}
+
+async function bookAppointment(startTimeIso, name, email, phone) {
+  const eventTypeUri = await findEventTypeUri("téléphonique");
+  const body = {
+    event_type: eventTypeUri,
+    start_time: startTimeIso,
+    invitee: { name, email, timezone: "Europe/Paris" },
+    location: { kind: "outbound_call", location: toE164(phone) },
+  };
+  return calendlyRequest("/invitees", { method: "POST", body: JSON.stringify(body) });
+}
+
+// ---- Claude avec function calling ----
+
+async function callAnthropic(messages, systemPrompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-5",
+      max_tokens: 500,
+      system: systemPrompt,
+      tools: TOOLS,
+      messages,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`Anthropic error: ${JSON.stringify(data)}`);
+  return data;
+}
+
+async function executeTool(toolName, toolInput, sessionId) {
+  try {
+    if (toolName === "save_project_location") {
+      await supabaseRequest(`leads?session_id=eq.${sessionId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ code_postal: toolInput.postal_code }),
+        prefer: "return=minimal",
+      });
+      const allowed = isDepartmentAllowed(toolInput.postal_code);
+      const border = isBorderDepartment(toolInput.postal_code);
+      return JSON.stringify({ success: true, in_zone: allowed, border_zone: border && !allowed });
+    }
+    if (toolName === "save_contact_info") {
+      await updateLeadContactInfo(sessionId, toolInput.name, toolInput.phone);
+      return JSON.stringify({ success: true });
+    }
+    if (toolName === "get_available_slots") {
+      const slots = await getAvailableSlots();
+      if (slots.length === 0) return "Aucun créneau disponible dans les 7 prochains jours.";
+      return JSON.stringify({ available_slots_utc: slots });
+    }
+    if (toolName === "book_appointment") {
+      const result = await bookAppointment(
+        toolInput.start_time_iso,
+        toolInput.name,
+        toolInput.email,
+        toolInput.phone
+      );
+      const confirmedTime = result.resource?.event?.start_time;
+      await sendAppointmentSms(toolInput.name, toolInput.phone, confirmedTime);
+      return JSON.stringify({
+        success: true,
+        confirmed_time: confirmedTime,
+        cancel_url: result.resource?.cancel_url,
+        reschedule_url: result.resource?.reschedule_url,
+      });
+    }
+    return JSON.stringify({ error: "Outil inconnu" });
+  } catch (err) {
+    console.error(`Tool error (${toolName}):`, err.message);
+    if (toolName === "book_appointment") {
+      return JSON.stringify({
+        error: true,
+        message:
+          "La réservation a échoué — ce créneau vient probablement d'être pris entre-temps, ou une erreur technique est survenue. N'invente SURTOUT PAS un nouveau créneau toi-même : rappelle get_available_slots pour récupérer les VRAIS créneaux encore disponibles.",
+      });
+    }
+    return JSON.stringify({
+      error: true,
+      message:
+        "La consultation des disponibilités a échoué techniquement. Explique au visiteur qu'il y a un petit souci technique et qu'un conseiller RMS ECOSKY le recontactera, sans inventer ni confirmer aucun créneau.",
+    });
+  }
+}
+
+async function askClaude(history, sessionId) {
+  const systemPrompt = buildSystemPrompt();
+  let messages = history.map((m) => ({ role: m.role, content: m.content }));
+
+  while (messages.length > 0 && messages[messages.length - 1].role !== "user") {
+    messages.pop();
+  }
+  if (messages.length === 0) {
+    return "Bonjour ! Comment puis-je vous aider avec votre projet de sol en résine EPDM ?";
+  }
+
+  for (let i = 0; i < 6; i++) {
+    const data = await callAnthropic(messages, systemPrompt);
+    if (data.stop_reason !== "tool_use") {
+      const textBlock = data.content.find((b) => b.type === "text");
+      return textBlock ? textBlock.text : "Merci pour votre message, on revient vers vous rapidement !";
+    }
+    messages.push({ role: "assistant", content: data.content });
+    const toolResults = [];
+    for (const block of data.content) {
+      if (block.type === "tool_use") {
+        const result = await executeTool(block.name, block.input, sessionId);
+        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+      }
+    }
+    messages.push({ role: "user", content: toolResults });
+  }
+  return "Merci pour votre message ! Un conseiller RMS ECOSKY revient vers vous rapidement.";
+}
+
+export default async function handler(req, res) {
+  // CORS : autorise le widget à appeler cette API depuis ecoskybyrms.fr
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).send("Method not allowed");
+
+  try {
+    const { session_id, message } = req.body;
+    if (!session_id || !message) {
+      return res.status(400).json({ error: "session_id et message sont requis" });
+    }
+
+    await getConversation(session_id);
+    await ensureLeadExists(session_id);
+    await saveMessage(session_id, "user", message);
+
+    const codePostal = await getLeadCodePostal(session_id);
+    if (!isDepartmentAllowed(codePostal)) {
+      const politeMessage =
+        "Merci pour votre message ! Malheureusement, RMS ECOSKY n'intervient pas dans votre secteur pour le moment. Nous intervenons en Bretagne, dans le Morbihan (56), le Finistère (29), les Côtes-d'Armor (22) et l'Ille-et-Vilaine (35). Bonne continuation dans votre projet !";
+      await saveMessage(session_id, "assistant", politeMessage);
+      return res.status(200).json({ reply: politeMessage });
+    }
+
+    const conversation = await getConversation(session_id);
+    if (isBorderDepartment(codePostal) && !conversation.border_notice_sent) {
+      const borderMessage =
+        "Merci pour votre message ! Sachez que nous sommes basés dans le Morbihan (56) : selon la distance exacte de votre projet, une intervention peut être possible, à évaluer au cas par cas. N'hésitez pas à nous en dire plus 😊";
+      await saveMessage(session_id, "assistant", borderMessage);
+      await supabaseRequest(`web_conversations?session_id=eq.${session_id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ border_notice_sent: true }),
+        prefer: "return=minimal",
+      });
+      return res.status(200).json({ reply: borderMessage });
+    }
+
+    const history = await getHistory(session_id);
+    const reply = await askClaude(history, session_id);
+    await saveMessage(session_id, "assistant", reply);
+    return res.status(200).json({ reply });
+  } catch (err) {
+    console.error("Webhook error:", err);
+    return res.status(500).json({
+      reply: "Désolé, un problème technique est survenu. Un conseiller RMS ECOSKY reviendra vers vous.",
+    });
+  }
+}
