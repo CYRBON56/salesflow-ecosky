@@ -97,6 +97,8 @@ export default function SalesFlowSystem() {
   const [mapping, setMapping] = useState({ nom: "", telephone: "", source: "" });
   const [expandedLead, setExpandedLead] = useState(null);
   const [waData, setWaData] = useState({}); // { [telephone]: { loading, conversation, messages } }
+  const [adClicks, setAdClicks] = useState([]);
+  const [showClicks, setShowClicks] = useState(false);
   const fileInputRef = useRef(null);
   useEffect(() => {
     (async () => {
@@ -119,8 +121,27 @@ export default function SalesFlowSystem() {
         if (settingsErr) throw settingsErr;
         if (settingsRow) setSettings(settingsFromRow(settingsRow));
       } catch (e) {}
+      try {
+        const { data: clickRows, error: clickErr } = await supabase
+          .from("web_clicks")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(200);
+        if (clickErr) throw clickErr;
+        setAdClicks(clickRows || []);
+      } catch (e) {
+        // Table pas encore créée ou inaccessible : on n'affiche simplement rien,
+        // sans bloquer le reste du dashboard.
+      }
       setLoading(false);
     })();
+    // Temps réel : un nouveau clic pub apparaît instantanément
+    const clicksChannel = supabase
+      .channel("web-clicks-changes")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "web_clicks" }, (payload) => {
+        setAdClicks((prev) => [payload.new, ...prev]);
+      })
+      .subscribe();
     // Temps réel : un nouveau lead ajouté par Make.com (ou un autre utilisateur) apparaît instantanément
     const channel = supabase
       .channel("leads-changes")
@@ -138,6 +159,7 @@ export default function SalesFlowSystem() {
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(clicksChannel);
     };
   }, []);
   const persistSettings = useCallback(async (next) => {
@@ -306,6 +328,9 @@ export default function SalesFlowSystem() {
           <div style={{ fontSize: 22, fontWeight: 700, marginTop: 2 }}>SalesFlow System</div>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => setShowClicks(true)} style={btnGhost}>
+            <MessageCircle size={16} /> Clics pub ({adClicks.length})
+          </button>
           <button onClick={() => setShowSettings(true)} style={btnGhost}>
             <SettingsIcon size={16} /> Réglages
           </button>
@@ -409,6 +434,9 @@ export default function SalesFlowSystem() {
             setShowSettings(false);
           }}
         />
+      )}
+      {showClicks && (
+        <AdClicksModal clicks={adClicks} leads={leads} onClose={() => setShowClicks(false)} />
       )}
     </div>
   );
@@ -627,6 +655,70 @@ function SettingsModal({ settings, onClose, onSave }) {
         <button onClick={() => onSave(local)} style={btnPrimary}><Check size={15} /> Enregistrer</button>
       </div>
     </Modal>
+  );
+}
+function AdClicksModal({ clicks, leads, onClose }) {
+  const totalClicks = clicks.length;
+  const totalLeadsFromAds = leads.filter((l) => (l.ad_id || (l.source || "").toLowerCase().includes("facebook"))).length;
+  const conversionRate = totalClicks > 0 ? Math.round((totalLeadsFromAds / totalClicks) * 100) : 0;
+
+  return (
+    <Modal onClose={onClose} title="Clics publicité Facebook">
+      <div style={{ display: "flex", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+        <StatCard label="Clics enregistrés" value={totalClicks} />
+        <StatCard label="Leads issus d'une pub" value={totalLeadsFromAds} />
+        <StatCard label="Taux clic → lead" value={`${conversionRate}%`} />
+      </div>
+      <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>
+        Un "clic" est enregistré dès qu'un visiteur arrive sur le site depuis une
+        publicité (avec fbclid ou paramètre utm), même s'il ne discute jamais
+        avec Skyeco ni ne devient un lead. Le taux ci-dessus est une estimation
+        globale (les leads ne sont pas toujours reliés au clic web précis dont
+        ils viennent, notamment pour le Click-to-WhatsApp direct).
+      </div>
+      {totalClicks === 0 ? (
+        <div style={{ fontSize: 13.5, color: "#94a3b8", textAlign: "center", padding: "24px 0" }}>
+          Aucun clic enregistré pour l'instant. Vérifie que la table
+          "web_clicks" existe bien dans Supabase et que le widget du site
+          pointe vers le bon endpoint de suivi.
+        </div>
+      ) : (
+        <div style={{ maxHeight: 360, overflowY: "auto", border: "1px solid #f1efe8", borderRadius: 10 }}>
+          {clicks.map((c) => (
+            <div
+              key={c.id}
+              style={{
+                padding: "10px 12px", borderBottom: "1px solid #f1efe8", fontSize: 12.5,
+                display: "flex", flexDirection: "column", gap: 3,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                <span style={{ fontWeight: 600, color: TEAL_DARK }}>
+                  {c.ad_id ? `Annonce ${c.ad_id}` : (c.utm_campaign || "Source inconnue")}
+                </span>
+                <span style={{ color: "#94a3b8", flexShrink: 0 }}>
+                  {new Date(c.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+              <div style={{ color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {c.landing_page || "—"}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
+        <button onClick={onClose} style={btnGhostSmall}>Fermer</button>
+      </div>
+    </Modal>
+  );
+}
+function StatCard({ label, value }) {
+  return (
+    <div style={{ flex: 1, minWidth: 120, background: "#f6faf9", border: "1px solid #e2f0ec", borderRadius: 10, padding: "10px 14px" }}>
+      <div style={{ fontSize: 20, fontWeight: 700, color: TEAL_DARK }}>{value}</div>
+      <div style={{ fontSize: 11.5, color: "#64748b" }}>{label}</div>
+    </div>
   );
 }
 function Modal({ title, children, onClose }) {
