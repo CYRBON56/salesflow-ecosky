@@ -133,7 +133,7 @@ ${catalogueInstruction}
      sera confirmé après réception de photos.
    - Application sur un PARKING CARROSSABLE : estimation à partir de 150€ HT/m². Précise TOUJOURS
      que ce prix est donné "sous réserve du travail préparatoire nécessaire (bordures, évacuation
-     des eaux, etc.)".
+     du déblai, etc.)".
    Dans les deux cas, demande TOUJOURS l'âge du bâtiment avant de donner le prix TTC (dans le même
    message que l'estimation, ou juste après si tu ne l'as pas encore), car la TVA applicable en
    dépend : 10% si le bâtiment a plus de 2 ans, 20% s'il a moins de 2 ans. Précise TOUJOURS que
