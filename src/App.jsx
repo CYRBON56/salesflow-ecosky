@@ -480,6 +480,28 @@ function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onDel
       </div>
       {expanded && (
         <div style={{ padding: "0 16px 16px", borderTop: "1px solid #f1efe8" }}>
+          {lead.estimation_pdf_url && (
+            <div style={{ marginTop: 14, padding: "10px 12px", background: "#f6faf9", border: "1px solid #e2f0ec", borderRadius: 8 }}>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>
+                Estimation détaillée {lead.estimation_numero ? `n°${lead.estimation_numero}` : ""}
+                {lead.estimation_texte ? ` — ${lead.estimation_texte}` : ""}
+              </div>
+              <a
+                href={lead.estimation_pdf_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                style={{ ...btnWA, textDecoration: "none", display: "inline-flex" }}
+              >
+                <FileText size={14} /> Voir le PDF estimation
+              </a>
+              {lead.rdv_date && (
+                <div style={{ fontSize: 12, color: "#1e6f4c", fontWeight: 600, marginTop: 8 }}>
+                  📅 RDV technicien : {new Date(lead.rdv_date).toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" })}
+                </div>
+              )}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
             <button onClick={() => onWhatsApp("intro")} style={btnWA}>
               <MessageCircle size={14} /> Message de prise de contact
