@@ -207,6 +207,36 @@ const SUPPORT_LABELS = {
 };
 const USAGE_LABELS = { pieton: "Usage piéton", carrossable: "Usage carrossable (véhicule)" };
 
+// Désignation technique détaillée des travaux, selon le type de pose choisi
+// par le client dans le formulaire. Utilisée dans le PDF pour lister
+// précisément ce que comprend l'intervention.
+function buildDesignationLines(answers) {
+  if (answers.usage === "pieton" && answers.support_pieton === "dalle_beton") {
+    return [
+      "POSE SUR BÉTON :",
+      "Surfaçage de la surface au disque diamant, aspiration des poussières,",
+      "lavage Karcher si besoin, pose de la primaire d'accrochage, pose des",
+      "baguettes si besoin, pose du revêtement.",
+    ];
+  }
+  if (answers.usage === "carrossable" && answers.etat_terrain_carrossable === "terre_nue") {
+    return [
+      "POSE POUR PARKING SUR TERRAIN NU :",
+      "Terrassement pour décaissement et évacuation du déblai, fourniture et",
+      "pose d'un concassé 0/31,5 sur 10cm, profilage et compactage, pose des",
+      "bordures si besoin, pose du revêtement quartz, granit ou marbre.",
+    ];
+  }
+  if (answers.usage === "carrossable" && answers.etat_terrain_carrossable === "deja_prepare") {
+    return [
+      "POSE PARKING (terrain déjà préparé) :",
+      "Pose du revêtement quartz, granit ou marbre sur terrain déjà stabilisé,",
+      "pose des bordures si besoin.",
+    ];
+  }
+  return [];
+}
+
 async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_postal, telephone, email, answers, estimation }) {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595.28, 841.89]); // A4
@@ -304,7 +334,18 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
     if (answers.bordure === "oui" && answers.bordure_metres) {
       tableRow(`Bordure — ${answers.bordure_metres} m linéaires × 45€ HT/m`, null);
     }
-    y -= 30;
+
+    // Désignation technique détaillée des travaux compris dans le prix
+    const designationLines = buildDesignationLines(answers);
+    if (designationLines.length > 0) {
+      y -= 6;
+      designationLines.forEach((lineText, i) => {
+        text(lineText, marginX + 8, y, { size: 8, color: grey, bold: i === 0 });
+        y -= 11;
+      });
+    }
+
+    y -= 24;
     const tauxTVA = estimation.tauxTVA;
     text("Sous-total HT", pageWidth - marginX - 220, y, { size: 9.5 });
     text(`${estimation.montantHT} €`, pageWidth - marginX - 110, y, { size: 9.5 });
