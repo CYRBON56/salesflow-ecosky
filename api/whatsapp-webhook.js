@@ -769,7 +769,8 @@ async function askClaude(history, phone, catalogueStatus) {
 }
 
 export default async function handler(req, res) {
-  // Vérification du webhook par Meta (première connexion)
+  // Vérification du webhook par Meta (première connexion) — laissé actif au
+  // cas où, mais ne touche à aucune base de données.
   if (req.method === "GET") {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
@@ -782,6 +783,14 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).send("Method not allowed");
   }
+
+  // ⚠️ CANAL WHATSAPP DÉSACTIVÉ (juillet 2026) — RMS ECOSKY n'utilise plus
+  // WhatsApp comme canal commercial. On répond immédiatement sans jamais
+  // toucher à Supabase, Anthropic ou Twilio, pour ne plus du tout charger ces
+  // services même si Meta envoyait encore un message par erreur. Le canal
+  // site web (api/web-chat.js) n'est absolument pas concerné par ce blocage.
+  return res.status(200).send("EVENT_RECEIVED");
+
   try {
     const body = req.body;
     const entry = body.entry?.[0];
