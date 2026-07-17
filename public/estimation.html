@@ -134,6 +134,52 @@
 (function () {
   const API_URL = "https://salesflow-ecosky.vercel.app/api/submit-estimation";
   const APPOINTMENT_API_URL = "https://salesflow-ecosky.vercel.app/api/estimation-appointment";
+  const TRACK_CLICK_URL = "https://salesflow-ecosky.vercel.app/api/track-click";
+
+  // ---------- Tracking des clics pub ----------
+  // Cette page peut être la toute première page vue par un visiteur venant
+  // d'une pub Facebook (destination directe du formulaire) — on capte donc le
+  // clic ici aussi, avec la même logique que sur le site principal, pour que
+  // ça remonte bien dans "Clics pub" de SalesFlow System.
+  (function trackAdClickIfNeeded() {
+    const params = new URLSearchParams(window.location.search);
+    const fbclid = params.get("fbclid");
+    const utmSource = params.get("utm_source");
+    const isFromAd = !!fbclid || utmSource === "facebook";
+    if (!isFromAd) return;
+
+    const dedupeKey = fbclid || "generic";
+    let alreadyTracked = null;
+    try { alreadyTracked = sessionStorage.getItem("ecosky_click_tracked_key"); } catch (e) {}
+    if (alreadyTracked === dedupeKey) return;
+    try { sessionStorage.setItem("ecosky_click_tracked_key", dedupeKey); } catch (e) {}
+
+    let sessionId = null;
+    try {
+      sessionId = localStorage.getItem("ecosky_chat_session");
+      if (!sessionId) {
+        sessionId = "web_" + crypto.randomUUID();
+        localStorage.setItem("ecosky_chat_session", sessionId);
+      }
+    } catch (e) {
+      sessionId = "web_" + Date.now();
+    }
+
+    fetch(TRACK_CLICK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionId,
+        fbclid,
+        ad_id: params.get("ad_id"),
+        utm_source: utmSource,
+        utm_campaign: params.get("utm_campaign"),
+        utm_medium: params.get("utm_medium"),
+        landing_page: window.location.href,
+        referrer: document.referrer || null,
+      }),
+    }).catch(() => {});
+  })();
 
   const state = {
     step: 0,
