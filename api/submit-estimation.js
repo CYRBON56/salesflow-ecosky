@@ -481,6 +481,7 @@ export default async function handler(req, res) {
       estimation_numero: numero,
       estimation_pdf_url: pdfUrl,
       source: "Formulaire estimation détaillée",
+      formulaire_complete: true,
       notes: "",
     };
 
