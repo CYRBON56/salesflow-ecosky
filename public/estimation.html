@@ -90,9 +90,11 @@
 <script>
 (function () {
   const API_URL = "https://salesflow-ecosky.vercel.app/api/submit-estimation";
+  const APPOINTMENT_API_URL = "https://salesflow-ecosky.vercel.app/api/estimation-appointment";
 
   const state = {
     step: 0,
+    leadId: null,
     usage: null,
     support_pieton: null,
     etat_dalle: null,
@@ -400,6 +402,8 @@
 
   function renderSuccess(data) {
     const est = data.estimation || {};
+    state.leadId = data.lead_id || null;
+
     let priceBlock = "";
     if (est.chiffrable) {
       priceBlock = `
@@ -423,9 +427,84 @@
       <p class="disclaimer">
         Cette estimation reste indicative et devra être confirmée par l'un de nos techniciens lors
         d'un appel téléphonique. Vous recevrez ce récapitulatif par SMS dans quelques instants.
-        Un conseiller RMS ECOSKY vous recontactera prochainement pour finaliser votre projet.
       </p>
+      <div id="appointmentSection">
+        <button class="btn btn-primary" id="btnWantAppointment" style="width:100%; margin-top:6px;">
+          📅 Pour connaître le contenu précis, les contraintes et les remises éventuelles —
+          prendre rendez-vous avec un technicien
+        </button>
+      </div>
     `;
+    document.getElementById("btnWantAppointment").addEventListener("click", showSlots);
+  }
+
+  async function showSlots() {
+    const section = document.getElementById("appointmentSection");
+    section.innerHTML = `<div style="text-align:center; padding: 14px 0; color:#5b6b64; font-size:13.5px;">Recherche des créneaux disponibles...</div>`;
+    try {
+      const res = await fetch(APPOINTMENT_API_URL, { method: "GET" });
+      const data = await res.json();
+      if (!data.success || !data.slots || data.slots.length === 0) {
+        section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#5b6b64; font-size:13.5px;">Aucun créneau disponible pour le moment. Un conseiller RMS ECOSKY vous recontactera directement.</div>`;
+        return;
+      }
+      renderSlotChoices(data.slots);
+    } catch (err) {
+      section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#991b1b; font-size:13.5px;">Impossible de récupérer les créneaux. Réessayez dans un instant.</div>`;
+    }
+  }
+
+  function renderSlotChoices(slots) {
+    const section = document.getElementById("appointmentSection");
+    const optionsHtml = slots
+      .map((iso) => {
+        const label = new Intl.DateTimeFormat("fr-FR", {
+          weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+          timeZone: "Europe/Paris",
+        }).format(new Date(iso));
+        return `<div class="option" data-iso="${iso}">${label}</div>`;
+      })
+      .join("");
+    section.innerHTML = `
+      <div class="step-label" style="margin-top:12px;">Choisissez un créneau d'appel avec un technicien</div>
+      <div class="options" id="slotOptions">${optionsHtml}</div>
+    `;
+    section.querySelectorAll(".option").forEach((el) => {
+      el.addEventListener("click", () => bookSlot(el.dataset.iso));
+    });
+  }
+
+  async function bookSlot(iso) {
+    const section = document.getElementById("appointmentSection");
+    section.innerHTML = `<div style="text-align:center; padding: 14px 0; color:#5b6b64; font-size:13.5px;">Confirmation du rendez-vous...</div>`;
+    try {
+      const res = await fetch(APPOINTMENT_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: state.leadId,
+          start_time_iso: iso,
+          nom: state.nom,
+          prenom: state.prenom,
+          email: state.email,
+          telephone: state.telephone,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        section.innerHTML = `
+          <div class="result-box" style="margin-top:12px;">
+            <div class="result-note">✅ Rendez-vous confirmé</div>
+            <div class="result-price" style="font-size:18px;">${data.formatted_date}</div>
+            <div class="result-note">Un technicien RMS ECOSKY vous appellera à ce créneau pour détailler votre devis, les contraintes éventuelles et les remises possibles.</div>
+          </div>
+        `;
+      } else {
+        section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#991b1b; font-size:13.5px;">${data.error || "La réservation a échoué, réessayez."}</div>`;
+      }
+    } catch (err) {
+      section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#991b1b; font-size:13.5px;">Impossible de confirmer le rendez-vous. Réessayez dans un instant.</div>`;
+    }
   }
 
   async function submitForm() {
