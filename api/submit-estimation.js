@@ -468,25 +468,42 @@ export default async function handler(req, res) {
       console.error("PDF estimateur error:", pdfErr.message);
     }
 
-    const lead = await supabaseRequest("leads", {
-      method: "POST",
-      body: JSON.stringify({
-        nom,
-        prenom: prenom || null,
-        telephone: phoneE164 || telephone,
-        email: email || null,
-        adresse_projet: adresse_projet || null,
-        code_postal: code_postal || null,
-        type_projet: type_projet || null,
-        reponses_estimation: answers || {},
-        estimation_texte: estimation.texte,
-        estimation_numero: numero,
-        estimation_pdf_url: pdfUrl,
-        source: "Formulaire estimation détaillée",
-        statut: "nouveau",
-        notes: "",
-      }),
-    });
+    const leadPayload = {
+      nom,
+      prenom: prenom || null,
+      telephone: phoneE164 || telephone,
+      email: email || null,
+      adresse_projet: adresse_projet || null,
+      code_postal: code_postal || null,
+      type_projet: type_projet || null,
+      reponses_estimation: answers || {},
+      estimation_texte: estimation.texte,
+      estimation_numero: numero,
+      estimation_pdf_url: pdfUrl,
+      source: "Formulaire estimation détaillée",
+      notes: "",
+    };
+
+    // Le téléphone est unique dans la table leads : si un dossier existe déjà
+    // pour ce numéro (contact précédent par WhatsApp, chat, ou une estimation
+    // antérieure), on le MET À JOUR avec cette nouvelle estimation plutôt que
+    // d'essayer d'en créer un doublon, ce qui échouerait systématiquement.
+    const existing = await supabaseRequest(
+      `leads?telephone=eq.${encodeURIComponent(phoneE164 || telephone)}`
+    );
+
+    let lead;
+    if (existing && existing.length > 0) {
+      lead = await supabaseRequest(`leads?telephone=eq.${encodeURIComponent(phoneE164 || telephone)}`, {
+        method: "PATCH",
+        body: JSON.stringify(leadPayload),
+      });
+    } else {
+      lead = await supabaseRequest("leads", {
+        method: "POST",
+        body: JSON.stringify({ ...leadPayload, statut: "nouveau" }),
+      });
+    }
 
     // SMS au client avec son estimation (uniquement si dans la zone d'intervention)
     if (phoneE164 && inZone) {
