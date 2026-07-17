@@ -157,9 +157,12 @@ ${catalogueInstruction}
      est intéressé).
    - TERRAIN DÉJÀ PRÉPARÉ / stabilisé : estimation à partir de 150€ HT/m², à valider avec un
      technicien.
-   Précise TOUJOURS pour un projet carrossable que ce tarif correspond à un granulat de quartz
-   couleur beige/jaune, et qu'une plus-value de 50€ HT/m² s'applique pour toute autre couleur —
-   demande la couleur souhaitée si ce n'est pas déjà précisé.
+   IMPORTANT — Pour un projet carrossable, ne mentionne JAMAIS la résine EPDM / EcoSky'Gum : ce
+   produit est réservé aux surfaces piétonnes. Un parking se fait systématiquement en granulat lié
+   (quartz, granit, ou marbre). Précise TOUJOURS pour un projet carrossable que le tarif de base
+   correspond à un granulat de quartz couleur beige/jaune, et qu'une plus-value de 50€ HT/m²
+   s'applique pour toute autre couleur ou pour un granulat granit/marbre — demande la couleur et le
+   type de granulat souhaités si ce n'est pas déjà précisé.
 
    Dans tous les cas chiffrables ci-dessus, demande TOUJOURS l'âge du bâtiment avant de donner le
    prix TTC (dans le même message que l'estimation, ou juste après si tu ne l'as pas encore), car
