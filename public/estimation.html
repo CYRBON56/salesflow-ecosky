@@ -123,6 +123,11 @@
         <h1>Votre estimation personnalisée</h1>
         <p class="sub" style="margin-bottom:0;">Répondez à quelques questions sur votre projet pour recevoir une estimation la plus précise possible, envoyée directement par SMS.</p>
       </div>
+      <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px; font-size:12.5px; color:#4a5a54;">
+        <span>✅ Sans engagement</span>
+        <span>⏱️ Réponse sous 24h</span>
+        <span>🔒 Données confidentielles</span>
+      </div>
 
       <div class="progress" id="progress"></div>
       <div class="card" id="card"></div>
@@ -219,6 +224,8 @@
         ["carrossable", "Parking ou allée pour véhicule (carrossable)"],
       ],
     });
+
+    s.push({ key: "identite", question: "Vos coordonnées", type: "identity" });
 
     if (state.usage === "pieton") {
       s.push({
@@ -334,7 +341,6 @@
       });
     }
     s.push({ key: "localisation", question: "Où se situe le projet ?", type: "location" });
-    s.push({ key: "identite", question: "Vos coordonnées", type: "identity" });
 
     return s;
   }
@@ -464,6 +470,9 @@
     });
     document.getElementById("btnNext").addEventListener("click", () => {
       if (!canProceed(s)) return;
+      if (s.type === "identity") {
+        savePartialLead();
+      }
       if (state.step < steps.length - 1) {
         state.step += 1;
         renderProgress();
@@ -472,6 +481,26 @@
         submitForm();
       }
     });
+  }
+
+  const SAVE_PARTIAL_URL = "https://salesflow-ecosky.vercel.app/api/save-partial-lead";
+  let partialLeadSaved = false;
+
+  function savePartialLead() {
+    // On ne sauvegarde qu'une fois par visite, pas à chaque fois que le
+    // visiteur revient sur cette étape en arrière/avant.
+    if (partialLeadSaved) return;
+    partialLeadSaved = true;
+    fetch(SAVE_PARTIAL_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nom: state.nom,
+        prenom: state.prenom,
+        telephone: state.telephone,
+        type_projet: state.usage,
+      }),
+    }).catch(() => {});
   }
 
   function renderLoading() {
