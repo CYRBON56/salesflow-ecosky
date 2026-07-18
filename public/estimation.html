@@ -749,6 +749,16 @@
         </div>
       `;
     }
+    const remiseBlock = est.chiffrable
+      ? `
+        <div style="background:#eaf4ef; border:1.5px solid #1e6f4c; border-radius:10px; padding:12px 14px; margin-top:10px; font-size:13px; color:#14312a; text-align:center;">
+          🎁 <strong>Remise de ${est.remisePourcent}% possible selon le volume</strong><br/>
+          Soit <strong>${est.montantApresRemise} €</strong> au lieu de ${est.montantTTC} € — contactez un
+          technicien pour voir si vous pouvez en bénéficier.
+        </div>
+      `
+      : "";
+
     cardEl.innerHTML = `
       <div class="success-icon">✅</div>
       <div class="question" style="text-align:center;">Merci ${state.prenom || ""} !</div>
@@ -758,12 +768,10 @@
         d'un appel téléphonique. Vous recevrez ce récapitulatif par SMS dans quelques instants.
       </p>
       <div id="appointmentSection">
-        <div style="background:#eaf4ef; border:1.5px solid #1e6f4c; border-radius:10px; padding:12px 14px; margin-top:10px; font-size:13px; color:#14312a; text-align:center;">
-          🎁 <strong>Remise en cours jusqu'à -15%</strong> selon le volume de votre projet
-        </div>
+        ${remiseBlock}
         <button class="btn btn-primary" id="btnWantAppointment" style="width:100%; margin-top:10px;">
-          📅 Prendre contact avec un technicien — pour connaître précisément ce qui est réellement
-          inclus et profiter de la remise actuelle
+          📅 Contactez le technicien — pour connaître précisément ce qui est réellement inclus et voir
+          si vous pouvez bénéficier de la remise
         </button>
       </div>
     `;
