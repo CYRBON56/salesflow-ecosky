@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Phone, MousePointerClick, FileText, RefreshCw } from "lucide-react";
+import { Phone, MousePointerClick, FileText, RefreshCw, Calendar } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
 
 const TEAL = "#0f5c56";
@@ -25,10 +25,22 @@ function timeAgo(dateStr) {
   return `il y a ${days} j`;
 }
 
+function formatRdv(dateStr) {
+  if (!dateStr) return "";
+  try {
+    return new Intl.DateTimeFormat("fr-FR", {
+      weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+      timeZone: "Europe/Paris",
+    }).format(new Date(dateStr));
+  } catch (e) {
+    return dateStr;
+  }
+}
 export default function MobileSummary() {
   const [clicks, setClicks] = useState([]);
   const [devisLeads, setDevisLeads] = useState([]);
   const [callbacks, setCallbacks] = useState([]);
+  const [rdvLeads, setRdvLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -36,7 +48,8 @@ export default function MobileSummary() {
     setLoading(true);
     setError("");
     try {
-      const [clicksRes, devisRes, callbacksRes] = await Promise.all([
+      const nowIso = new Date().toISOString();
+      const [clicksRes, devisRes, callbacksRes, rdvRes] = await Promise.all([
         supabase.from("web_clicks").select("*").order("created_at", { ascending: false }).limit(50),
         supabase
           .from("leads")
@@ -49,13 +62,21 @@ export default function MobileSummary() {
           .select("*")
           .eq("callback_demande", true)
           .order("callback_demande_le", { ascending: false }),
+        supabase
+          .from("leads")
+          .select("*")
+          .not("rdv_date", "is", null)
+          .gte("rdv_date", nowIso)
+          .order("rdv_date", { ascending: true }),
       ]);
       if (clicksRes.error) throw clicksRes.error;
       if (devisRes.error) throw devisRes.error;
       if (callbacksRes.error) throw callbacksRes.error;
+      if (rdvRes.error) throw rdvRes.error;
       setClicks(clicksRes.data || []);
       setDevisLeads(devisRes.data || []);
       setCallbacks(callbacksRes.data || []);
+      setRdvLeads(rdvRes.data || []);
     } catch (e) {
       setError("Impossible de charger les données.");
     }
@@ -88,11 +109,28 @@ export default function MobileSummary() {
       {error && <div style={{ margin: 16, padding: 12, background: "#fef2f2", color: "#991b1b", borderRadius: 8, fontSize: 14 }}>{error}</div>}
 
       {/* Compteurs du jour */}
-      <div style={{ display: "flex", gap: 10, padding: "16px 16px 4px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "16px 16px 4px" }}>
         <StatCard icon={<MousePointerClick size={18} />} label="Clics aujourd'hui" value={clicksToday} color={TEAL} />
         <StatCard icon={<FileText size={18} />} label="Devis aujourd'hui" value={devisToday} color="#0d9488" />
         <StatCard icon={<Phone size={18} />} label="À rappeler" value={callbacks.length} color="#dc2626" urgent={callbacks.length > 0} />
+        <StatCard icon={<Calendar size={18} />} label="RDV à venir" value={rdvLeads.length} color="#7c3aed" />
       </div>
+
+      {/* RDV Calendly à venir */}
+      <Section title="📅 Rendez-vous à venir" empty={rdvLeads.length === 0} emptyLabel="Aucun rendez-vous à venir">
+        {rdvLeads.map((lead) => (
+          <div key={lead.id} style={{ ...cardStyle, borderLeft: "4px solid #7c3aed" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, color: TEAL_DARK, fontSize: 15 }}>{lead.nom}</div>
+              <div style={{ fontSize: 13, color: "#7c3aed", fontWeight: 600 }}>{formatRdv(lead.rdv_date)}</div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>{lead.telephone}</div>
+            </div>
+            <a href={`tel:${lead.telephone}`} style={callBtnGhost}>
+              <Phone size={16} />
+            </a>
+          </div>
+        ))}
+      </Section>
 
       {/* Demandes de rappel en attente */}
       <Section title="📞 Demandes de rappel en attente" empty={callbacks.length === 0} emptyLabel="Aucune demande en attente">
