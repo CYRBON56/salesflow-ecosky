@@ -95,6 +95,8 @@
     border-radius: 10px;
     flex-shrink: 0;
     border: 1.5px solid rgba(0,0,0,0.12);
+    background-size: cover;
+    background-position: center;
   }
   .color-preview-text { font-size: 13px; color: #4a5a54; }
   .color-limit-note { font-size: 12px; color: #8a9490; margin-top: 8px; }
@@ -479,26 +481,54 @@
     return true;
   }
 
+  // Génère une texture de grains mouchetés (comme le rendu EPDM réel), pour
+  // remplacer le simple dégradé par un aperçu bien plus fidèle au produit.
+  function generateSpeckleDataUrl(colors, size) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+
+    // Fond neutre (liant résine) légèrement translucide sous les grains
+    ctx.fillStyle = "#e9e6dd";
+    ctx.fillRect(0, 0, size, size);
+
+    const grainCount = Math.round((size * size) / 9); // densité des grains
+    for (let i = 0; i < grainCount; i++) {
+      // Répartition ~homogène entre les 1 ou 2 couleurs, avec un léger désordre
+      const pick = colors.length === 1 ? colors[0] : colors[Math.random() < 0.5 ? 0 : 1];
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const r = 1.2 + Math.random() * 2.3;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r, r * (0.75 + Math.random() * 0.4), Math.random() * Math.PI, 0, Math.PI * 2);
+      ctx.fillStyle = pick;
+      ctx.globalAlpha = 0.65 + Math.random() * 0.35;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    return canvas.toDataURL();
+  }
+
   function buildColorPreview(selected) {
     if (!Array.isArray(selected) || selected.length === 0) return "";
     const real = selected.filter((v) => v !== "pas_encore" && COLOR_SWATCHES[v]);
     if (real.length === 0) return "";
 
     if (real.length === 1) {
+      const dataUrl = generateSpeckleDataUrl([COLOR_SWATCHES[real[0]]], 110);
       return `
         <div class="color-preview">
-          <div class="color-preview-swatch" style="background:${COLOR_SWATCHES[real[0]]};"></div>
+          <div class="color-preview-swatch" style="background-image:url(${dataUrl});"></div>
           <div class="color-preview-text">${COLOR_LABELS[real[0]] || real[0]}</div>
         </div>
       `;
     }
 
-    const c1 = COLOR_SWATCHES[real[0]];
-    const c2 = COLOR_SWATCHES[real[1]];
-    const mixBg = `repeating-linear-gradient(45deg, ${c1} 0px, ${c1} 6px, ${c2} 6px, ${c2} 12px)`;
+    const dataUrl = generateSpeckleDataUrl([COLOR_SWATCHES[real[0]], COLOR_SWATCHES[real[1]]], 110);
     return `
       <div class="color-preview">
-        <div class="color-preview-swatch" style="background:${mixBg};"></div>
+        <div class="color-preview-swatch" style="background-image:url(${dataUrl});"></div>
         <div class="color-preview-text">Mélange 50/50 : ${COLOR_LABELS[real[0]] || real[0]} + ${COLOR_LABELS[real[1]] || real[1]}</div>
       </div>
     `;
