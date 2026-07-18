@@ -198,12 +198,61 @@
 
   // Teintes réelles approximatives pour les pastilles de couleur (gamme
   // EcoSky'Gum pour le piéton, granulats pour le carrossable).
+  // Palette complète DIECO — granulats/résine EPDM, avec les vraies
+  // références RAL (voir PALETTE_COLORIS_DIECO_2026.pdf).
   const COLOR_SWATCHES = {
-    gris: "#7C7C7B",         // RAL 7037 — Gris Souris
-    anthracite: "#2F3234",   // RAL 7021 — Gris Noir
-    beige: "#C6B286",        // RAL 1001 — Beige
-    beige_jaune: "#AF8050",  // RAL 1011 — Sable
-    autre: "conic-gradient(red, orange, yellow, green, blue, violet, red)",
+    rouge_brique: "#AC4034",   // RAL 3016
+    rouge_vif: "#C1121C",      // RAL 3020
+    vert_fonce: "#316650",     // RAL 6028
+    vert_clair: "#468641",     // RAL 6017
+    orange: "#E75B12",         // RAL 2008
+    vert_reseda: "#5E8351",    // RAL 6011
+    jaune: "#F3DA0B",          // RAL 1018
+    bleu_fonce: "#154889",     // RAL 5005
+    gris_noir: "#2F3234",      // RAL 7021 (= "anthracite")
+    marron: "#4D3324",         // RAL 8028
+    beige: "#C6B286",          // RAL 1001
+    ocre: "#CB8F00",           // RAL 1005
+    gris_souris: "#7C7C7B",    // RAL 7037 (= "gris")
+    gris_clair: "#CFD0CF",     // RAL 7047
+    blanc_perle: "#E3D9C6",    // RAL 1013
+    blanc_casse: "#E6D2B5",    // RAL 1015
+    sable: "#AF8050",          // RAL 1011
+    bleu_petrole: "#234856",   // RAL 5001
+    bleu_moyen: "#2271B3",     // RAL 5015
+    bleu_clair: "#3481B8",     // RAL 5012
+    bleu_pastel: "#7FB0B7",    // RAL 5024
+    violet: "#4A203B",         // RAL 4007
+    lilas: "#6C4675",          // RAL 4005
+    rose: "#B24C8C",           // RAL 4010
+    beige_jaune: "#AF8050",    // RAL 1011 — utilisé uniquement pour l'option parking (inchangée)
+  };
+
+  const COLOR_LABELS = {
+    rouge_brique: "Rouge brique — RAL 3016",
+    rouge_vif: "Rouge vif — RAL 3020",
+    vert_fonce: "Vert foncé — RAL 6028",
+    vert_clair: "Vert clair — RAL 6017",
+    orange: "Orange — RAL 2008",
+    vert_reseda: "Vert réséda — RAL 6011",
+    jaune: "Jaune — RAL 1018",
+    bleu_fonce: "Bleu foncé — RAL 5005",
+    gris_noir: "Anthracite (Gris noir) — RAL 7021",
+    marron: "Marron — RAL 8028",
+    beige: "Beige — RAL 1001",
+    ocre: "Ocre — RAL 1005",
+    gris_souris: "Gris souris — RAL 7037",
+    gris_clair: "Gris clair — RAL 7047",
+    blanc_perle: "Blanc perle — RAL 1013",
+    blanc_casse: "Blanc cassé — RAL 1015",
+    sable: "Sable — RAL 1011",
+    bleu_petrole: "Bleu pétrole — RAL 5001",
+    bleu_moyen: "Bleu moyen — RAL 5015",
+    bleu_clair: "Bleu clair — RAL 5012",
+    bleu_pastel: "Bleu pastel — RAL 5024",
+    violet: "Violet — RAL 4007",
+    lilas: "Lilas — RAL 4005",
+    rose: "Rose — RAL 4010",
   };
 
   const state = {
@@ -353,9 +402,30 @@
         question: "Un coloris EcoSky'Gum vous fait-il déjà envie ?",
         type: "choice",
         options: [
-          ["gris", "Gris — RAL 7037"],
-          ["anthracite", "Anthracite — RAL 7021"],
-          ["beige", "Beige — RAL 1001"],
+          ["gris_souris", COLOR_LABELS.gris_souris],
+          ["gris_noir", COLOR_LABELS.gris_noir],
+          ["gris_clair", COLOR_LABELS.gris_clair],
+          ["beige", COLOR_LABELS.beige],
+          ["sable", COLOR_LABELS.sable],
+          ["ocre", COLOR_LABELS.ocre],
+          ["blanc_perle", COLOR_LABELS.blanc_perle],
+          ["blanc_casse", COLOR_LABELS.blanc_casse],
+          ["marron", COLOR_LABELS.marron],
+          ["jaune", COLOR_LABELS.jaune],
+          ["orange", COLOR_LABELS.orange],
+          ["rouge_brique", COLOR_LABELS.rouge_brique],
+          ["rouge_vif", COLOR_LABELS.rouge_vif],
+          ["rose", COLOR_LABELS.rose],
+          ["violet", COLOR_LABELS.violet],
+          ["lilas", COLOR_LABELS.lilas],
+          ["bleu_fonce", COLOR_LABELS.bleu_fonce],
+          ["bleu_petrole", COLOR_LABELS.bleu_petrole],
+          ["bleu_moyen", COLOR_LABELS.bleu_moyen],
+          ["bleu_clair", COLOR_LABELS.bleu_clair],
+          ["bleu_pastel", COLOR_LABELS.bleu_pastel],
+          ["vert_fonce", COLOR_LABELS.vert_fonce],
+          ["vert_clair", COLOR_LABELS.vert_clair],
+          ["vert_reseda", COLOR_LABELS.vert_reseda],
           ["pas_encore", "Pas encore décidé"],
         ],
       });
