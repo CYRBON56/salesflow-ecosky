@@ -222,7 +222,15 @@
         <div class="legal-line">
           RMS EcoSky — RESINE MARBRE SOL, SASU au capital de 50&nbsp;000&nbsp;€<br/>
           23 Route de Corn Er Hoet, 56400 Brech — SIRET 939 997 870 00018<br/>
-          Assurance responsabilité civile décennale n° SV75020721/11590 — ERGO France
+          Assurance responsabilité civile décennale n° SV75020721/11590 — ERGO France<br/>
+          <a href="https://www.ecoskybyrms.fr" target="_blank" rel="noopener noreferrer" style="color:#1e6f4c;">www.ecoskybyrms.fr</a>
+          &nbsp;—&nbsp;
+          <a href="mailto:infos@ecosky.fr" style="color:#1e6f4c;">infos@ecosky.fr</a>
+        </div>
+        <div id="footerCallback" style="margin-top:14px;">
+          <button class="btn" id="btnFooterCallback" style="background:white; border:1.5px solid #1e6f4c; color:#14312a; padding:10px 18px; font-size:13px; font-weight:700; border-radius:10px; cursor:pointer;">
+            📞 Être rappelé
+          </button>
         </div>
       </div>
     </div>
@@ -881,6 +889,54 @@
     document.getElementById("btnWantAppointment").addEventListener("click", showSlots);
     document.getElementById("btnWantCallback").addEventListener("click", requestCallback);
   }
+
+  document.getElementById("btnFooterCallback").addEventListener("click", handleFooterCallbackClick);
+
+  function handleFooterCallbackClick() {
+    if (state.nom && state.telephone) {
+      sendFooterCallback(state.nom, state.prenom, state.telephone);
+      return;
+    }
+    const container = document.getElementById("footerCallback");
+    container.innerHTML = `
+      <div style="max-width:320px; margin:0 auto; text-align:left;">
+        <input type="text" id="footerNom" placeholder="Votre nom" style="width:100%; border:1.5px solid #d8e3de; border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:8px;" />
+        <input type="tel" id="footerTel" placeholder="Votre téléphone" style="width:100%; border:1.5px solid #d8e3de; border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:10px;" />
+        <button class="btn btn-primary" id="btnFooterCallbackConfirm" style="width:100%; padding:10px;">Confirmer</button>
+      </div>
+    `;
+    document.getElementById("btnFooterCallbackConfirm").addEventListener("click", () => {
+      const nom = document.getElementById("footerNom").value.trim();
+      const tel = document.getElementById("footerTel").value.trim();
+      if (!nom || tel.length < 8) return;
+      sendFooterCallback(nom, "", tel);
+    });
+  }
+
+  async function sendFooterCallback(nom, prenom, telephone) {
+    const container = document.getElementById("footerCallback");
+    container.innerHTML = `<div style="font-size:13px; color:#5b6b64;">Envoi en cours...</div>`;
+    try {
+      const res = await fetch(CALLBACK_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: state.leadId,
+          nom,
+          prenom,
+          telephone,
+          estimation_texte: state.lastEstimationTexte || "",
+        }),
+      });
+      const data = await res.json();
+      container.innerHTML = data.success
+        ? `<div style="font-size:13px; color:#1e6f4c; font-weight:600;">✅ Demande envoyée, on vous rappelle très vite !</div>`
+        : `<div style="font-size:13px; color:#991b1b;">${data.error || "Réessayez dans un instant."}</div>`;
+    } catch (err) {
+      container.innerHTML = `<div style="font-size:13px; color:#991b1b;">Impossible d'envoyer la demande. Réessayez.</div>`;
+    }
+  }
+
 
   async function requestCallback() {
     const btn = document.getElementById("btnWantCallback");
