@@ -69,6 +69,16 @@
   }
   .option:hover { border-color: #1e6f4c; }
   .option.selected { border-color: #1e6f4c; background: #eaf4ef; font-weight: 600; }
+  .color-swatch {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    margin-right: 10px;
+    vertical-align: middle;
+    border: 1.5px solid rgba(0,0,0,0.12);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.5);
+  }
 
   input[type="text"], input[type="tel"], input[type="email"], input[type="number"] {
     width: 100%;
@@ -186,6 +196,16 @@
     }).catch(() => {});
   })();
 
+  // Teintes réelles approximatives pour les pastilles de couleur (gamme
+  // EcoSky'Gum pour le piéton, granulats pour le carrossable).
+  const COLOR_SWATCHES = {
+    gris: "#7C7C7B",         // RAL 7037 — Gris Souris
+    anthracite: "#2F3234",   // RAL 7021 — Gris Noir
+    beige: "#C6B286",        // RAL 1001 — Beige
+    beige_jaune: "#AF8050",  // RAL 1011 — Sable
+    autre: "conic-gradient(red, orange, yellow, green, blue, violet, red)",
+  };
+
   const state = {
     step: 0,
     leadId: null,
@@ -296,7 +316,7 @@
         question: "Quelle couleur de granulat souhaitez-vous ?",
         type: "choice",
         options: [
-          ["beige_jaune", "Beige / Jaune (inclus dans le prix de base)"],
+          ["beige_jaune", "Beige / Sable — RAL 1011 (inclus dans le prix de base)"],
           ["autre", "Une autre couleur (+50€ HT/m²)"],
         ],
       });
@@ -333,9 +353,9 @@
         question: "Un coloris EcoSky'Gum vous fait-il déjà envie ?",
         type: "choice",
         options: [
-          ["gris", "Gris"],
-          ["anthracite", "Anthracite"],
-          ["beige", "Beige"],
+          ["gris", "Gris — RAL 7037"],
+          ["anthracite", "Anthracite — RAL 7021"],
+          ["beige", "Beige — RAL 1001"],
           ["pas_encore", "Pas encore décidé"],
         ],
       });
@@ -382,7 +402,10 @@
       html += '<div class="options">';
       s.options.forEach(([val, label]) => {
         const sel = state[s.key] === val ? " selected" : "";
-        html += `<div class="option${sel}" data-val="${val}">${label}</div>`;
+        const swatch = COLOR_SWATCHES[val]
+          ? `<span class="color-swatch" style="background:${COLOR_SWATCHES[val]};"></span>`
+          : "";
+        html += `<div class="option${sel}" data-val="${val}">${swatch}${label}</div>`;
       });
       html += "</div>";
     } else if (s.type === "number") {
