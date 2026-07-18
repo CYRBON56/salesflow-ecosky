@@ -45,6 +45,14 @@ async function sendSms(to, body) {
   }
 }
 
+function toE164(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("33")) return "+" + digits;
+  if (digits.startsWith("0")) return "+33" + digits.slice(1);
+  return "+" + digits;
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -53,21 +61,50 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).send("Method not allowed");
 
   try {
-    const { lead_id, nom, prenom, telephone, estimation_texte } = req.body || {};
+    const { lead_id, nom, prenom, telephone, code_postal, estimation_texte } = req.body || {};
     if (!telephone) {
       return res.status(400).json({ success: false, error: "Téléphone requis." });
     }
 
+    const phoneE164 = toE164(telephone);
+
     if (lead_id) {
+      const patch = { statut: "contacté", notes: "Demande de rappel rapide via formulaire estimation" };
+      if (code_postal) patch.code_postal = code_postal;
       await supabaseRequest(`leads?id=eq.${lead_id}`, {
         method: "PATCH",
-        body: JSON.stringify({
-          callback_demande: true,
-          callback_demande_le: new Date().toISOString(),
-          notes: "Demande de rappel rapide via formulaire estimation",
-        }),
+        body: JSON.stringify(patch),
         prefer: "return=minimal",
       });
+    } else {
+      // Aucun dossier existant (le visiteur a utilisé le bouton "Être rappelé"
+      // du bas de page sans avoir rempli le formulaire) : on en crée un, ou on
+      // met à jour un dossier existant pour ce même numéro le cas échéant, pour
+      // que cette demande apparaisse bien dans SalesFlow System.
+      const existing = await supabaseRequest(`leads?telephone=eq.${encodeURIComponent(phoneE164)}`);
+      if (existing && existing.length > 0) {
+        const patch = { statut: "contacté", notes: "Demande de rappel rapide via formulaire estimation" };
+        if (code_postal) patch.code_postal = code_postal;
+        await supabaseRequest(`leads?telephone=eq.${encodeURIComponent(phoneE164)}`, {
+          method: "PATCH",
+          body: JSON.stringify(patch),
+          prefer: "return=minimal",
+        });
+      } else {
+        await supabaseRequest("leads", {
+          method: "POST",
+          body: JSON.stringify({
+            nom: nom || "Visiteur formulaire",
+            prenom: prenom || null,
+            telephone: phoneE164,
+            code_postal: code_postal || null,
+            source: "Formulaire estimation détaillée",
+            statut: "nouveau",
+            notes: "Demande de rappel rapide via formulaire estimation (bas de page)",
+          }),
+          prefer: "return=minimal",
+        });
+      }
     }
 
     const fullName = `${prenom || ""} ${nom || ""}`.trim() || "Un client";
