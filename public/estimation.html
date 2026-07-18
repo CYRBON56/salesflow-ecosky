@@ -890,30 +890,51 @@
     document.getElementById("btnWantCallback").addEventListener("click", requestCallback);
   }
 
+  const CALLBACK_ALLOWED_DEPARTMENTS = ["56", "22", "29", "35", "44"];
+  function isPostalCodeInZone(cp) {
+    if (!cp || cp.length < 2) return true; // pas de code postal donné, on ne bloque pas
+    return CALLBACK_ALLOWED_DEPARTMENTS.includes(cp.trim().slice(0, 2));
+  }
+
   document.getElementById("btnFooterCallback").addEventListener("click", handleFooterCallbackClick);
 
   function handleFooterCallbackClick() {
     if (state.nom && state.telephone) {
-      sendFooterCallback(state.nom, state.prenom, state.telephone);
+      if (!isPostalCodeInZone(state.code_postal)) {
+        showOutOfZoneMessage();
+        return;
+      }
+      sendFooterCallback(state.nom, state.prenom, state.telephone, state.code_postal || "");
       return;
     }
     const container = document.getElementById("footerCallback");
     container.innerHTML = `
       <div style="max-width:320px; margin:0 auto; text-align:left;">
         <input type="text" id="footerNom" placeholder="Votre nom" style="width:100%; border:1.5px solid #d8e3de; border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:8px;" />
-        <input type="tel" id="footerTel" placeholder="Votre téléphone" style="width:100%; border:1.5px solid #d8e3de; border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:10px;" />
+        <input type="tel" id="footerTel" placeholder="Votre téléphone" style="width:100%; border:1.5px solid #d8e3de; border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:8px;" />
+        <input type="text" id="footerCP" placeholder="Code postal" maxlength="5" style="width:100%; border:1.5px solid #d8e3de; border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:10px;" />
         <button class="btn btn-primary" id="btnFooterCallbackConfirm" style="width:100%; padding:10px;">Confirmer</button>
       </div>
     `;
     document.getElementById("btnFooterCallbackConfirm").addEventListener("click", () => {
       const nom = document.getElementById("footerNom").value.trim();
       const tel = document.getElementById("footerTel").value.trim();
+      const cp = document.getElementById("footerCP").value.trim();
       if (!nom || tel.length < 8) return;
-      sendFooterCallback(nom, "", tel);
+      if (!isPostalCodeInZone(cp)) {
+        showOutOfZoneMessage();
+        return;
+      }
+      sendFooterCallback(nom, "", tel, cp);
     });
   }
 
-  async function sendFooterCallback(nom, prenom, telephone) {
+  function showOutOfZoneMessage() {
+    const container = document.getElementById("footerCallback");
+    container.innerHTML = `<div style="font-size:13px; color:#991b1b; max-width:320px; margin:0 auto;">Désolé, nous n'intervenons pas dans votre secteur / département.</div>`;
+  }
+
+  async function sendFooterCallback(nom, prenom, telephone, code_postal) {
     const container = document.getElementById("footerCallback");
     container.innerHTML = `<div style="font-size:13px; color:#5b6b64;">Envoi en cours...</div>`;
     try {
@@ -925,6 +946,7 @@
           nom,
           prenom,
           telephone,
+          code_postal: code_postal || "",
           estimation_texte: state.lastEstimationTexte || "",
         }),
       });
