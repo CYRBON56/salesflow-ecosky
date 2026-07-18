@@ -58,7 +58,7 @@
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
     z-index: -1;
-    background: rgba(246,244,239,0.88);
+    background: rgba(246,244,239,0.55);
   }
   @media (max-width: 800px) {
     .split-layout { flex-direction: column; }
@@ -66,7 +66,12 @@
     .form-panel { padding: 28px 20px 60px; }
   }
   .wrap { max-width: 480px; width: 100%; margin: 0; padding: 0; }
-  .header-block { margin-bottom: 20px; }
+  .header-block {
+    margin-bottom: 20px;
+    background: rgba(255,255,255,0.7);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
   .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 1px; color: #1e6f4c; text-transform: uppercase; }
   h1 { font-size: 22px; margin: 6px 0 8px; }
   .sub { font-size: 14px; color: #5b6b64; margin: 0 0 24px; line-height: 1.5; }
