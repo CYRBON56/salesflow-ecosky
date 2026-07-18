@@ -170,6 +170,7 @@
 (function () {
   const API_URL = "https://salesflow-ecosky.vercel.app/api/submit-estimation";
   const APPOINTMENT_API_URL = "https://salesflow-ecosky.vercel.app/api/estimation-appointment";
+  const CALLBACK_API_URL = "https://salesflow-ecosky.vercel.app/api/request-callback";
   const TRACK_CLICK_URL = "https://salesflow-ecosky.vercel.app/api/track-click";
 
   // ---------- Tracking des clics pub ----------
@@ -732,6 +733,7 @@
   function renderSuccess(data) {
     const est = data.estimation || {};
     state.leadId = data.lead_id || null;
+    state.lastEstimationTexte = est.texte || "";
 
     let priceBlock = "";
     if (est.chiffrable) {
@@ -770,12 +772,50 @@
       <div id="appointmentSection">
         ${remiseBlock}
         <button class="btn btn-primary" id="btnWantAppointment" style="width:100%; margin-top:10px;">
-          📅 Contactez le technicien — pour connaître précisément ce qui est réellement inclus et voir
-          si vous pouvez bénéficier de la remise
+          📅 Prendre rendez-vous à un horaire précis — pour connaître précisément ce qui est réellement
+          inclus et voir si vous pouvez bénéficier de la remise
         </button>
+        <button class="btn" id="btnWantCallback" style="width:100%; margin-top:8px; background:white; border:1.5px solid #1e6f4c; color:#14312a;">
+          📞 Être rappelé rapidement (sans rendez-vous précis)
+        </button>
+        <div id="callbackFeedback"></div>
       </div>
     `;
     document.getElementById("btnWantAppointment").addEventListener("click", showSlots);
+    document.getElementById("btnWantCallback").addEventListener("click", requestCallback);
+  }
+
+  async function requestCallback() {
+    const btn = document.getElementById("btnWantCallback");
+    const feedback = document.getElementById("callbackFeedback");
+    btn.disabled = true;
+    btn.textContent = "Envoi en cours...";
+    try {
+      const res = await fetch(CALLBACK_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: state.leadId,
+          nom: state.nom,
+          prenom: state.prenom,
+          telephone: state.telephone,
+          estimation_texte: state.lastEstimationTexte || "",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        btn.style.display = "none";
+        feedback.innerHTML = `<div class="result-box" style="margin-top:10px;"><div class="result-note">✅ Demande envoyée ! Un conseiller RMS ECOSKY va vous rappeler très rapidement.</div></div>`;
+      } else {
+        btn.disabled = false;
+        btn.textContent = "📞 Être rappelé rapidement (sans rendez-vous précis)";
+        feedback.innerHTML = `<div style="text-align:center; padding:8px 0; color:#991b1b; font-size:13px;">${data.error || "Réessayez dans un instant."}</div>`;
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "📞 Être rappelé rapidement (sans rendez-vous précis)";
+      feedback.innerHTML = `<div style="text-align:center; padding:8px 0; color:#991b1b; font-size:13px;">Impossible d'envoyer la demande. Réessayez.</div>`;
+    }
   }
 
   async function showSlots() {
