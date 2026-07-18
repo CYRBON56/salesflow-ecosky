@@ -166,11 +166,24 @@ function computeEstimation(answers) {
   const totalHT = montantHT + bordureHT;
   const montantTTC = Math.round(totalHT * (1 + tauxTVA));
 
+  // Remise selon le volume (montant TTC de l'estimation) : 5% en dessous de
+  // 5 000€, 10% entre 5 000€ et 10 000€, 15% à partir de 10 000€. Cette
+  // remise n'est PAS automatiquement appliquée au prix final : elle est
+  // affichée à titre indicatif, à confirmer avec un technicien.
+  let remisePourcent = 5;
+  if (montantTTC >= 10000) remisePourcent = 15;
+  else if (montantTTC >= 5000) remisePourcent = 10;
+  const remiseMontant = Math.round(montantTTC * (remisePourcent / 100));
+  const montantApresRemise = montantTTC - remiseMontant;
+
   return {
     chiffrable: true,
     prixM2,
     montantHT: totalHT,
     montantTTC,
+    remisePourcent,
+    remiseMontant,
+    montantApresRemise,
     tauxTVA: batimentAncien ? "10%" : "20%",
     texte: `Estimation indicative : ${prixM2}€ HT/m² × ${surface}m² = ${montantHT}€ HT${bordureTexte}, soit environ ${montantTTC}€ TTC (TVA ${batimentAncien ? "10%" : "20%"}) — ${note}.`,
   };
@@ -355,7 +368,19 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
     page.drawRectangle({ x: pageWidth - marginX - 230, y: y - 8, width: 230, height: 22, color: lightBg });
     text("ESTIMATION TTC", pageWidth - marginX - 220, y, { bold: true, size: 10.5 });
     text(`${estimation.montantTTC} €`, pageWidth - marginX - 110, y, { bold: true, size: 12, color: green });
-    y -= 30;
+    y -= 34;
+    text(`Remise de ${estimation.remisePourcent}% possible selon le volume, à confirmer avec un`, marginX, y, {
+      size: 9,
+      color: green,
+    });
+    y -= 12;
+    text(
+      `technicien : ${estimation.remiseMontant} € offerts, soit ${estimation.montantApresRemise} € TTC au lieu de ${estimation.montantTTC} €.`,
+      marginX,
+      y,
+      { size: 9, color: green }
+    );
+    y -= 26;
   } else {
     tableRow("Ce projet nécessite une évaluation par un technicien", null);
     y -= 20;
@@ -509,9 +534,12 @@ export default async function handler(req, res) {
     // SMS au client avec son estimation (uniquement si dans la zone d'intervention)
     if (phoneE164 && inZone) {
       const pdfLine = pdfUrl ? ` Votre estimateur détaillé (n°${numero}) : ${pdfUrl}` : "";
+      const remiseLine = estimation.chiffrable
+        ? ` 🎁 Remise de ${estimation.remisePourcent}% possible selon le volume (${estimation.montantApresRemise}€ TTC au lieu de ${estimation.montantTTC}€) — contactez un technicien pour voir si vous pouvez en bénéficier.`
+        : "";
       const clientMessage =
         `Bonjour ${prenom || ""}, merci pour votre demande sur RMS ECOSKY ! ` +
-        `${estimation.texte} Cette estimation reste indicative et sera confirmée par l'un de nos techniciens lors d'un appel.${pdfLine} À très vite !`;
+        `${estimation.texte} Cette estimation reste indicative et sera confirmée par l'un de nos techniciens lors d'un appel.${remiseLine}${pdfLine} À très vite !`;
       await sendSms(phoneE164, clientMessage);
     } else if (phoneE164 && !inZone) {
       await sendSms(
