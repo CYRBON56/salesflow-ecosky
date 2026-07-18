@@ -404,6 +404,7 @@ export default function SalesFlowSystem() {
                 onToggle={() => toggleLead(lead)}
                 onStageChange={(stage) => updateLead(lead.id, { stage })}
                 onNotesChange={(notes) => updateLead(lead.id, { notes })}
+                onCallbackHandled={() => updateLead(lead.id, { callback_demande: false })}
                 onDelete={() => deleteLead(lead.id)}
                 onWhatsApp={(key) => openWhatsApp(lead, key)}
                 wa={waData[lead.telephone]}
@@ -453,17 +454,27 @@ function EmptyState({ onImport }) {
     </div>
   );
 }
-function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onDelete, onWhatsApp, wa }) {
+function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onCallbackHandled, onDelete, onWhatsApp, wa }) {
   const stageInfo = ALL_STAGES.find((s) => s.id === lead.stage) || ALL_STAGES[0];
   return (
-    <div style={{ background: "white", borderRadius: 10, border: "1px solid #e7e3d8", overflow: "hidden" }}>
+    <div style={{ background: "white", borderRadius: 10, border: lead.callback_demande ? "1px solid #dc2626" : "1px solid #e7e3d8", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", padding: "14px 16px", gap: 14, cursor: "pointer" }} onClick={onToggle}>
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: stageInfo.color, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 15, color: TEAL_DARK }}>{lead.nom}</div>
+          <div style={{ fontWeight: 600, fontSize: 15, color: TEAL_DARK, display: "flex", alignItems: "center", gap: 8 }}>
+            {lead.nom}
+            {lead.callback_demande && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#fff", background: "#dc2626", borderRadius: 999, padding: "2px 8px" }}>
+                <Phone size={10} /> À rappeler
+              </span>
+            )}
+          </div>
           <div style={{ fontSize: 13, color: "#64748b", display: "flex", gap: 10, marginTop: 2, flexWrap: "wrap" }}>
             <span><Phone size={11} style={{ verticalAlign: -1 }} /> {lead.telephone}</span>
             {lead.source && <span>• {lead.source}</span>}
+            {lead.callback_demande_le && (
+              <span>• Demandé le {new Date(lead.callback_demande_le).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</span>
+            )}
           </div>
         </div>
         <select
@@ -480,6 +491,17 @@ function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onDel
       </div>
       {expanded && (
         <div style={{ padding: "0 16px 16px", borderTop: "1px solid #f1efe8" }}>
+          {lead.callback_demande && (
+            <div style={{ marginTop: 14, padding: "10px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <span style={{ fontSize: 13, color: "#991b1b", fontWeight: 600 }}>📞 Ce client a demandé à être rappelé</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); onCallbackHandled(); }}
+                style={{ ...btnWA, background: "#fff", color: "#991b1b", border: "1px solid #fecaca" }}
+              >
+                <Check size={14} /> Marquer comme rappelé
+              </button>
+            </div>
+          )}
           {lead.estimation_pdf_url && (
             <div style={{ marginTop: 14, padding: "10px 12px", background: "#f6faf9", border: "1px solid #e2f0ec", borderRadius: 8 }}>
               <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>
