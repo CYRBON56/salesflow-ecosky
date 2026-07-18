@@ -61,7 +61,11 @@ export default async function handler(req, res) {
     if (lead_id) {
       await supabaseRequest(`leads?id=eq.${lead_id}`, {
         method: "PATCH",
-        body: JSON.stringify({ statut: "contacté", notes: "Demande de rappel rapide via formulaire estimation" }),
+        body: JSON.stringify({
+          callback_demande: true,
+          callback_demande_le: new Date().toISOString(),
+          notes: "Demande de rappel rapide via formulaire estimation",
+        }),
         prefer: "return=minimal",
       });
     }
