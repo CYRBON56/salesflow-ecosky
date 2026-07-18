@@ -173,19 +173,19 @@
   const CALLBACK_API_URL = "https://salesflow-ecosky.vercel.app/api/request-callback";
   const TRACK_CLICK_URL = "https://salesflow-ecosky.vercel.app/api/track-click";
 
-  // ---------- Tracking des clics pub ----------
-  // Cette page peut être la toute première page vue par un visiteur venant
-  // d'une pub Facebook (destination directe du formulaire) — on capte donc le
-  // clic ici aussi, avec la même logique que sur le site principal, pour que
-  // ça remonte bien dans "Clics pub" de SalesFlow System.
-  (function trackAdClickIfNeeded() {
+  // ---------- Tracking des visites du formulaire ----------
+  // On capte ICI toute arrivée sur le formulaire d'estimation, qu'elle vienne
+  // d'une pub Facebook ou non, pour avoir le nombre réel de gens qui arrivent
+  // sur le formulaire dans "Clics pub" de SalesFlow System.
+  (function trackFormVisit() {
     const params = new URLSearchParams(window.location.search);
     const fbclid = params.get("fbclid");
     const utmSource = params.get("utm_source");
     const isFromAd = !!fbclid || utmSource === "facebook";
-    if (!isFromAd) return;
 
-    const dedupeKey = fbclid || "generic";
+    // Session courante : on ne compte qu'une visite par onglet/session, même
+    // en cas de rechargement de page.
+    const dedupeKey = fbclid || utmSource || "direct";
     let alreadyTracked = null;
     try { alreadyTracked = sessionStorage.getItem("ecosky_click_tracked_key"); } catch (e) {}
     if (alreadyTracked === dedupeKey) return;
@@ -209,7 +209,7 @@
         session_id: sessionId,
         fbclid,
         ad_id: params.get("ad_id"),
-        utm_source: utmSource,
+        utm_source: utmSource || (isFromAd ? null : "direct"),
         utm_campaign: params.get("utm_campaign"),
         utm_medium: params.get("utm_medium"),
         landing_page: window.location.href,
