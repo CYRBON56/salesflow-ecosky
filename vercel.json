@@ -4,5 +4,8 @@
       "path": "/api/send-relances",
       "schedule": "0 9 * * *"
     }
+  ],
+  "rewrites": [
+    { "source": "/mobile", "destination": "/index.html" }
   ]
 }
