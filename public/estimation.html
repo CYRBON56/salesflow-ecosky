@@ -420,7 +420,7 @@
     if (state.usage === "pieton") {
       s.push({
         key: "coloris",
-        question: "Un ou deux coloris EcoSky'Gum vous font-ils déjà envie ?",
+        question: "Quel coloris EcoSky'Gum vous fait envie ?",
         type: "multi-color",
         maxSelection: 2,
         options: [
@@ -555,6 +555,11 @@
       });
       html += "</div>";
     } else if (s.type === "multi-color") {
+      html += `<p style="font-size:13px; color:#5b6b64; margin:-8px 0 16px; line-height:1.5;">
+        Choisissez <strong>une seule couleur</strong> pour un rendu uni, ou <strong>deux couleurs</strong>
+        pour un mélange 50/50 — ce qu'on appelle un <strong>moucheté</strong> chez EcoSky'Gum. Cliquez sur
+        une couleur pour la sélectionner, puis sur une deuxième si vous voulez un mélange.
+      </p>`;
       html += buildColorPreview(state[s.key]);
       html += '<div class="options">';
       s.options.forEach(([val, label]) => {
