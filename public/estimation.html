@@ -1,868 +1,1091 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import Papa from "papaparse";
-import {
-  Upload, MessageCircle, FileText, Send, Trash2, Search,
-  Settings as SettingsIcon, Phone, X, Check, ChevronDown,
-  Users, Filter, Download, RefreshCw, AlertCircle
-} from "lucide-react";
-import { supabase } from "./supabaseClient.js";
-const STAGES = [
-  { id: "nouveau", label: "Nouveau", color: "#64748b" },
-  { id: "contacte", label: "Contacté", color: "#2563eb" },
-  { id: "interesse", label: "Intéressé", color: "#0d9488" },
-  { id: "devis_envoye", label: "Devis envoyé", color: "#d97706" },
-  { id: "negociation", label: "Négociation", color: "#7c3aed" },
-  { id: "client", label: "Client", color: "#059669" },
-];
-const PERDU = { id: "perdu", label: "Perdu", color: "#94a3b8" };
-const ALL_STAGES = [...STAGES, PERDU];
-const TEAL = "#0f5c56";
-const TEAL_DARK = "#0a3f3c";
-const SAND = "#f6f4ef";
-const DEFAULT_TEMPLATES = {
-  intro: "Bonjour {nom}, ici RMS ECOSKY. Merci pour votre demande, on revient vers vous rapidement pour votre projet. À très vite !",
-  catalogue: "Bonjour {nom}, voici notre catalogue EcoSky by RMS : {catalogue_url}\nN'hésitez pas à me dire ce qui vous intéresse, je reste dispo.",
-  devis: "Bonjour {nom}, pour vous préparer un chiffrage précis, pourriez-vous nous envoyer quelques photos (ou une courte vidéo) de la zone concernée via ce lien : {devis_url}\nMerci, on revient vers vous rapidement !",
-};
-const DEFAULT_SETTINGS = {
-  catalogueUrl: "https://www.ecoskybyrms.fr/nos-services-et-prestations/catalogue",
-  devisUrl: "https://www.ecoskybyrms.fr/devis",
-  templates: DEFAULT_TEMPLATES,
-};
-function normalizeHeader(h) {
-  return h
-    .toString()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-function guessColumn(headers, candidates) {
-  const norm = headers.map((h) => ({ raw: h, n: normalizeHeader(h) }));
-  for (const c of candidates) {
-    const found = norm.find((h) => h.n === c);
-    if (found) return found.raw;
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Estimation détaillée — RMS EcoSky</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #14312a;
   }
-  for (const c of candidates) {
-    const found = norm.find((h) => h.n.includes(c));
-    if (found) return found.raw;
+  .split-layout {
+    display: flex;
+    min-height: 100vh;
   }
-  return null;
-}
-function normalizePhone(raw) {
-  if (!raw) return "";
-  let p = raw.toString().replace(/[^\d+]/g, "");
-  if (p.startsWith("+")) return p.replace("+", "");
-  if (p.startsWith("0")) return "33" + p.slice(1);
-  if (p.startsWith("33")) return p;
-  return p;
-}
-function fillTemplate(tpl, lead, settings) {
-  return tpl
-    .replaceAll("{nom}", lead.nom || "")
-    .replaceAll("{catalogue_url}", settings.catalogueUrl || "[lien catalogue à renseigner]")
-    .replaceAll("{devis_url}", settings.devisUrl || "[lien devis à renseigner]");
-}
-function uid() {
-  return Math.random().toString(36).slice(2, 10);
-}
-function settingsFromRow(row) {
-  return {
-    catalogueUrl: row.catalogue_url || "",
-    devisUrl: row.devis_url || "",
-    templates: row.templates || DEFAULT_TEMPLATES,
-  };
-}
-function settingsToRow(s) {
-  return {
-    catalogue_url: s.catalogueUrl,
-    devis_url: s.devisUrl,
-    templates: s.templates,
-  };
-}
-// La table Supabase utilise la colonne "statut", tandis que l'app utilise "stage" en interne.
-function mapRowToLead(row) {
-  return { ...row, stage: row.statut };
-}
-export default function SalesFlowSystem() {
-  const [leads, setLeads] = useState([]);
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-  const [stageFilter, setStageFilter] = useState("all");
-  const [showSettings, setShowSettings] = useState(false);
-  const [showImport, setShowImport] = useState(false);
-  const [csvPreview, setCsvPreview] = useState(null);
-  const [mapping, setMapping] = useState({ nom: "", telephone: "", source: "" });
-  const [expandedLead, setExpandedLead] = useState(null);
-  const [waData, setWaData] = useState({}); // { [telephone]: { loading, conversation, messages } }
-  const [adClicks, setAdClicks] = useState([]);
-  const [showClicks, setShowClicks] = useState(false);
-  const [showCallbacks, setShowCallbacks] = useState(false);
-  const fileInputRef = useRef(null);
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data: leadRows, error: leadErr } = await supabase
-          .from("leads")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (leadErr) throw leadErr;
-        setLeads((leadRows || []).map(mapRowToLead));
-      } catch (e) {
-        setError("Impossible de charger les leads depuis Supabase. Vérifie ton URL/clé dans supabaseClient.js.");
-      }
-      try {
-        const { data: settingsRow, error: settingsErr } = await supabase
-          .from("settings")
-          .select("*")
-          .eq("id", 1)
-          .single();
-        if (settingsErr) throw settingsErr;
-        if (settingsRow) setSettings(settingsFromRow(settingsRow));
-      } catch (e) {}
-      try {
-        const { data: clickRows, error: clickErr } = await supabase
-          .from("web_clicks")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(200);
-        if (clickErr) throw clickErr;
-        setAdClicks(clickRows || []);
-      } catch (e) {
-        // Table pas encore créée ou inaccessible : on n'affiche simplement rien,
-        // sans bloquer le reste du dashboard.
-      }
-      setLoading(false);
-    })();
-    // Temps réel : un nouveau clic pub apparaît instantanément
-    const clicksChannel = supabase
-      .channel("web-clicks-changes")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "web_clicks" }, (payload) => {
-        setAdClicks((prev) => [payload.new, ...prev]);
-      })
-      .subscribe();
-    // Temps réel : un nouveau lead ajouté par Make.com (ou un autre utilisateur) apparaît instantanément
-    const channel = supabase
-      .channel("leads-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "leads" }, (payload) => {
-        if (payload.eventType === "INSERT") {
-          const lead = mapRowToLead(payload.new);
-          setLeads((prev) => (prev.some((l) => l.id === lead.id) ? prev : [lead, ...prev]));
-        } else if (payload.eventType === "UPDATE") {
-          const lead = mapRowToLead(payload.new);
-          setLeads((prev) => prev.map((l) => (l.id === lead.id ? lead : l)));
-        } else if (payload.eventType === "DELETE") {
-          setLeads((prev) => prev.filter((l) => l.id !== payload.old.id));
-        }
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-      supabase.removeChannel(clicksChannel);
-    };
-  }, []);
-  const persistSettings = useCallback(async (next) => {
-    setSettings(next);
-    const { error: err } = await supabase.from("settings").update(settingsToRow(next)).eq("id", 1);
-    if (err) setError("Erreur de sauvegarde des réglages.");
-  }, []);
-  const handleFile = (file) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const headers = results.meta.fields || [];
-        const guessed = {
-          nom: guessColumn(headers, ["nom", "name", "prenom nom", "full name", "prenom"]),
-          telephone: guessColumn(headers, ["telephone", "tel", "phone", "mobile", "numero"]),
-          source: guessColumn(headers, ["campagne", "campaign", "source", "ad set", "ad name"]),
-        };
-        setMapping(guessed);
-        setCsvPreview({ headers, rows: results.data });
-        setShowImport(true);
-      },
-      error: (err) => setError("Erreur de lecture du CSV : " + err.message),
+  .video-panel {
+    flex: 1 1 45%;
+    position: relative;
+    overflow: hidden;
+    background: #14312a;
+  }
+  .video-panel video {
+    position: absolute;
+    top: 50%; left: 50%;
+    min-width: 100%; min-height: 100%;
+    width: auto; height: auto;
+    transform: translate(-50%, -50%);
+    object-fit: cover;
+  }
+  .form-panel {
+    flex: 1 1 55%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .form-bg-slideshow {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: -2;
+    overflow: hidden;
+  }
+  .form-bg-slideshow img {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 1.8s ease-in-out;
+  }
+  .form-bg-slideshow img.active { opacity: 1; }
+  .form-bg-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: -1;
+    background: rgba(246,244,239,0.55);
+  }
+  @media (max-width: 800px) {
+    .split-layout { flex-direction: column; }
+    .video-panel { flex: 0 0 220px; }
+    .form-panel { padding: 28px 20px 60px; }
+  }
+  .wrap { max-width: 480px; width: 100%; margin: 0; padding: 0; }
+  .header-block {
+    margin-bottom: 20px;
+    background: rgba(255,255,255,0.7);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+  .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 1px; color: #1e6f4c; text-transform: uppercase; }
+  h1 { font-size: 22px; margin: 6px 0 8px; }
+  .sub { font-size: 14px; color: #5b6b64; margin: 0 0 24px; line-height: 1.5; }
+
+  .progress { display: flex; gap: 4px; margin-bottom: 26px; }
+  .progress-seg { flex: 1; height: 4px; border-radius: 2px; background: #e0ddd2; }
+  .progress-seg.done { background: #1e6f4c; }
+
+  .card { background: white; border: 1px solid #e2e0d5; border-radius: 14px; padding: 22px; box-shadow: 0 4px 18px rgba(20,49,42,0.06); }
+  .step-label { font-size: 12px; color: #8a9490; margin-bottom: 6px; }
+  .question { font-size: 16px; font-weight: 600; margin: 0 0 16px; line-height: 1.4; }
+
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .option {
+    border: 1.5px solid #d8e3de;
+    border-radius: 10px;
+    padding: 13px 16px;
+    font-size: 14.5px;
+    cursor: pointer;
+    background: white;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .option:hover { border-color: #1e6f4c; }
+  .option.selected { border-color: #1e6f4c; background: #eaf4ef; font-weight: 600; }
+  .color-swatch {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    margin-right: 10px;
+    vertical-align: middle;
+    border: 1.5px solid rgba(0,0,0,0.12);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.5);
+  }
+  .color-preview {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: white;
+    border: 1.5px solid #d8e3de;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+  .color-preview-swatch {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    border: 1.5px solid rgba(0,0,0,0.12);
+    background-size: cover;
+    background-position: center;
+  }
+  .color-preview-text { font-size: 13px; color: #4a5a54; }
+  .color-limit-note { font-size: 12px; color: #8a9490; margin-top: 8px; }
+
+  input[type="text"], input[type="tel"], input[type="email"], input[type="number"] {
+    width: 100%;
+    border: 1.5px solid #d8e3de;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 15px;
+    margin-bottom: 12px;
+    font-family: inherit;
+  }
+  input:focus { outline: none; border-color: #1e6f4c; }
+  label.field-label { display: block; font-size: 12.5px; color: #5b6b64; margin-bottom: 4px; font-weight: 600; }
+
+  .nav-row { display: flex; justify-content: space-between; margin-top: 22px; gap: 10px; }
+  button.btn {
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 14.5px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-primary { background: #1e6f4c; color: white; flex: 1; }
+  .btn-primary:disabled { opacity: 0.45; cursor: default; }
+  .btn-ghost { background: transparent; color: #5b6b64; }
+
+  .result-box {
+    background: #eaf4ef;
+    border: 1.5px solid #1e6f4c;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 10px;
+  }
+  .result-price { font-size: 26px; font-weight: 800; color: #14312a; margin: 6px 0; }
+  .result-note { font-size: 13px; color: #4a5a54; line-height: 1.5; }
+  .disclaimer { font-size: 12px; color: #8a9490; margin-top: 14px; line-height: 1.5; }
+
+  .success-icon { font-size: 40px; text-align: center; margin-bottom: 8px; }
+
+  .trust-footer {
+    margin-top: 28px;
+    padding-top: 18px;
+    border-top: 1px solid #e2e0d5;
+    font-size: 11.5px;
+    color: #8a9490;
+    line-height: 1.6;
+    text-align: center;
+  }
+  .trust-footer .trust-badges {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #4a5a54;
+    font-weight: 600;
+  }
+  .trust-footer .trust-badges span { display: inline-flex; align-items: center; gap: 5px; }
+  .trust-footer .legal-line { color: #14312a; }
+</style>
+</head>
+<body>
+<div class="split-layout">
+  <div class="video-panel">
+    <video autoplay muted loop playsinline>
+      <source src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/VIDEO-2026-07-13-22-59-06.mp4" type="video/mp4" />
+    </video>
+  </div>
+  <div class="form-panel">
+    <div class="form-bg-slideshow" id="formBgSlideshow"></div>
+    <div class="form-bg-overlay"></div>
+    <div class="wrap">
+      <div class="header-block">
+        <div class="eyebrow">RMS EcoSky — Estimation détaillée</div>
+        <h1>Votre estimation personnalisée</h1>
+        <p class="sub" style="margin-bottom:0;">Répondez à quelques questions sur votre projet pour recevoir une estimation la plus précise possible, envoyée directement par SMS.</p>
+      </div>
+      <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px; font-size:12.5px; color:#4a5a54;">
+        <span>✅ Sans engagement</span>
+        <span>⏱️ Réponse sous 24h</span>
+        <span>🔒 Données confidentielles</span>
+      </div>
+
+      <div class="progress" id="progress"></div>
+      <div class="card" id="card"></div>
+
+      <div class="trust-footer">
+        <div class="trust-badges">
+          <span>🛡️ Assurance décennale ERGO France</span>
+          <span>🏛️ RCS Lorient 939 997 870</span>
+        </div>
+        <div class="legal-line">
+          RMS EcoSky — RESINE MARBRE SOL, SASU au capital de 50&nbsp;000&nbsp;€<br/>
+          23 Route de Corn Er Hoet, 56400 Brech — SIRET 939 997 870 00018<br/>
+          Assurance responsabilité civile décennale n° SV75020721/11590 — ERGO France<br/>
+          <a href="https://www.ecoskybyrms.fr" target="_blank" rel="noopener noreferrer" style="color:#1e6f4c;">www.ecoskybyrms.fr</a>
+          &nbsp;—&nbsp;
+          <a href="mailto:infos@ecosky.fr" style="color:#1e6f4c;">infos@ecosky.fr</a>
+        </div>
+        <div id="footerCallback" style="margin-top:14px;">
+          <button class="btn" id="btnFooterCallback" style="background:white; border:1.5px solid #1e6f4c; color:#14312a; padding:10px 18px; font-size:13px; font-weight:700; border-radius:10px; cursor:pointer;">
+            📞 Être rappelé
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const API_URL = "https://salesflow-ecosky.vercel.app/api/submit-estimation";
+  const APPOINTMENT_API_URL = "https://salesflow-ecosky.vercel.app/api/estimation-appointment";
+  const CALLBACK_API_URL = "https://salesflow-ecosky.vercel.app/api/request-callback";
+  const TRACK_CLICK_URL = "https://salesflow-ecosky.vercel.app/api/track-click";
+
+  // ---------- Diaporama de fond (panneau formulaire) ----------
+  const FORM_BG_IMAGES = [
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/1.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/2.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/3.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/4.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/5.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/6.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/7.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/8.JPG",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/9.JPG",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/terrasse.jpg",
+  ];
+  const FORM_BG_INTERVAL_MS = 4500;
+
+  (function initFormBgSlideshow() {
+    const container = document.getElementById("formBgSlideshow");
+    if (!container || FORM_BG_IMAGES.length === 0) return;
+    const imgs = FORM_BG_IMAGES.map((src, i) => {
+      const img = document.createElement("img");
+      img.src = src;
+      if (i === 0) img.className = "active";
+      container.appendChild(img);
+      return img;
     });
-  };
-  const confirmImport = async () => {
-    if (!mapping.nom || !mapping.telephone) {
-      setError("Merci d'indiquer au minimum les colonnes Nom et Téléphone.");
-      return;
-    }
-    const existingPhones = new Set(leads.map((l) => l.telephone));
-    const imported = csvPreview.rows
-      .map((row) => {
-        const nom = (row[mapping.nom] || "").trim();
-        const telephone = normalizePhone(row[mapping.telephone] || "");
-        if (!nom || !telephone) return null;
-        return {
-          nom,
-          telephone,
-          source: mapping.source ? (row[mapping.source] || "").trim() : "",
-          statut: "nouveau",
-          notes: "",
-        };
-      })
-      .filter(Boolean)
-      .filter((l) => !existingPhones.has(l.telephone));
-    if (imported.length === 0) {
-      setShowImport(false);
-      setCsvPreview(null);
-      return;
-    }
-    const { data, error: err } = await supabase.from("leads").insert(imported).select();
-    if (err) {
-      setError("Erreur lors de l'import dans Supabase : " + err.message);
-      return;
-    }
-    setLeads((prev) => [...(data || []).map(mapRowToLead), ...prev]);
-    setShowImport(false);
-    setCsvPreview(null);
-    setError("");
-  };
-  const updateLead = async (id, patch) => {
-    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
-    const dbPatch = { ...patch };
-    if ("stage" in dbPatch) {
-      dbPatch.statut = dbPatch.stage;
-      delete dbPatch.stage;
-    }
-    const { error: err } = await supabase.from("leads").update(dbPatch).eq("id", id);
-    if (err) setError("Erreur de mise à jour du lead.");
-  };
-  const deleteLead = async (id) => {
-    setLeads((prev) => prev.filter((l) => l.id !== id));
-    const { error: err } = await supabase.from("leads").delete().eq("id", id);
-    if (err) setError("Erreur de suppression du lead.");
-  };
-  const loadWhatsApp = useCallback(async (telephone) => {
-    setWaData((prev) => ({ ...prev, [telephone]: { ...(prev[telephone] || {}), loading: true } }));
+    if (imgs.length <= 1) return;
+    let index = 0;
+    setInterval(() => {
+      imgs[index].classList.remove("active");
+      index = (index + 1) % imgs.length;
+      imgs[index].classList.add("active");
+    }, FORM_BG_INTERVAL_MS);
+  })();
+
+  // ---------- Tracking des clics pub ----------
+  // Cette page peut être la toute première page vue par un visiteur venant
+  // d'une pub Facebook (destination directe du formulaire) — on capte donc le
+  // clic ici aussi, avec la même logique que sur le site principal, pour que
+  // ça remonte bien dans "Clics pub" de SalesFlow System.
+  (function trackAdClickIfNeeded() {
+    const params = new URLSearchParams(window.location.search);
+    const fbclid = params.get("fbclid");
+    const utmSource = params.get("utm_source");
+    const isFromAd = !!fbclid || utmSource === "facebook";
+    if (!isFromAd) return;
+
+    const dedupeKey = fbclid || "generic";
+    let alreadyTracked = null;
+    try { alreadyTracked = sessionStorage.getItem("ecosky_click_tracked_key"); } catch (e) {}
+    if (alreadyTracked === dedupeKey) return;
+    try { sessionStorage.setItem("ecosky_click_tracked_key", dedupeKey); } catch (e) {}
+
+    let sessionId = null;
     try {
-      const { data: conversation } = await supabase
-        .from("wa_conversations")
-        .select("*")
-        .eq("phone", telephone)
-        .maybeSingle();
-      const { data: messages } = await supabase
-        .from("wa_messages")
-        .select("*")
-        .eq("phone", telephone)
-        .order("created_at", { ascending: true });
-      setWaData((prev) => ({
-        ...prev,
-        [telephone]: { loading: false, conversation: conversation || null, messages: messages || [] },
-      }));
+      sessionId = localStorage.getItem("ecosky_chat_session");
+      if (!sessionId) {
+        sessionId = "web_" + crypto.randomUUID();
+        localStorage.setItem("ecosky_chat_session", sessionId);
+      }
     } catch (e) {
-      setWaData((prev) => ({ ...prev, [telephone]: { loading: false, conversation: null, messages: [], error: true } }));
+      sessionId = "web_" + Date.now();
     }
-  }, []);
-  const toggleLead = (lead) => {
-    const next = expandedLead === lead.id ? null : lead.id;
-    setExpandedLead(next);
-    if (next && !waData[lead.telephone]) {
-      loadWhatsApp(lead.telephone);
-    }
+
+    fetch(TRACK_CLICK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionId,
+        fbclid,
+        ad_id: params.get("ad_id"),
+        utm_source: utmSource,
+        utm_campaign: params.get("utm_campaign"),
+        utm_medium: params.get("utm_medium"),
+        landing_page: window.location.href,
+        referrer: document.referrer || null,
+      }),
+    }).catch(() => {});
+  })();
+
+  // Teintes réelles approximatives pour les pastilles de couleur (gamme
+  // EcoSky'Gum pour le piéton, granulats pour le carrossable).
+  // Palette complète DIECO — granulats/résine EPDM, avec les vraies
+  // références RAL (voir PALETTE_COLORIS_DIECO_2026.pdf).
+  const COLOR_SWATCHES = {
+    rouge_brique: "#AC4034",   // RAL 3016
+    rouge_vif: "#C1121C",      // RAL 3020
+    vert_fonce: "#316650",     // RAL 6028
+    vert_clair: "#468641",     // RAL 6017
+    orange: "#E75B12",         // RAL 2008
+    vert_reseda: "#5E8351",    // RAL 6011
+    jaune: "#F3DA0B",          // RAL 1018
+    bleu_fonce: "#154889",     // RAL 5005
+    gris_noir: "#2F3234",      // RAL 7021 (= "anthracite")
+    marron: "#4D3324",         // RAL 8028
+    beige: "#C6B286",          // RAL 1001
+    ocre: "#CB8F00",           // RAL 1005
+    gris_souris: "#7C7C7B",    // RAL 7037 (= "gris")
+    gris_clair: "#CFD0CF",     // RAL 7047
+    blanc_perle: "#E3D9C6",    // RAL 1013
+    blanc_casse: "#E6D2B5",    // RAL 1015
+    sable: "#AF8050",          // RAL 1011
+    bleu_petrole: "#234856",   // RAL 5001
+    bleu_moyen: "#2271B3",     // RAL 5015
+    bleu_clair: "#3481B8",     // RAL 5012
+    bleu_pastel: "#7FB0B7",    // RAL 5024
+    violet: "#4A203B",         // RAL 4007
+    lilas: "#6C4675",          // RAL 4005
+    rose: "#B24C8C",           // RAL 4010
+    beige_jaune: "#AF8050",    // RAL 1011 — utilisé uniquement pour l'option parking (inchangée)
   };
-  const openWhatsApp = (lead, templateKey) => {
-    const tpl = settings.templates[templateKey] || "";
-    const text = fillTemplate(tpl, lead, settings);
-    const url = `https://wa.me/${lead.telephone}?text=${encodeURIComponent(text)}`;
-    window.open(url, "_blank");
-    if (templateKey === "intro" && lead.stage === "nouveau") {
-      updateLead(lead.id, { stage: "contacte" });
-    }
-    if (templateKey === "devis" && (lead.stage === "contacte" || lead.stage === "interesse")) {
-      updateLead(lead.id, { stage: "devis_envoye" });
-    }
+
+  const COLOR_LABELS = {
+    rouge_brique: "Rouge brique — RAL 3016",
+    rouge_vif: "Rouge vif — RAL 3020",
+    vert_fonce: "Vert foncé — RAL 6028",
+    vert_clair: "Vert clair — RAL 6017",
+    orange: "Orange — RAL 2008",
+    vert_reseda: "Vert réséda — RAL 6011",
+    jaune: "Jaune — RAL 1018",
+    bleu_fonce: "Bleu foncé — RAL 5005",
+    gris_noir: "Anthracite (Gris noir) — RAL 7021",
+    marron: "Marron — RAL 8028",
+    beige: "Beige — RAL 1001",
+    ocre: "Ocre — RAL 1005",
+    gris_souris: "Gris souris — RAL 7037",
+    gris_clair: "Gris clair — RAL 7047",
+    blanc_perle: "Blanc perle — RAL 1013",
+    blanc_casse: "Blanc cassé — RAL 1015",
+    sable: "Sable — RAL 1011",
+    bleu_petrole: "Bleu pétrole — RAL 5001",
+    bleu_moyen: "Bleu moyen — RAL 5015",
+    bleu_clair: "Bleu clair — RAL 5012",
+    bleu_pastel: "Bleu pastel — RAL 5024",
+    violet: "Violet — RAL 4007",
+    lilas: "Lilas — RAL 4005",
+    rose: "Rose — RAL 4010",
   };
-  const filtered = useMemo(() => {
-    return leads.filter((l) => {
-      const matchesSearch =
-        !search ||
-        l.nom.toLowerCase().includes(search.toLowerCase()) ||
-        l.telephone.includes(search);
-      const matchesStage = stageFilter === "all" || l.stage === stageFilter;
-      return matchesSearch && matchesStage;
+
+  const state = {
+    step: 0,
+    leadId: null,
+    usage: null,
+    support_pieton: null,
+    etat_dalle: null,
+    enlevement_carrelage: null,
+    etat_terrain_carrossable: null,
+    bordure: null,
+    bordure_metres: "",
+    couleur_granulat: null,
+    surface: "",
+    age_batiment: null,
+    delai: null,
+    coloris: [],
+    ville: "",
+    code_postal: "",
+    nom: "",
+    prenom: "",
+    telephone: "",
+    email: "",
+  };
+
+  // La liste des étapes dépend des réponses précédentes (support piéton vs
+  // carrossable, dalle vs carrelage vs pavé, bordure ou non...). On la
+  // recalcule à chaque fois plutôt que d'avoir une liste figée.
+  function getSteps() {
+    const s = [];
+
+    s.push({
+      key: "usage",
+      question: "Quel est le type de projet ?",
+      type: "choice",
+      options: [
+        ["pieton", "Terrasse, tour de piscine ou allée piétonne"],
+        ["carrossable", "Parking ou allée pour véhicule (carrossable)"],
+      ],
     });
-  }, [leads, search, stageFilter]);
-  const counts = useMemo(() => {
-    const c = {};
-    ALL_STAGES.forEach((s) => (c[s.id] = 0));
-    leads.forEach((l) => {
-      c[l.stage] = (c[l.stage] || 0) + 1;
+
+    s.push({ key: "identite", question: "Vos coordonnées", type: "identity" });
+
+    if (state.usage === "pieton") {
+      s.push({
+        key: "support_pieton",
+        question: "Quel est le support actuel ?",
+        type: "choice",
+        options: [
+          ["dalle_beton", "Dalle béton existante"],
+          ["carrelage", "Carrelage existant"],
+          ["pave", "Pavé autobloquant existant"],
+          ["terrain_nu", "Terrain nu, rien n'existe"],
+        ],
+      });
+
+      if (state.support_pieton === "dalle_beton") {
+        s.push({
+          key: "etat_dalle",
+          question: "Dans quel état est la dalle ?",
+          type: "choice",
+          options: [
+            ["bon_etat", "Bon état"],
+            ["a_reprendre", "Fissurée / nécessite réparation"],
+          ],
+        });
+      }
+      if (state.support_pieton === "carrelage") {
+        s.push({
+          key: "enlevement_carrelage",
+          question: "Qui retire les carreaux existants avant notre intervention ?",
+          type: "choice",
+          options: [
+            ["client", "Je m'en charge moi-même"],
+            ["rms", "RMS ECOSKY s'en charge"],
+          ],
+        });
+      }
+    }
+
+    if (state.usage === "carrossable") {
+      s.push({
+        key: "etat_terrain_carrossable",
+        question: "Dans quel état est le terrain actuellement ?",
+        type: "choice",
+        options: [
+          ["terre_nue", "Terre nue, rien n'est fait"],
+          ["deja_prepare", "Terrain déjà préparé / stabilisé"],
+        ],
+      });
+      s.push({
+        key: "bordure",
+        question: "Souhaitez-vous une bordure autour de la zone ?",
+        type: "choice",
+        options: [
+          ["oui", "Oui"],
+          ["non", "Non"],
+        ],
+      });
+      if (state.bordure === "oui") {
+        s.push({
+          key: "bordure_metres",
+          question: "Longueur de bordure souhaitée, en mètres linéaires ?",
+          type: "number",
+          placeholder: "Ex : 12",
+        });
+      }
+      s.push({
+        key: "couleur_granulat",
+        question: "Quelle couleur de granulat souhaitez-vous ?",
+        type: "choice",
+        options: [
+          ["beige_jaune", "Beige / Sable — RAL 1011 (inclus dans le prix de base)"],
+          ["autre", "Une autre couleur (+50€ HT/m²)"],
+        ],
+      });
+    }
+
+    s.push({
+      key: "surface",
+      question: "Quelle surface représente le projet, en m² environ ?",
+      type: "number",
+      placeholder: "Ex : 25",
     });
-    return c;
-  }, [leads]);
-  const exportCsv = () => {
-    const csv = Papa.unparse(
-      leads.map((l) => ({
-        Nom: l.nom,
-        Telephone: l.telephone,
-        Source: l.source,
-        Etape: ALL_STAGES.find((s) => s.id === l.stage)?.label || l.stage,
-        Notes: l.notes,
-      }))
-    );
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `ecosky-leads-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-  };
-  if (loading) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: SAND, fontFamily: "Inter, system-ui, sans-serif", color: TEAL_DARK }}>
-        <RefreshCw size={20} style={{ marginRight: 8, animation: "spin 1s linear infinite" }} />
-        Chargement du SalesFlow...
-        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
+    s.push({
+      key: "age_batiment",
+      question: "Le bâtiment concerné a-t-il plus de 2 ans ?",
+      type: "choice",
+      options: [
+        ["plus_2_ans", "Oui, plus de 2 ans (TVA 10%)"],
+        ["moins_2_ans", "Non, moins de 2 ans (TVA 20%)"],
+      ],
+    });
+    s.push({
+      key: "delai",
+      question: "Sous quel délai souhaitez-vous réaliser ce projet ?",
+      type: "choice",
+      options: [
+        ["urgent", "Le plus vite possible"],
+        ["1_3_mois", "Dans 1 à 3 mois"],
+        ["plus_tard", "Plus tard / pas encore défini"],
+      ],
+    });
+    if (state.usage === "pieton") {
+      s.push({
+        key: "coloris",
+        question: "Quel coloris EcoSky'Gum vous fait envie ?",
+        type: "multi-color",
+        maxSelection: 2,
+        options: [
+          ["gris_souris", COLOR_LABELS.gris_souris],
+          ["gris_noir", COLOR_LABELS.gris_noir],
+          ["gris_clair", COLOR_LABELS.gris_clair],
+          ["beige", COLOR_LABELS.beige],
+          ["sable", COLOR_LABELS.sable],
+          ["ocre", COLOR_LABELS.ocre],
+          ["blanc_perle", COLOR_LABELS.blanc_perle],
+          ["blanc_casse", COLOR_LABELS.blanc_casse],
+          ["marron", COLOR_LABELS.marron],
+          ["jaune", COLOR_LABELS.jaune],
+          ["orange", COLOR_LABELS.orange],
+          ["rouge_brique", COLOR_LABELS.rouge_brique],
+          ["rouge_vif", COLOR_LABELS.rouge_vif],
+          ["rose", COLOR_LABELS.rose],
+          ["violet", COLOR_LABELS.violet],
+          ["lilas", COLOR_LABELS.lilas],
+          ["bleu_fonce", COLOR_LABELS.bleu_fonce],
+          ["bleu_petrole", COLOR_LABELS.bleu_petrole],
+          ["bleu_moyen", COLOR_LABELS.bleu_moyen],
+          ["bleu_clair", COLOR_LABELS.bleu_clair],
+          ["bleu_pastel", COLOR_LABELS.bleu_pastel],
+          ["vert_fonce", COLOR_LABELS.vert_fonce],
+          ["vert_clair", COLOR_LABELS.vert_clair],
+          ["vert_reseda", COLOR_LABELS.vert_reseda],
+          ["pas_encore", "Pas encore décidé"],
+        ],
+      });
+    }
+    s.push({ key: "localisation", question: "Où se situe le projet ?", type: "location" });
+
+    return s;
   }
-  return (
-    <div style={{ minHeight: "100vh", background: SAND, fontFamily: "'Inter', system-ui, -apple-system, sans-serif", color: "#1e2a28" }}>
-      {/* Header */}
-      <div style={{ background: TEAL, color: "white", padding: "20px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 12, letterSpacing: 2, textTransform: "uppercase", opacity: 0.75, fontWeight: 600 }}>EcoSky by RMS</div>
-          <div style={{ fontSize: 22, fontWeight: 700, marginTop: 2 }}>SalesFlow System</div>
+
+  const cardEl = document.getElementById("card");
+  const progressEl = document.getElementById("progress");
+
+  function renderProgress() {
+    const steps = getSteps();
+    progressEl.innerHTML = "";
+    const total = steps.length + 1; // +1 pour l'écran de résultat
+    for (let i = 0; i < total; i++) {
+      const seg = document.createElement("div");
+      seg.className = "progress-seg" + (i <= state.step ? " done" : "");
+      progressEl.appendChild(seg);
+    }
+  }
+
+  function canProceed(s) {
+    if (!s) return true;
+    if (s.type === "choice") return !!state[s.key];
+    if (s.type === "multi-color") return Array.isArray(state[s.key]) && state[s.key].length > 0;
+    if (s.type === "number") return state[s.key] && parseFloat(state[s.key]) > 0;
+    if (s.type === "location") return state.code_postal && state.code_postal.length === 5;
+    if (s.type === "identity") return state.nom && state.telephone && state.telephone.length >= 8;
+    return true;
+  }
+
+  // Génère une texture de grains mouchetés (comme le rendu EPDM réel), pour
+  // remplacer le simple dégradé par un aperçu bien plus fidèle au produit.
+  function generateSpeckleDataUrl(colors, size) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+
+    // Fond neutre (liant résine) légèrement translucide sous les grains
+    ctx.fillStyle = "#e9e6dd";
+    ctx.fillRect(0, 0, size, size);
+
+    const grainCount = Math.round((size * size) / 9); // densité des grains
+    for (let i = 0; i < grainCount; i++) {
+      // Répartition ~homogène entre les 1 ou 2 couleurs, avec un léger désordre
+      const pick = colors.length === 1 ? colors[0] : colors[Math.random() < 0.5 ? 0 : 1];
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const r = 1.2 + Math.random() * 2.3;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r, r * (0.75 + Math.random() * 0.4), Math.random() * Math.PI, 0, Math.PI * 2);
+      ctx.fillStyle = pick;
+      ctx.globalAlpha = 0.65 + Math.random() * 0.35;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    return canvas.toDataURL();
+  }
+
+  function buildColorPreview(selected) {
+    if (!Array.isArray(selected) || selected.length === 0) return "";
+    const real = selected.filter((v) => v !== "pas_encore" && COLOR_SWATCHES[v]);
+    if (real.length === 0) return "";
+
+    if (real.length === 1) {
+      const dataUrl = generateSpeckleDataUrl([COLOR_SWATCHES[real[0]]], 110);
+      return `
+        <div class="color-preview">
+          <div class="color-preview-swatch" style="background-image:url(${dataUrl});"></div>
+          <div class="color-preview-text">${COLOR_LABELS[real[0]] || real[0]}</div>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => setShowClicks(true)} style={btnGhost}>
-            <MessageCircle size={16} /> Clics pub ({adClicks.length})
-          </button>
-          <button onClick={() => setShowCallbacks(true)} style={btnGhost}>
-            <Phone size={16} /> Rappels ({leads.filter((l) => (l.notes || "").includes("rappel rapide")).length})
-          </button>
-          <button onClick={() => setShowSettings(true)} style={btnGhost}>
-            <SettingsIcon size={16} /> Réglages
-          </button>
-          <button onClick={exportCsv} style={btnGhost}>
-            <Download size={16} /> Export
-          </button>
-          <button onClick={() => fileInputRef.current?.click()} style={btnPrimary}>
-            <Upload size={16} /> Importer un CSV
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            style={{ display: "none" }}
-            onChange={(e) => e.target.files[0] && handleFile(e.target.files[0])}
-          />
-        </div>
+      `;
+    }
+
+    const dataUrl = generateSpeckleDataUrl([COLOR_SWATCHES[real[0]], COLOR_SWATCHES[real[1]]], 110);
+    return `
+      <div class="color-preview">
+        <div class="color-preview-swatch" style="background-image:url(${dataUrl});"></div>
+        <div class="color-preview-text">Mélange 50/50 : ${COLOR_LABELS[real[0]] || real[0]} + ${COLOR_LABELS[real[1]] || real[1]}</div>
       </div>
-      {error && (
-        <div style={{ background: "#fef2f2", color: "#b91c1c", padding: "10px 28px", display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-          <AlertCircle size={16} /> {error}
-          <button onClick={() => setError("")} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#b91c1c" }}>
-            <X size={16} />
-          </button>
+    `;
+  }
+
+  function renderStep() {
+    const steps = getSteps();
+    // Si on a dépassé le nombre d'étapes suite à un changement de branche
+    // (ex: retour en arrière puis nouveau choix), on recadre proprement.
+    if (state.step >= steps.length) state.step = steps.length - 1;
+    const s = steps[state.step];
+
+    let html = `<div class="step-label">Étape ${state.step + 1} sur ${steps.length}</div>`;
+    html += `<div class="question">${s.question}</div>`;
+
+    if (s.type === "choice") {
+      html += '<div class="options">';
+      s.options.forEach(([val, label]) => {
+        const sel = state[s.key] === val ? " selected" : "";
+        const swatch = COLOR_SWATCHES[val]
+          ? `<span class="color-swatch" style="background:${COLOR_SWATCHES[val]};"></span>`
+          : "";
+        html += `<div class="option${sel}" data-val="${val}">${swatch}${label}</div>`;
+      });
+      html += "</div>";
+    } else if (s.type === "multi-color") {
+      html += `<p style="font-size:13px; color:#5b6b64; margin:-8px 0 16px; line-height:1.5;">
+        Choisissez <strong>une seule couleur</strong> pour un rendu uni, ou <strong>deux couleurs</strong>
+        pour un mélange 50/50 — ce qu'on appelle un <strong>moucheté</strong> chez EcoSky'Gum. Cliquez sur
+        une couleur pour la sélectionner, puis sur une deuxième si vous voulez un mélange.
+      </p>`;
+      html += buildColorPreview(state[s.key]);
+      html += '<div class="options">';
+      s.options.forEach(([val, label]) => {
+        const chosen = Array.isArray(state[s.key]) && state[s.key].includes(val);
+        const sel = chosen ? " selected" : "";
+        const swatch = COLOR_SWATCHES[val]
+          ? `<span class="color-swatch" style="background:${COLOR_SWATCHES[val]};"></span>`
+          : "";
+        html += `<div class="option${sel}" data-val="${val}">${swatch}${label}${chosen ? " ✓" : ""}</div>`;
+      });
+      html += "</div>";
+      html += `<div class="color-limit-note">Sélectionnez 1 ou 2 couleurs maximum. Avec 2 couleurs, le mélange se fait à 50/50.</div>`;
+    } else if (s.type === "number") {
+      html += `<input type="number" id="inputNum" placeholder="${s.placeholder}" value="${state[s.key]}" min="1" />`;
+    } else if (s.type === "location") {
+      html += `
+        <label class="field-label">Ville</label>
+        <input type="text" id="inputVille" placeholder="Ex : Brech" value="${state.ville}" />
+        <label class="field-label">Code postal</label>
+        <input type="text" id="inputCP" placeholder="Ex : 56400" value="${state.code_postal}" maxlength="5" />
+      `;
+    } else if (s.type === "identity") {
+      html += `
+        <label class="field-label">Nom</label>
+        <input type="text" id="inputNom" value="${state.nom}" />
+        <label class="field-label">Prénom</label>
+        <input type="text" id="inputPrenom" value="${state.prenom}" />
+        <label class="field-label">Téléphone (pour recevoir l'estimation par SMS)</label>
+        <input type="tel" id="inputTel" value="${state.telephone}" placeholder="06 XX XX XX XX" />
+        <label class="field-label">Email (optionnel)</label>
+        <input type="email" id="inputEmail" value="${state.email}" />
+      `;
+    }
+
+    html += `
+      <div class="nav-row">
+        <button class="btn btn-ghost" id="btnBack" ${state.step === 0 ? "style='visibility:hidden'" : ""}>← Retour</button>
+        <button class="btn btn-primary" id="btnNext" disabled>Continuer</button>
+      </div>
+    `;
+
+    cardEl.innerHTML = html;
+    wireStepEvents(s, steps);
+    document.getElementById("btnNext").disabled = !canProceed(s);
+  }
+
+  function wireStepEvents(s, steps) {
+    if (s.type === "choice") {
+      cardEl.querySelectorAll(".option").forEach((el) => {
+        el.addEventListener("click", () => {
+          state[s.key] = el.dataset.val;
+          renderProgress();
+          renderStep();
+        });
+      });
+    } else if (s.type === "multi-color") {
+      if (!Array.isArray(state[s.key])) state[s.key] = [];
+      cardEl.querySelectorAll(".option").forEach((el) => {
+        el.addEventListener("click", () => {
+          const val = el.dataset.val;
+          let current = state[s.key];
+          if (val === "pas_encore") {
+            current = current.includes("pas_encore") ? [] : ["pas_encore"];
+          } else {
+            current = current.filter((v) => v !== "pas_encore");
+            if (current.includes(val)) {
+              current = current.filter((v) => v !== val);
+            } else if (current.length < (s.maxSelection || 2)) {
+              current = [...current, val];
+            } else {
+              // Déjà 2 couleurs choisies : la nouvelle remplace la première.
+              current = [current[1], val];
+            }
+          }
+          state[s.key] = current;
+          renderProgress();
+          renderStep();
+        });
+      });
+    } else if (s.type === "number") {
+      const input = document.getElementById("inputNum");
+      input.addEventListener("input", () => {
+        state[s.key] = input.value;
+        document.getElementById("btnNext").disabled = !canProceed(s);
+      });
+      input.focus();
+    } else if (s.type === "location") {
+      const ville = document.getElementById("inputVille");
+      const cp = document.getElementById("inputCP");
+      ville.addEventListener("input", () => { state.ville = ville.value; });
+      cp.addEventListener("input", () => {
+        state.code_postal = cp.value;
+        document.getElementById("btnNext").disabled = !canProceed(s);
+      });
+      ville.focus();
+    } else if (s.type === "identity") {
+      const nom = document.getElementById("inputNom");
+      const prenom = document.getElementById("inputPrenom");
+      const tel = document.getElementById("inputTel");
+      const email = document.getElementById("inputEmail");
+      [nom, prenom, tel, email].forEach((el) => {
+        el.addEventListener("input", () => {
+          state.nom = nom.value;
+          state.prenom = prenom.value;
+          state.telephone = tel.value;
+          state.email = email.value;
+          document.getElementById("btnNext").disabled = !canProceed(s);
+        });
+      });
+      nom.focus();
+    }
+
+    document.getElementById("btnBack").addEventListener("click", () => {
+      if (state.step > 0) {
+        state.step -= 1;
+        renderProgress();
+        renderStep();
+      }
+    });
+    document.getElementById("btnNext").addEventListener("click", () => {
+      if (!canProceed(s)) return;
+      if (s.type === "identity") {
+        savePartialLead();
+      }
+      if (state.step < steps.length - 1) {
+        state.step += 1;
+        renderProgress();
+        renderStep();
+      } else {
+        submitForm();
+      }
+    });
+  }
+
+  const SAVE_PARTIAL_URL = "https://salesflow-ecosky.vercel.app/api/save-partial-lead";
+  let partialLeadSaved = false;
+
+  function savePartialLead() {
+    // On ne sauvegarde qu'une fois par visite, pas à chaque fois que le
+    // visiteur revient sur cette étape en arrière/avant.
+    if (partialLeadSaved) return;
+    partialLeadSaved = true;
+    fetch(SAVE_PARTIAL_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nom: state.nom,
+        prenom: state.prenom,
+        telephone: state.telephone,
+        type_projet: state.usage,
+      }),
+    }).catch(() => {});
+  }
+
+  function renderLoading() {
+    cardEl.innerHTML = `<div style="text-align:center; padding: 30px 0; color:#5b6b64;">Calcul de votre estimation en cours...</div>`;
+  }
+
+  function renderError(message) {
+    cardEl.innerHTML = `
+      <div style="text-align:center; padding: 10px 0;">
+        <div class="question">Un souci est survenu</div>
+        <p class="sub">${message}</p>
+        <button class="btn btn-primary" id="btnRetry">Réessayer</button>
+      </div>
+    `;
+    document.getElementById("btnRetry").addEventListener("click", submitForm);
+  }
+
+  function renderSuccess(data) {
+    const est = data.estimation || {};
+    state.leadId = data.lead_id || null;
+    state.lastEstimationTexte = est.texte || "";
+
+    let priceBlock = "";
+    if (est.chiffrable) {
+      priceBlock = `
+        <div class="result-box">
+          <div class="result-note">Estimation indicative</div>
+          <div class="result-price">${est.montantTTC} € TTC</div>
+          <div class="result-note">${est.texte}</div>
         </div>
-      )}
-      {/* Stage summary bar */}
-      <div style={{ display: "flex", gap: 8, padding: "16px 28px 0", flexWrap: "wrap" }}>
-        <button
-          onClick={() => setStageFilter("all")}
-          style={pill(stageFilter === "all", "#334155")}
-        >
-          Tous ({leads.length})
+      `;
+    } else {
+      priceBlock = `
+        <div class="result-box">
+          <div class="result-note">${est.texte || "Votre projet nécessite une évaluation personnalisée."}</div>
+        </div>
+      `;
+    }
+    const remiseBlock = est.chiffrable
+      ? `
+        <div style="background:#eaf4ef; border:1.5px solid #1e6f4c; border-radius:10px; padding:12px 14px; margin-top:10px; font-size:13px; color:#14312a; text-align:center;">
+          🎁 <strong>Remise de ${est.remisePourcent}% possible selon le volume</strong><br/>
+          Soit <strong>${est.montantApresRemise} €</strong> au lieu de ${est.montantTTC} € — contactez un
+          technicien pour voir si vous pouvez en bénéficier.
+        </div>
+      `
+      : "";
+
+    cardEl.innerHTML = `
+      <div class="success-icon">✅</div>
+      <div class="question" style="text-align:center;">Merci ${state.prenom || ""} !</div>
+      ${priceBlock}
+      <p class="disclaimer">
+        Cette estimation reste indicative et devra être confirmée par l'un de nos techniciens lors
+        d'un appel téléphonique. Vous recevrez ce récapitulatif par SMS dans quelques instants.
+      </p>
+      <div id="appointmentSection">
+        ${remiseBlock}
+        <button class="btn btn-primary" id="btnWantAppointment" style="width:100%; margin-top:10px;">
+          📅 Prendre rendez-vous à un horaire précis — pour connaître précisément ce qui est réellement
+          inclus et voir si vous pouvez bénéficier de la remise
         </button>
-        {ALL_STAGES.map((s) => (
-          <button key={s.id} onClick={() => setStageFilter(s.id)} style={pill(stageFilter === s.id, s.color)}>
-            {s.label} ({counts[s.id] || 0})
-          </button>
-        ))}
+        <button class="btn" id="btnWantCallback" style="width:100%; margin-top:8px; background:white; border:1.5px solid #1e6f4c; color:#14312a;">
+          📞 Être rappelé rapidement (sans rendez-vous précis)
+        </button>
+        <div id="callbackFeedback"></div>
       </div>
-      {/* Search */}
-      <div style={{ padding: "16px 28px 0" }}>
-        <div style={{ position: "relative", maxWidth: 340 }}>
-          <Search size={16} style={{ position: "absolute", left: 12, top: 11, color: "#94a3b8" }} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher un nom ou un numéro..."
-            style={{
-              width: "100%", padding: "9px 12px 9px 34px", borderRadius: 8,
-              border: "1px solid #d9d5c9", fontSize: 14, outline: "none", boxSizing: "border-box",
-            }}
-          />
-        </div>
-      </div>
-      {/* Leads list */}
-      <div style={{ padding: 28 }}>
-        {leads.length === 0 ? (
-          <EmptyState onImport={() => fileInputRef.current?.click()} />
-        ) : filtered.length === 0 ? (
-          <div style={{ color: "#64748b", fontSize: 14, padding: 40, textAlign: "center" }}>
-            Aucun lead ne correspond à ta recherche.
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {filtered.map((lead) => (
-              <LeadRow
-                key={lead.id}
-                lead={lead}
-                expanded={expandedLead === lead.id}
-                onToggle={() => toggleLead(lead)}
-                onStageChange={(stage) => updateLead(lead.id, { stage })}
-                onNotesChange={(notes) => updateLead(lead.id, { notes })}
-                onCallbackHandled={() => updateLead(lead.id, { callback_demande: false })}
-                onDelete={() => deleteLead(lead.id)}
-                onWhatsApp={(key) => openWhatsApp(lead, key)}
-                wa={waData[lead.telephone]}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-      {showImport && csvPreview && (
-        <ImportModal
-          headers={csvPreview.headers}
-          mapping={mapping}
-          setMapping={setMapping}
-          rowCount={csvPreview.rows.length}
-          onCancel={() => {
-            setShowImport(false);
-            setCsvPreview(null);
-          }}
-          onConfirm={confirmImport}
-        />
-      )}
-      {showSettings && (
-        <SettingsModal
-          settings={settings}
-          onClose={() => setShowSettings(false)}
-          onSave={(next) => {
-            persistSettings(next);
-            setShowSettings(false);
-          }}
-        />
-      )}
-      {showClicks && (
-        <AdClicksModal clicks={adClicks} leads={leads} onClose={() => setShowClicks(false)} />
-      )}
-      {showCallbacks && (
-        <CallbacksModal leads={leads} onClose={() => setShowCallbacks(false)} />
-      )}
-    </div>
-  );
-}
-function EmptyState({ onImport }) {
-  return (
-    <div style={{ textAlign: "center", padding: "60px 20px", color: "#5b6b69" }}>
-      <Users size={36} style={{ marginBottom: 12, color: TEAL, opacity: 0.6 }} />
-      <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6, color: TEAL_DARK }}>Aucun lead pour l'instant</div>
-      <div style={{ fontSize: 14, marginBottom: 18 }}>Importe ton export CSV de leads Facebook Ads pour démarrer.</div>
-      <button onClick={onImport} style={btnPrimary}>
-        <Upload size={16} /> Importer un CSV
-      </button>
-    </div>
-  );
-}
-function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onCallbackHandled, onDelete, onWhatsApp, wa }) {
-  const stageInfo = ALL_STAGES.find((s) => s.id === lead.stage) || ALL_STAGES[0];
-  return (
-    <div style={{ background: "white", borderRadius: 10, border: lead.callback_demande ? "1px solid #dc2626" : "1px solid #e7e3d8", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", padding: "14px 16px", gap: 14, cursor: "pointer" }} onClick={onToggle}>
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: stageInfo.color, flexShrink: 0 }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 15, color: TEAL_DARK, display: "flex", alignItems: "center", gap: 8 }}>
-            {lead.nom}
-            {lead.callback_demande && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#fff", background: "#dc2626", borderRadius: 999, padding: "2px 8px" }}>
-                <Phone size={10} /> À rappeler
-              </span>
-            )}
-          </div>
-          <div style={{ fontSize: 13, color: "#64748b", display: "flex", gap: 10, marginTop: 2, flexWrap: "wrap" }}>
-            <span><Phone size={11} style={{ verticalAlign: -1 }} /> {lead.telephone}</span>
-            {lead.source && <span>• {lead.source}</span>}
-            {lead.callback_demande_le && (
-              <span>• Demandé le {new Date(lead.callback_demande_le).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</span>
-            )}
-          </div>
-        </div>
-        <select
-          value={lead.stage}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => onStageChange(e.target.value)}
-          style={{ fontSize: 13, padding: "6px 8px", borderRadius: 6, border: "1px solid #d9d5c9", background: SAND, color: TEAL_DARK, fontWeight: 500 }}
-        >
-          {ALL_STAGES.map((s) => (
-            <option key={s.id} value={s.id}>{s.label}</option>
-          ))}
-        </select>
-        <ChevronDown size={16} style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s", color: "#94a3b8" }} />
-      </div>
-      {expanded && (
-        <div style={{ padding: "0 16px 16px", borderTop: "1px solid #f1efe8" }}>
-          {lead.callback_demande && (
-            <div style={{ marginTop: 14, padding: "10px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <span style={{ fontSize: 13, color: "#991b1b", fontWeight: 600 }}>📞 Ce client a demandé à être rappelé</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); onCallbackHandled(); }}
-                style={{ ...btnWA, background: "#fff", color: "#991b1b", border: "1px solid #fecaca" }}
-              >
-                <Check size={14} /> Marquer comme rappelé
-              </button>
-            </div>
-          )}
-          {lead.estimation_pdf_url && (
-            <div style={{ marginTop: 14, padding: "10px 12px", background: "#f6faf9", border: "1px solid #e2f0ec", borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>
-                Estimation détaillée {lead.estimation_numero ? `n°${lead.estimation_numero}` : ""}
-                {lead.estimation_texte ? ` — ${lead.estimation_texte}` : ""}
-              </div>
-              <a
-                href={lead.estimation_pdf_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                style={{ ...btnWA, textDecoration: "none", display: "inline-flex" }}
-              >
-                <FileText size={14} /> Voir le PDF estimation
-              </a>
-              {lead.rdv_date && (
-                <div style={{ fontSize: 12, color: "#1e6f4c", fontWeight: 600, marginTop: 8 }}>
-                  📅 RDV technicien : {new Date(lead.rdv_date).toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" })}
-                </div>
-              )}
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-            <button onClick={() => onWhatsApp("intro")} style={btnWA}>
-              <MessageCircle size={14} /> Message de prise de contact
-            </button>
-            <button onClick={() => onWhatsApp("catalogue")} style={btnWA}>
-              <FileText size={14} /> Envoyer le catalogue
-            </button>
-            <button onClick={() => onWhatsApp("devis")} style={btnWA}>
-              <Send size={14} /> Demander un devis (photos/vidéo)
-            </button>
-          </div>
-          <WhatsAppHistory wa={wa} />
-          <textarea
-            value={lead.notes}
-            onChange={(e) => onNotesChange(e.target.value)}
-            placeholder="Notes sur ce lead..."
-            style={{ width: "100%", marginTop: 12, minHeight: 60, padding: 10, borderRadius: 8, border: "1px solid #e7e3d8", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }}
-          />
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-            <button onClick={onDelete} style={{ ...btnGhostSmall, color: "#b91c1c" }}>
-              <Trash2 size={13} /> Supprimer
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-function WhatsAppHistory({ wa }) {
-  const [openThread, setOpenThread] = useState(false);
-  if (!wa || wa.loading) {
-    return (
-      <div style={{ marginTop: 14, fontSize: 12.5, color: "#94a3b8", display: "flex", alignItems: "center", gap: 6 }}>
-        <RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} />
-        Chargement des échanges WhatsApp...
-      </div>
-    );
+    `;
+    document.getElementById("btnWantAppointment").addEventListener("click", showSlots);
+    document.getElementById("btnWantCallback").addEventListener("click", requestCallback);
   }
-  if (wa.error) {
-    return (
-      <div style={{ marginTop: 14, fontSize: 12.5, color: "#b91c1c" }}>
-        Impossible de charger l'historique WhatsApp pour ce numéro.
-      </div>
-    );
-  }
-  if (!wa.conversation || wa.messages.length === 0) {
-    return (
-      <div style={{ marginTop: 14, fontSize: 12.5, color: "#94a3b8" }}>
-        Aucun échange WhatsApp pour ce numéro pour l'instant.
-      </div>
-    );
-  }
-  const lastMessage = wa.messages[wa.messages.length - 1];
-  const preview = lastMessage.content.length > 90 ? lastMessage.content.slice(0, 90) + "…" : lastMessage.content;
-  return (
-    <div style={{ marginTop: 14 }}>
-      <div
-        onClick={() => setOpenThread((v) => !v)}
-        style={{
-          display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
-          padding: "8px 10px", borderRadius: 8, background: "#f6faf9", border: "1px solid #e2f0ec",
-        }}
-      >
-        <MessageCircle size={14} style={{ color: TEAL, flexShrink: 0 }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 600, color: TEAL_DARK }}>
-            Échanges WhatsApp ({wa.messages.length} message{wa.messages.length > 1 ? "s" : ""})
-          </div>
-          <div style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {lastMessage.role === "assistant" ? "Vous : " : ""}{preview}
-          </div>
-        </div>
-        <ChevronDown size={14} style={{ transform: openThread ? "rotate(180deg)" : "none", transition: "transform 0.15s", color: "#94a3b8", flexShrink: 0 }} />
-      </div>
-      {openThread && (
-        <div style={{ marginTop: 8, padding: 12, borderRadius: 8, background: "#fbfaf7", border: "1px solid #f1efe8", maxHeight: 280, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-          {wa.messages.map((m) => (
-            <div key={m.id} style={{ display: "flex", justifyContent: m.role === "assistant" ? "flex-end" : "flex-start" }}>
-              <div
-                style={{
-                  maxWidth: "78%", padding: "7px 11px", borderRadius: 10, fontSize: 12.5, lineHeight: 1.4,
-                  background: m.role === "assistant" ? TEAL : "white",
-                  color: m.role === "assistant" ? "white" : "#1e2a28",
-                  border: m.role === "assistant" ? "none" : "1px solid #e7e3d8",
-                }}
-              >
-                {m.content}
-                <div style={{ fontSize: 10, opacity: 0.7, marginTop: 3 }}>
-                  {new Date(m.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-function ImportModal({ headers, mapping, setMapping, rowCount, onCancel, onConfirm }) {
-  return (
-    <Modal onClose={onCancel} title="Associer les colonnes du CSV">
-      <div style={{ fontSize: 13, color: "#64748b", marginBottom: 14 }}>
-        {rowCount} lignes détectées. Indique quelle colonne correspond à quoi.
-      </div>
-      {[
-        { key: "nom", label: "Nom du contact *" },
-        { key: "telephone", label: "Téléphone *" },
-        { key: "source", label: "Campagne / Source (optionnel)" },
-      ].map((field) => (
-        <div key={field.key} style={{ marginBottom: 12 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: TEAL_DARK, display: "block", marginBottom: 4 }}>{field.label}</label>
-          <select
-            value={mapping[field.key] || ""}
-            onChange={(e) => setMapping({ ...mapping, [field.key]: e.target.value })}
-            style={{ width: "100%", padding: 9, borderRadius: 8, border: "1px solid #d9d5c9", fontSize: 14, boxSizing: "border-box" }}
-          >
-            <option value="">-- Aucune --</option>
-            {headers.map((h) => (
-              <option key={h} value={h}>{h}</option>
-            ))}
-          </select>
-        </div>
-      ))}
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
-        <button onClick={onCancel} style={btnGhostSmall}>Annuler</button>
-        <button onClick={onConfirm} style={btnPrimary}><Check size={15} /> Importer les leads</button>
-      </div>
-    </Modal>
-  );
-}
-function SettingsModal({ settings, onClose, onSave }) {
-  const [local, setLocal] = useState(settings);
-  return (
-    <Modal onClose={onClose} title="Réglages">
-      <div style={{ marginBottom: 14 }}>
-        <label style={labelStyle}>Lien du catalogue</label>
-        <input
-          value={local.catalogueUrl}
-          onChange={(e) => setLocal({ ...local, catalogueUrl: e.target.value })}
-          placeholder="https://ecoskybyrms.fr/catalogue"
-          style={inputStyle}
-        />
-      </div>
-      <div style={{ marginBottom: 18 }}>
-        <label style={labelStyle}>Lien de la page devis (photos/vidéo)</label>
-        <input
-          value={local.devisUrl}
-          onChange={(e) => setLocal({ ...local, devisUrl: e.target.value })}
-          placeholder="https://ecoskybyrms.fr/devis"
-          style={inputStyle}
-        />
-      </div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: TEAL_DARK, marginBottom: 8 }}>Modèles de messages WhatsApp</div>
-      {[
-        { key: "intro", label: "Prise de contact" },
-        { key: "catalogue", label: "Envoi du catalogue" },
-        { key: "devis", label: "Demande de devis" },
-      ].map((t) => (
-        <div key={t.key} style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>{t.label}</label>
-          <textarea
-            value={local.templates[t.key]}
-            onChange={(e) => setLocal({ ...local, templates: { ...local.templates, [t.key]: e.target.value } })}
-            style={{ ...inputStyle, minHeight: 70, fontFamily: "inherit", resize: "vertical" }}
-          />
-        </div>
-      ))}
-      <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 16 }}>
-        Variables disponibles : {"{nom}"}, {"{catalogue_url}"}, {"{devis_url}"}
-      </div>
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-        <button onClick={onClose} style={btnGhostSmall}>Annuler</button>
-        <button onClick={() => onSave(local)} style={btnPrimary}><Check size={15} /> Enregistrer</button>
-      </div>
-    </Modal>
-  );
-}
-function AdClicksModal({ clicks, leads, onClose }) {
-  const totalClicks = clicks.length;
-  const totalLeadsFromAds = leads.filter((l) => (l.ad_id || (l.source || "").toLowerCase().includes("facebook"))).length;
-  const conversionRate = totalClicks > 0 ? Math.round((totalLeadsFromAds / totalClicks) * 100) : 0;
 
-  return (
-    <Modal onClose={onClose} title="Clics publicité Facebook">
-      <div style={{ display: "flex", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
-        <StatCard label="Clics enregistrés" value={totalClicks} />
-        <StatCard label="Leads issus d'une pub" value={totalLeadsFromAds} />
-        <StatCard label="Taux clic → lead" value={`${conversionRate}%`} />
-      </div>
-      <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>
-        Un "clic" est enregistré dès qu'un visiteur arrive sur le site depuis une
-        publicité (avec fbclid ou paramètre utm), même s'il ne discute jamais
-        avec Skyeco ni ne devient un lead. Le taux ci-dessus est une estimation
-        globale (les leads ne sont pas toujours reliés au clic web précis dont
-        ils viennent, notamment pour le Click-to-WhatsApp direct).
-      </div>
-      {totalClicks === 0 ? (
-        <div style={{ fontSize: 13.5, color: "#94a3b8", textAlign: "center", padding: "24px 0" }}>
-          Aucun clic enregistré pour l'instant. Vérifie que la table
-          "web_clicks" existe bien dans Supabase et que le widget du site
-          pointe vers le bon endpoint de suivi.
-        </div>
-      ) : (
-        <div style={{ maxHeight: 360, overflowY: "auto", border: "1px solid #f1efe8", borderRadius: 10 }}>
-          {clicks.map((c) => (
-            <div
-              key={c.id}
-              style={{
-                padding: "10px 12px", borderBottom: "1px solid #f1efe8", fontSize: 12.5,
-                display: "flex", flexDirection: "column", gap: 3,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                <span style={{ fontWeight: 600, color: TEAL_DARK }}>
-                  {c.ad_id ? `Annonce ${c.ad_id}` : (c.utm_campaign || "Source inconnue")}
-                </span>
-                <span style={{ color: "#94a3b8", flexShrink: 0 }}>
-                  {new Date(c.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                </span>
-              </div>
-              <div style={{ color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {c.landing_page || "—"}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
-        <button onClick={onClose} style={btnGhostSmall}>Fermer</button>
-      </div>
-    </Modal>
-  );
-}
-function CallbacksModal({ leads, onClose }) {
-  const callbacks = leads
-    .filter((l) => (l.notes || "").includes("rappel rapide"))
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  document.getElementById("btnFooterCallback").addEventListener("click", handleFooterCallbackClick);
 
-  return (
-    <Modal onClose={onClose} title="Demandes de rappel">
-      <div style={{ display: "flex", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
-        <StatCard label="Demandes reçues" value={callbacks.length} />
+  function handleFooterCallbackClick() {
+    if (state.nom && state.telephone) {
+      sendFooterCallback(state.nom, state.prenom, state.telephone);
+      return;
+    }
+    const container = document.getElementById("footerCallback");
+    container.innerHTML = `
+      <div style="max-width:320px; margin:0 auto; text-align:left;">
+        <input type="text" id="footerNom" placeholder="Votre nom" style="width:100%; border:1.5px solid #d8e3de; border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:8px;" />
+        <input type="tel" id="footerTel" placeholder="Votre téléphone" style="width:100%; border:1.5px solid #d8e3de; border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:10px;" />
+        <button class="btn btn-primary" id="btnFooterCallbackConfirm" style="width:100%; padding:10px;">Confirmer</button>
       </div>
-      <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>
-        Liste des visiteurs ayant demandé à être rappelés rapidement (bouton "Être
-        rappelé" du formulaire d'estimation). Tant que le SMS Twilio n'est pas
-        pleinement opérationnel, c'est ici qu'il faut vérifier ces demandes.
-      </div>
-      {callbacks.length === 0 ? (
-        <div style={{ fontSize: 13.5, color: "#94a3b8", textAlign: "center", padding: "24px 0" }}>
-          Aucune demande de rappel pour l'instant.
-        </div>
-      ) : (
-        <div style={{ maxHeight: 360, overflowY: "auto", border: "1px solid #f1efe8", borderRadius: 10 }}>
-          {callbacks.map((c) => (
-            <div
-              key={c.id}
-              style={{
-                padding: "10px 12px", borderBottom: "1px solid #f1efe8", fontSize: 12.5,
-                display: "flex", flexDirection: "column", gap: 3,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                <span style={{ fontWeight: 600, color: TEAL_DARK }}>
-                  {c.prenom ? `${c.prenom} ${c.nom}` : c.nom || "Nom non renseigné"}
-                </span>
-                <span style={{ color: "#94a3b8", flexShrink: 0 }}>
-                  {new Date(c.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                </span>
-              </div>
-              <div style={{ color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
-                <Phone size={12} /> {c.telephone || "—"}
-              </div>
-              {c.estimation_texte && (
-                <div style={{ color: "#94a3b8", fontSize: 11.5 }}>{c.estimation_texte}</div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
-        <button onClick={onClose} style={btnGhostSmall}>Fermer</button>
-      </div>
-    </Modal>
-  );
-}
-function StatCard({ label, value }) {
-  return (
-    <div style={{ flex: 1, minWidth: 120, background: "#f6faf9", border: "1px solid #e2f0ec", borderRadius: 10, padding: "10px 14px" }}>
-      <div style={{ fontSize: 20, fontWeight: 700, color: TEAL_DARK }}>{value}</div>
-      <div style={{ fontSize: 11.5, color: "#64748b" }}>{label}</div>
-    </div>
-  );
-}
-function Modal({ title, children, onClose }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,25,24,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }} onClick={onClose}>
-      <div style={{ background: "white", borderRadius: 14, padding: 24, width: "100%", maxWidth: 460, maxHeight: "85vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <div style={{ fontSize: 17, fontWeight: 700, color: TEAL_DARK }}>{title}</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8" }}>
-            <X size={18} />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-const labelStyle = { fontSize: 13, fontWeight: 600, color: TEAL_DARK, display: "block", marginBottom: 4 };
-const inputStyle = { width: "100%", padding: 9, borderRadius: 8, border: "1px solid #d9d5c9", fontSize: 14, boxSizing: "border-box" };
-const btnPrimary = {
-  display: "flex", alignItems: "center", gap: 6, background: "white", color: TEAL,
-  border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-};
-const btnGhost = {
-  display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.12)", color: "white",
-  border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer",
-};
-const btnGhostSmall = {
-  display: "flex", alignItems: "center", gap: 5, background: "none", color: "#475569",
-  border: "1px solid #d9d5c9", borderRadius: 7, padding: "7px 12px", fontSize: 12.5, fontWeight: 500, cursor: "pointer",
-};
-const btnWA = {
-  display: "flex", alignItems: "center", gap: 6, background: "#e6f4f1", color: TEAL_DARK,
-  border: "1px solid #cbe8e2", borderRadius: 7, padding: "7px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer",
-};
-function pill(active, color) {
-  return {
-    padding: "6px 12px", borderRadius: 20, fontSize: 12.5, fontWeight: 600, cursor: "pointer",
-    border: `1px solid ${active ? color : "#e7e3d8"}`,
-    background: active ? color : "white",
-    color: active ? "white" : "#475569",
-  };
-}
+    `;
+    document.getElementById("btnFooterCallbackConfirm").addEventListener("click", () => {
+      const nom = document.getElementById("footerNom").value.trim();
+      const tel = document.getElementById("footerTel").value.trim();
+      if (!nom || tel.length < 8) return;
+      sendFooterCallback(nom, "", tel);
+    });
+  }
+
+  async function sendFooterCallback(nom, prenom, telephone) {
+    const container = document.getElementById("footerCallback");
+    container.innerHTML = `<div style="font-size:13px; color:#5b6b64;">Envoi en cours...</div>`;
+    try {
+      const res = await fetch(CALLBACK_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: state.leadId,
+          nom,
+          prenom,
+          telephone,
+          estimation_texte: state.lastEstimationTexte || "",
+        }),
+      });
+      const data = await res.json();
+      container.innerHTML = data.success
+        ? `<div style="font-size:13px; color:#1e6f4c; font-weight:600;">✅ Demande envoyée, on vous rappelle très vite !</div>`
+        : `<div style="font-size:13px; color:#991b1b;">${data.error || "Réessayez dans un instant."}</div>`;
+    } catch (err) {
+      container.innerHTML = `<div style="font-size:13px; color:#991b1b;">Impossible d'envoyer la demande. Réessayez.</div>`;
+    }
+  }
+
+
+  async function requestCallback() {
+    const btn = document.getElementById("btnWantCallback");
+    const feedback = document.getElementById("callbackFeedback");
+    btn.disabled = true;
+    btn.textContent = "Envoi en cours...";
+    try {
+      const res = await fetch(CALLBACK_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: state.leadId,
+          nom: state.nom,
+          prenom: state.prenom,
+          telephone: state.telephone,
+          estimation_texte: state.lastEstimationTexte || "",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        btn.style.display = "none";
+        feedback.innerHTML = `<div class="result-box" style="margin-top:10px;"><div class="result-note">✅ Demande envoyée ! Un conseiller RMS ECOSKY va vous rappeler très rapidement.</div></div>`;
+      } else {
+        btn.disabled = false;
+        btn.textContent = "📞 Être rappelé rapidement (sans rendez-vous précis)";
+        feedback.innerHTML = `<div style="text-align:center; padding:8px 0; color:#991b1b; font-size:13px;">${data.error || "Réessayez dans un instant."}</div>`;
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "📞 Être rappelé rapidement (sans rendez-vous précis)";
+      feedback.innerHTML = `<div style="text-align:center; padding:8px 0; color:#991b1b; font-size:13px;">Impossible d'envoyer la demande. Réessayez.</div>`;
+    }
+  }
+
+  async function showSlots() {
+    const section = document.getElementById("appointmentSection");
+    section.innerHTML = `<div style="text-align:center; padding: 14px 0; color:#5b6b64; font-size:13.5px;">Recherche des créneaux disponibles...</div>`;
+    try {
+      const res = await fetch(APPOINTMENT_API_URL, { method: "GET" });
+      const data = await res.json();
+      if (!data.success || !data.slots || data.slots.length === 0) {
+        section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#5b6b64; font-size:13.5px;">Aucun créneau disponible pour le moment. Un conseiller RMS ECOSKY vous recontactera directement.</div>`;
+        return;
+      }
+      renderSlotChoices(data.slots);
+    } catch (err) {
+      section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#991b1b; font-size:13.5px;">Impossible de récupérer les créneaux. Réessayez dans un instant.</div>`;
+    }
+  }
+
+  function renderSlotChoices(slots) {
+    const section = document.getElementById("appointmentSection");
+    const optionsHtml = slots
+      .map((iso) => {
+        const label = new Intl.DateTimeFormat("fr-FR", {
+          weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+          timeZone: "Europe/Paris",
+        }).format(new Date(iso));
+        return `<div class="option" data-iso="${iso}">${label}</div>`;
+      })
+      .join("");
+    section.innerHTML = `
+      <div class="step-label" style="margin-top:12px;">Choisissez un créneau d'appel avec un technicien</div>
+      <div class="options" id="slotOptions">${optionsHtml}</div>
+    `;
+    section.querySelectorAll(".option").forEach((el) => {
+      el.addEventListener("click", () => bookSlot(el.dataset.iso));
+    });
+  }
+
+  async function bookSlot(iso) {
+    const section = document.getElementById("appointmentSection");
+    section.innerHTML = `<div style="text-align:center; padding: 14px 0; color:#5b6b64; font-size:13.5px;">Confirmation du rendez-vous...</div>`;
+    try {
+      const res = await fetch(APPOINTMENT_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: state.leadId,
+          start_time_iso: iso,
+          nom: state.nom,
+          prenom: state.prenom,
+          email: state.email,
+          telephone: state.telephone,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        section.innerHTML = `
+          <div class="result-box" style="margin-top:12px;">
+            <div class="result-note">✅ Rendez-vous confirmé</div>
+            <div class="result-price" style="font-size:18px;">${data.formatted_date}</div>
+            <div class="result-note">Un technicien RMS ECOSKY vous appellera à ce créneau pour détailler votre devis, les contraintes éventuelles et les remises possibles.</div>
+          </div>
+        `;
+      } else {
+        section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#991b1b; font-size:13.5px;">${data.error || "La réservation a échoué, réessayez."}</div>`;
+      }
+    } catch (err) {
+      section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#991b1b; font-size:13.5px;">Impossible de confirmer le rendez-vous. Réessayez dans un instant.</div>`;
+    }
+  }
+
+  async function submitForm() {
+    renderLoading();
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nom: state.nom,
+          prenom: state.prenom,
+          telephone: state.telephone,
+          email: state.email || null,
+          adresse_projet: state.ville,
+          code_postal: state.code_postal,
+          type_projet: state.usage,
+          answers: {
+            usage: state.usage,
+            support_pieton: state.support_pieton,
+            etat_dalle: state.etat_dalle,
+            enlevement_carrelage: state.enlevement_carrelage,
+            etat_terrain_carrossable: state.etat_terrain_carrossable,
+            bordure: state.bordure,
+            bordure_metres: state.bordure_metres,
+            couleur_granulat: state.couleur_granulat,
+            surface: state.surface,
+            age_batiment: state.age_batiment,
+            delai: state.delai,
+            coloris: state.coloris,
+            ville: state.ville,
+            code_postal: state.code_postal,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        renderSuccess(data);
+      } else {
+        renderError(data.error || "Merci de réessayer dans quelques instants.");
+      }
+    } catch (err) {
+      renderError("Impossible de contacter le serveur pour le moment. Merci de réessayer.");
+    }
+  }
+
+  renderProgress();
+  renderStep();
+})();
+</script>
+</body>
+</html>
