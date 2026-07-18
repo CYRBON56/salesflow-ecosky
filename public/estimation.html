@@ -202,4 +202,771 @@
 
 <script>
 (function () {
-  const API_URL = "https://salesflow-ecosky.verc
+  const API_URL = "https://salesflow-ecosky.vercel.app/api/submit-estimation";
+  const APPOINTMENT_API_URL = "https://salesflow-ecosky.vercel.app/api/estimation-appointment";
+  const CALLBACK_API_URL = "https://salesflow-ecosky.vercel.app/api/request-callback";
+  const TRACK_CLICK_URL = "https://salesflow-ecosky.vercel.app/api/track-click";
+
+  // ---------- Tracking des clics pub ----------
+  // Cette page peut être la toute première page vue par un visiteur venant
+  // d'une pub Facebook (destination directe du formulaire) — on capte donc le
+  // clic ici aussi, avec la même logique que sur le site principal, pour que
+  // ça remonte bien dans "Clics pub" de SalesFlow System.
+  (function trackAdClickIfNeeded() {
+    const params = new URLSearchParams(window.location.search);
+    const fbclid = params.get("fbclid");
+    const utmSource = params.get("utm_source");
+    const isFromAd = !!fbclid || utmSource === "facebook";
+    if (!isFromAd) return;
+
+    const dedupeKey = fbclid || "generic";
+    let alreadyTracked = null;
+    try { alreadyTracked = sessionStorage.getItem("ecosky_click_tracked_key"); } catch (e) {}
+    if (alreadyTracked === dedupeKey) return;
+    try { sessionStorage.setItem("ecosky_click_tracked_key", dedupeKey); } catch (e) {}
+
+    let sessionId = null;
+    try {
+      sessionId = localStorage.getItem("ecosky_chat_session");
+      if (!sessionId) {
+        sessionId = "web_" + crypto.randomUUID();
+        localStorage.setItem("ecosky_chat_session", sessionId);
+      }
+    } catch (e) {
+      sessionId = "web_" + Date.now();
+    }
+
+    fetch(TRACK_CLICK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionId,
+        fbclid,
+        ad_id: params.get("ad_id"),
+        utm_source: utmSource,
+        utm_campaign: params.get("utm_campaign"),
+        utm_medium: params.get("utm_medium"),
+        landing_page: window.location.href,
+        referrer: document.referrer || null,
+      }),
+    }).catch(() => {});
+  })();
+
+  // Teintes réelles approximatives pour les pastilles de couleur (gamme
+  // EcoSky'Gum pour le piéton, granulats pour le carrossable).
+  // Palette complète DIECO — granulats/résine EPDM, avec les vraies
+  // références RAL (voir PALETTE_COLORIS_DIECO_2026.pdf).
+  const COLOR_SWATCHES = {
+    rouge_brique: "#AC4034",   // RAL 3016
+    rouge_vif: "#C1121C",      // RAL 3020
+    vert_fonce: "#316650",     // RAL 6028
+    vert_clair: "#468641",     // RAL 6017
+    orange: "#E75B12",         // RAL 2008
+    vert_reseda: "#5E8351",    // RAL 6011
+    jaune: "#F3DA0B",          // RAL 1018
+    bleu_fonce: "#154889",     // RAL 5005
+    gris_noir: "#2F3234",      // RAL 7021 (= "anthracite")
+    marron: "#4D3324",         // RAL 8028
+    beige: "#C6B286",          // RAL 1001
+    ocre: "#CB8F00",           // RAL 1005
+    gris_souris: "#7C7C7B",    // RAL 7037 (= "gris")
+    gris_clair: "#CFD0CF",     // RAL 7047
+    blanc_perle: "#E3D9C6",    // RAL 1013
+    blanc_casse: "#E6D2B5",    // RAL 1015
+    sable: "#AF8050",          // RAL 1011
+    bleu_petrole: "#234856",   // RAL 5001
+    bleu_moyen: "#2271B3",     // RAL 5015
+    bleu_clair: "#3481B8",     // RAL 5012
+    bleu_pastel: "#7FB0B7",    // RAL 5024
+    violet: "#4A203B",         // RAL 4007
+    lilas: "#6C4675",          // RAL 4005
+    rose: "#B24C8C",           // RAL 4010
+    beige_jaune: "#AF8050",    // RAL 1011 — utilisé uniquement pour l'option parking (inchangée)
+  };
+
+  const COLOR_LABELS = {
+    rouge_brique: "Rouge brique — RAL 3016",
+    rouge_vif: "Rouge vif — RAL 3020",
+    vert_fonce: "Vert foncé — RAL 6028",
+    vert_clair: "Vert clair — RAL 6017",
+    orange: "Orange — RAL 2008",
+    vert_reseda: "Vert réséda — RAL 6011",
+    jaune: "Jaune — RAL 1018",
+    bleu_fonce: "Bleu foncé — RAL 5005",
+    gris_noir: "Anthracite (Gris noir) — RAL 7021",
+    marron: "Marron — RAL 8028",
+    beige: "Beige — RAL 1001",
+    ocre: "Ocre — RAL 1005",
+    gris_souris: "Gris souris — RAL 7037",
+    gris_clair: "Gris clair — RAL 7047",
+    blanc_perle: "Blanc perle — RAL 1013",
+    blanc_casse: "Blanc cassé — RAL 1015",
+    sable: "Sable — RAL 1011",
+    bleu_petrole: "Bleu pétrole — RAL 5001",
+    bleu_moyen: "Bleu moyen — RAL 5015",
+    bleu_clair: "Bleu clair — RAL 5012",
+    bleu_pastel: "Bleu pastel — RAL 5024",
+    violet: "Violet — RAL 4007",
+    lilas: "Lilas — RAL 4005",
+    rose: "Rose — RAL 4010",
+  };
+
+  const state = {
+    step: 0,
+    leadId: null,
+    usage: null,
+    support_pieton: null,
+    etat_dalle: null,
+    enlevement_carrelage: null,
+    etat_terrain_carrossable: null,
+    bordure: null,
+    bordure_metres: "",
+    couleur_granulat: null,
+    surface: "",
+    age_batiment: null,
+    delai: null,
+    coloris: [],
+    ville: "",
+    code_postal: "",
+    nom: "",
+    prenom: "",
+    telephone: "",
+    email: "",
+  };
+
+  // La liste des étapes dépend des réponses précédentes (support piéton vs
+  // carrossable, dalle vs carrelage vs pavé, bordure ou non...). On la
+  // recalcule à chaque fois plutôt que d'avoir une liste figée.
+  function getSteps() {
+    const s = [];
+
+    s.push({
+      key: "usage",
+      question: "Quel est le type de projet ?",
+      type: "choice",
+      options: [
+        ["pieton", "Terrasse, tour de piscine ou allée piétonne"],
+        ["carrossable", "Parking ou allée pour véhicule (carrossable)"],
+      ],
+    });
+
+    s.push({ key: "identite", question: "Vos coordonnées", type: "identity" });
+
+    if (state.usage === "pieton") {
+      s.push({
+        key: "support_pieton",
+        question: "Quel est le support actuel ?",
+        type: "choice",
+        options: [
+          ["dalle_beton", "Dalle béton existante"],
+          ["carrelage", "Carrelage existant"],
+          ["pave", "Pavé autobloquant existant"],
+          ["terrain_nu", "Terrain nu, rien n'existe"],
+        ],
+      });
+
+      if (state.support_pieton === "dalle_beton") {
+        s.push({
+          key: "etat_dalle",
+          question: "Dans quel état est la dalle ?",
+          type: "choice",
+          options: [
+            ["bon_etat", "Bon état"],
+            ["a_reprendre", "Fissurée / nécessite réparation"],
+          ],
+        });
+      }
+      if (state.support_pieton === "carrelage") {
+        s.push({
+          key: "enlevement_carrelage",
+          question: "Qui retire les carreaux existants avant notre intervention ?",
+          type: "choice",
+          options: [
+            ["client", "Je m'en charge moi-même"],
+            ["rms", "RMS ECOSKY s'en charge"],
+          ],
+        });
+      }
+    }
+
+    if (state.usage === "carrossable") {
+      s.push({
+        key: "etat_terrain_carrossable",
+        question: "Dans quel état est le terrain actuellement ?",
+        type: "choice",
+        options: [
+          ["terre_nue", "Terre nue, rien n'est fait"],
+          ["deja_prepare", "Terrain déjà préparé / stabilisé"],
+        ],
+      });
+      s.push({
+        key: "bordure",
+        question: "Souhaitez-vous une bordure autour de la zone ?",
+        type: "choice",
+        options: [
+          ["oui", "Oui"],
+          ["non", "Non"],
+        ],
+      });
+      if (state.bordure === "oui") {
+        s.push({
+          key: "bordure_metres",
+          question: "Longueur de bordure souhaitée, en mètres linéaires ?",
+          type: "number",
+          placeholder: "Ex : 12",
+        });
+      }
+      s.push({
+        key: "couleur_granulat",
+        question: "Quelle couleur de granulat souhaitez-vous ?",
+        type: "choice",
+        options: [
+          ["beige_jaune", "Beige / Sable — RAL 1011 (inclus dans le prix de base)"],
+          ["autre", "Une autre couleur (+50€ HT/m²)"],
+        ],
+      });
+    }
+
+    s.push({
+      key: "surface",
+      question: "Quelle surface représente le projet, en m² environ ?",
+      type: "number",
+      placeholder: "Ex : 25",
+    });
+    s.push({
+      key: "age_batiment",
+      question: "Le bâtiment concerné a-t-il plus de 2 ans ?",
+      type: "choice",
+      options: [
+        ["plus_2_ans", "Oui, plus de 2 ans (TVA 10%)"],
+        ["moins_2_ans", "Non, moins de 2 ans (TVA 20%)"],
+      ],
+    });
+    s.push({
+      key: "delai",
+      question: "Sous quel délai souhaitez-vous réaliser ce projet ?",
+      type: "choice",
+      options: [
+        ["urgent", "Le plus vite possible"],
+        ["1_3_mois", "Dans 1 à 3 mois"],
+        ["plus_tard", "Plus tard / pas encore défini"],
+      ],
+    });
+    if (state.usage === "pieton") {
+      s.push({
+        key: "coloris",
+        question: "Quel coloris EcoSky'Gum vous fait envie ?",
+        type: "multi-color",
+        maxSelection: 2,
+        options: [
+          ["gris_souris", COLOR_LABELS.gris_souris],
+          ["gris_noir", COLOR_LABELS.gris_noir],
+          ["gris_clair", COLOR_LABELS.gris_clair],
+          ["beige", COLOR_LABELS.beige],
+          ["sable", COLOR_LABELS.sable],
+          ["ocre", COLOR_LABELS.ocre],
+          ["blanc_perle", COLOR_LABELS.blanc_perle],
+          ["blanc_casse", COLOR_LABELS.blanc_casse],
+          ["marron", COLOR_LABELS.marron],
+          ["jaune", COLOR_LABELS.jaune],
+          ["orange", COLOR_LABELS.orange],
+          ["rouge_brique", COLOR_LABELS.rouge_brique],
+          ["rouge_vif", COLOR_LABELS.rouge_vif],
+          ["rose", COLOR_LABELS.rose],
+          ["violet", COLOR_LABELS.violet],
+          ["lilas", COLOR_LABELS.lilas],
+          ["bleu_fonce", COLOR_LABELS.bleu_fonce],
+          ["bleu_petrole", COLOR_LABELS.bleu_petrole],
+          ["bleu_moyen", COLOR_LABELS.bleu_moyen],
+          ["bleu_clair", COLOR_LABELS.bleu_clair],
+          ["bleu_pastel", COLOR_LABELS.bleu_pastel],
+          ["vert_fonce", COLOR_LABELS.vert_fonce],
+          ["vert_clair", COLOR_LABELS.vert_clair],
+          ["vert_reseda", COLOR_LABELS.vert_reseda],
+          ["pas_encore", "Pas encore décidé"],
+        ],
+      });
+    }
+    s.push({ key: "localisation", question: "Où se situe le projet ?", type: "location" });
+
+    return s;
+  }
+
+  const cardEl = document.getElementById("card");
+  const progressEl = document.getElementById("progress");
+
+  function renderProgress() {
+    const steps = getSteps();
+    progressEl.innerHTML = "";
+    const total = steps.length + 1; // +1 pour l'écran de résultat
+    for (let i = 0; i < total; i++) {
+      const seg = document.createElement("div");
+      seg.className = "progress-seg" + (i <= state.step ? " done" : "");
+      progressEl.appendChild(seg);
+    }
+  }
+
+  function canProceed(s) {
+    if (!s) return true;
+    if (s.type === "choice") return !!state[s.key];
+    if (s.type === "multi-color") return Array.isArray(state[s.key]) && state[s.key].length > 0;
+    if (s.type === "number") return state[s.key] && parseFloat(state[s.key]) > 0;
+    if (s.type === "location") return state.code_postal && state.code_postal.length === 5;
+    if (s.type === "identity") return state.nom && state.telephone && state.telephone.length >= 8;
+    return true;
+  }
+
+  // Génère une texture de grains mouchetés (comme le rendu EPDM réel), pour
+  // remplacer le simple dégradé par un aperçu bien plus fidèle au produit.
+  function generateSpeckleDataUrl(colors, size) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+
+    // Fond neutre (liant résine) légèrement translucide sous les grains
+    ctx.fillStyle = "#e9e6dd";
+    ctx.fillRect(0, 0, size, size);
+
+    const grainCount = Math.round((size * size) / 9); // densité des grains
+    for (let i = 0; i < grainCount; i++) {
+      // Répartition ~homogène entre les 1 ou 2 couleurs, avec un léger désordre
+      const pick = colors.length === 1 ? colors[0] : colors[Math.random() < 0.5 ? 0 : 1];
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const r = 1.2 + Math.random() * 2.3;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r, r * (0.75 + Math.random() * 0.4), Math.random() * Math.PI, 0, Math.PI * 2);
+      ctx.fillStyle = pick;
+      ctx.globalAlpha = 0.65 + Math.random() * 0.35;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    return canvas.toDataURL();
+  }
+
+  function buildColorPreview(selected) {
+    if (!Array.isArray(selected) || selected.length === 0) return "";
+    const real = selected.filter((v) => v !== "pas_encore" && COLOR_SWATCHES[v]);
+    if (real.length === 0) return "";
+
+    if (real.length === 1) {
+      const dataUrl = generateSpeckleDataUrl([COLOR_SWATCHES[real[0]]], 110);
+      return `
+        <div class="color-preview">
+          <div class="color-preview-swatch" style="background-image:url(${dataUrl});"></div>
+          <div class="color-preview-text">${COLOR_LABELS[real[0]] || real[0]}</div>
+        </div>
+      `;
+    }
+
+    const dataUrl = generateSpeckleDataUrl([COLOR_SWATCHES[real[0]], COLOR_SWATCHES[real[1]]], 110);
+    return `
+      <div class="color-preview">
+        <div class="color-preview-swatch" style="background-image:url(${dataUrl});"></div>
+        <div class="color-preview-text">Mélange 50/50 : ${COLOR_LABELS[real[0]] || real[0]} + ${COLOR_LABELS[real[1]] || real[1]}</div>
+      </div>
+    `;
+  }
+
+  function renderStep() {
+    const steps = getSteps();
+    // Si on a dépassé le nombre d'étapes suite à un changement de branche
+    // (ex: retour en arrière puis nouveau choix), on recadre proprement.
+    if (state.step >= steps.length) state.step = steps.length - 1;
+    const s = steps[state.step];
+
+    let html = `<div class="step-label">Étape ${state.step + 1} sur ${steps.length}</div>`;
+    html += `<div class="question">${s.question}</div>`;
+
+    if (s.type === "choice") {
+      html += '<div class="options">';
+      s.options.forEach(([val, label]) => {
+        const sel = state[s.key] === val ? " selected" : "";
+        const swatch = COLOR_SWATCHES[val]
+          ? `<span class="color-swatch" style="background:${COLOR_SWATCHES[val]};"></span>`
+          : "";
+        html += `<div class="option${sel}" data-val="${val}">${swatch}${label}</div>`;
+      });
+      html += "</div>";
+    } else if (s.type === "multi-color") {
+      html += `<p style="font-size:13px; color:#5b6b64; margin:-8px 0 16px; line-height:1.5;">
+        Choisissez <strong>une seule couleur</strong> pour un rendu uni, ou <strong>deux couleurs</strong>
+        pour un mélange 50/50 — ce qu'on appelle un <strong>moucheté</strong> chez EcoSky'Gum. Cliquez sur
+        une couleur pour la sélectionner, puis sur une deuxième si vous voulez un mélange.
+      </p>`;
+      html += buildColorPreview(state[s.key]);
+      html += '<div class="options">';
+      s.options.forEach(([val, label]) => {
+        const chosen = Array.isArray(state[s.key]) && state[s.key].includes(val);
+        const sel = chosen ? " selected" : "";
+        const swatch = COLOR_SWATCHES[val]
+          ? `<span class="color-swatch" style="background:${COLOR_SWATCHES[val]};"></span>`
+          : "";
+        html += `<div class="option${sel}" data-val="${val}">${swatch}${label}${chosen ? " ✓" : ""}</div>`;
+      });
+      html += "</div>";
+      html += `<div class="color-limit-note">Sélectionnez 1 ou 2 couleurs maximum. Avec 2 couleurs, le mélange se fait à 50/50.</div>`;
+    } else if (s.type === "number") {
+      html += `<input type="number" id="inputNum" placeholder="${s.placeholder}" value="${state[s.key]}" min="1" />`;
+    } else if (s.type === "location") {
+      html += `
+        <label class="field-label">Ville</label>
+        <input type="text" id="inputVille" placeholder="Ex : Brech" value="${state.ville}" />
+        <label class="field-label">Code postal</label>
+        <input type="text" id="inputCP" placeholder="Ex : 56400" value="${state.code_postal}" maxlength="5" />
+      `;
+    } else if (s.type === "identity") {
+      html += `
+        <label class="field-label">Nom</label>
+        <input type="text" id="inputNom" value="${state.nom}" />
+        <label class="field-label">Prénom</label>
+        <input type="text" id="inputPrenom" value="${state.prenom}" />
+        <label class="field-label">Téléphone (pour recevoir l'estimation par SMS)</label>
+        <input type="tel" id="inputTel" value="${state.telephone}" placeholder="06 XX XX XX XX" />
+        <label class="field-label">Email (optionnel)</label>
+        <input type="email" id="inputEmail" value="${state.email}" />
+      `;
+    }
+
+    html += `
+      <div class="nav-row">
+        <button class="btn btn-ghost" id="btnBack" ${state.step === 0 ? "style='visibility:hidden'" : ""}>← Retour</button>
+        <button class="btn btn-primary" id="btnNext" disabled>Continuer</button>
+      </div>
+    `;
+
+    cardEl.innerHTML = html;
+    wireStepEvents(s, steps);
+    document.getElementById("btnNext").disabled = !canProceed(s);
+  }
+
+  function wireStepEvents(s, steps) {
+    if (s.type === "choice") {
+      cardEl.querySelectorAll(".option").forEach((el) => {
+        el.addEventListener("click", () => {
+          state[s.key] = el.dataset.val;
+          renderProgress();
+          renderStep();
+        });
+      });
+    } else if (s.type === "multi-color") {
+      if (!Array.isArray(state[s.key])) state[s.key] = [];
+      cardEl.querySelectorAll(".option").forEach((el) => {
+        el.addEventListener("click", () => {
+          const val = el.dataset.val;
+          let current = state[s.key];
+          if (val === "pas_encore") {
+            current = current.includes("pas_encore") ? [] : ["pas_encore"];
+          } else {
+            current = current.filter((v) => v !== "pas_encore");
+            if (current.includes(val)) {
+              current = current.filter((v) => v !== val);
+            } else if (current.length < (s.maxSelection || 2)) {
+              current = [...current, val];
+            } else {
+              // Déjà 2 couleurs choisies : la nouvelle remplace la première.
+              current = [current[1], val];
+            }
+          }
+          state[s.key] = current;
+          renderProgress();
+          renderStep();
+        });
+      });
+    } else if (s.type === "number") {
+      const input = document.getElementById("inputNum");
+      input.addEventListener("input", () => {
+        state[s.key] = input.value;
+        document.getElementById("btnNext").disabled = !canProceed(s);
+      });
+      input.focus();
+    } else if (s.type === "location") {
+      const ville = document.getElementById("inputVille");
+      const cp = document.getElementById("inputCP");
+      ville.addEventListener("input", () => { state.ville = ville.value; });
+      cp.addEventListener("input", () => {
+        state.code_postal = cp.value;
+        document.getElementById("btnNext").disabled = !canProceed(s);
+      });
+      ville.focus();
+    } else if (s.type === "identity") {
+      const nom = document.getElementById("inputNom");
+      const prenom = document.getElementById("inputPrenom");
+      const tel = document.getElementById("inputTel");
+      const email = document.getElementById("inputEmail");
+      [nom, prenom, tel, email].forEach((el) => {
+        el.addEventListener("input", () => {
+          state.nom = nom.value;
+          state.prenom = prenom.value;
+          state.telephone = tel.value;
+          state.email = email.value;
+          document.getElementById("btnNext").disabled = !canProceed(s);
+        });
+      });
+      nom.focus();
+    }
+
+    document.getElementById("btnBack").addEventListener("click", () => {
+      if (state.step > 0) {
+        state.step -= 1;
+        renderProgress();
+        renderStep();
+      }
+    });
+    document.getElementById("btnNext").addEventListener("click", () => {
+      if (!canProceed(s)) return;
+      if (s.type === "identity") {
+        savePartialLead();
+      }
+      if (state.step < steps.length - 1) {
+        state.step += 1;
+        renderProgress();
+        renderStep();
+      } else {
+        submitForm();
+      }
+    });
+  }
+
+  const SAVE_PARTIAL_URL = "https://salesflow-ecosky.vercel.app/api/save-partial-lead";
+  let partialLeadSaved = false;
+
+  function savePartialLead() {
+    // On ne sauvegarde qu'une fois par visite, pas à chaque fois que le
+    // visiteur revient sur cette étape en arrière/avant.
+    if (partialLeadSaved) return;
+    partialLeadSaved = true;
+    fetch(SAVE_PARTIAL_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nom: state.nom,
+        prenom: state.prenom,
+        telephone: state.telephone,
+        type_projet: state.usage,
+      }),
+    }).catch(() => {});
+  }
+
+  function renderLoading() {
+    cardEl.innerHTML = `<div style="text-align:center; padding: 30px 0; color:#5b6b64;">Calcul de votre estimation en cours...</div>`;
+  }
+
+  function renderError(message) {
+    cardEl.innerHTML = `
+      <div style="text-align:center; padding: 10px 0;">
+        <div class="question">Un souci est survenu</div>
+        <p class="sub">${message}</p>
+        <button class="btn btn-primary" id="btnRetry">Réessayer</button>
+      </div>
+    `;
+    document.getElementById("btnRetry").addEventListener("click", submitForm);
+  }
+
+  function renderSuccess(data) {
+    const est = data.estimation || {};
+    state.leadId = data.lead_id || null;
+    state.lastEstimationTexte = est.texte || "";
+
+    let priceBlock = "";
+    if (est.chiffrable) {
+      priceBlock = `
+        <div class="result-box">
+          <div class="result-note">Estimation indicative</div>
+          <div class="result-price">${est.montantTTC} € TTC</div>
+          <div class="result-note">${est.texte}</div>
+        </div>
+      `;
+    } else {
+      priceBlock = `
+        <div class="result-box">
+          <div class="result-note">${est.texte || "Votre projet nécessite une évaluation personnalisée."}</div>
+        </div>
+      `;
+    }
+    const remiseBlock = est.chiffrable
+      ? `
+        <div style="background:#eaf4ef; border:1.5px solid #1e6f4c; border-radius:10px; padding:12px 14px; margin-top:10px; font-size:13px; color:#14312a; text-align:center;">
+          🎁 <strong>Remise de ${est.remisePourcent}% possible selon le volume</strong><br/>
+          Soit <strong>${est.montantApresRemise} €</strong> au lieu de ${est.montantTTC} € — contactez un
+          technicien pour voir si vous pouvez en bénéficier.
+        </div>
+      `
+      : "";
+
+    cardEl.innerHTML = `
+      <div class="success-icon">✅</div>
+      <div class="question" style="text-align:center;">Merci ${state.prenom || ""} !</div>
+      ${priceBlock}
+      <p class="disclaimer">
+        Cette estimation reste indicative et devra être confirmée par l'un de nos techniciens lors
+        d'un appel téléphonique. Vous recevrez ce récapitulatif par SMS dans quelques instants.
+      </p>
+      <div id="appointmentSection">
+        ${remiseBlock}
+        <button class="btn btn-primary" id="btnWantAppointment" style="width:100%; margin-top:10px;">
+          📅 Prendre rendez-vous à un horaire précis — pour connaître précisément ce qui est réellement
+          inclus et voir si vous pouvez bénéficier de la remise
+        </button>
+        <button class="btn" id="btnWantCallback" style="width:100%; margin-top:8px; background:white; border:1.5px solid #1e6f4c; color:#14312a;">
+          📞 Être rappelé rapidement (sans rendez-vous précis)
+        </button>
+        <div id="callbackFeedback"></div>
+      </div>
+    `;
+    document.getElementById("btnWantAppointment").addEventListener("click", showSlots);
+    document.getElementById("btnWantCallback").addEventListener("click", requestCallback);
+  }
+
+  async function requestCallback() {
+    const btn = document.getElementById("btnWantCallback");
+    const feedback = document.getElementById("callbackFeedback");
+    btn.disabled = true;
+    btn.textContent = "Envoi en cours...";
+    try {
+      const res = await fetch(CALLBACK_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: state.leadId,
+          nom: state.nom,
+          prenom: state.prenom,
+          telephone: state.telephone,
+          estimation_texte: state.lastEstimationTexte || "",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        btn.style.display = "none";
+        feedback.innerHTML = `<div class="result-box" style="margin-top:10px;"><div class="result-note">✅ Demande envoyée ! Un conseiller RMS ECOSKY va vous rappeler très rapidement.</div></div>`;
+      } else {
+        btn.disabled = false;
+        btn.textContent = "📞 Être rappelé rapidement (sans rendez-vous précis)";
+        feedback.innerHTML = `<div style="text-align:center; padding:8px 0; color:#991b1b; font-size:13px;">${data.error || "Réessayez dans un instant."}</div>`;
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "📞 Être rappelé rapidement (sans rendez-vous précis)";
+      feedback.innerHTML = `<div style="text-align:center; padding:8px 0; color:#991b1b; font-size:13px;">Impossible d'envoyer la demande. Réessayez.</div>`;
+    }
+  }
+
+  async function showSlots() {
+    const section = document.getElementById("appointmentSection");
+    section.innerHTML = `<div style="text-align:center; padding: 14px 0; color:#5b6b64; font-size:13.5px;">Recherche des créneaux disponibles...</div>`;
+    try {
+      const res = await fetch(APPOINTMENT_API_URL, { method: "GET" });
+      const data = await res.json();
+      if (!data.success || !data.slots || data.slots.length === 0) {
+        section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#5b6b64; font-size:13.5px;">Aucun créneau disponible pour le moment. Un conseiller RMS ECOSKY vous recontactera directement.</div>`;
+        return;
+      }
+      renderSlotChoices(data.slots);
+    } catch (err) {
+      section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#991b1b; font-size:13.5px;">Impossible de récupérer les créneaux. Réessayez dans un instant.</div>`;
+    }
+  }
+
+  function renderSlotChoices(slots) {
+    const section = document.getElementById("appointmentSection");
+    const optionsHtml = slots
+      .map((iso) => {
+        const label = new Intl.DateTimeFormat("fr-FR", {
+          weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+          timeZone: "Europe/Paris",
+        }).format(new Date(iso));
+        return `<div class="option" data-iso="${iso}">${label}</div>`;
+      })
+      .join("");
+    section.innerHTML = `
+      <div class="step-label" style="margin-top:12px;">Choisissez un créneau d'appel avec un technicien</div>
+      <div class="options" id="slotOptions">${optionsHtml}</div>
+    `;
+    section.querySelectorAll(".option").forEach((el) => {
+      el.addEventListener("click", () => bookSlot(el.dataset.iso));
+    });
+  }
+
+  async function bookSlot(iso) {
+    const section = document.getElementById("appointmentSection");
+    section.innerHTML = `<div style="text-align:center; padding: 14px 0; color:#5b6b64; font-size:13.5px;">Confirmation du rendez-vous...</div>`;
+    try {
+      const res = await fetch(APPOINTMENT_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: state.leadId,
+          start_time_iso: iso,
+          nom: state.nom,
+          prenom: state.prenom,
+          email: state.email,
+          telephone: state.telephone,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        section.innerHTML = `
+          <div class="result-box" style="margin-top:12px;">
+            <div class="result-note">✅ Rendez-vous confirmé</div>
+            <div class="result-price" style="font-size:18px;">${data.formatted_date}</div>
+            <div class="result-note">Un technicien RMS ECOSKY vous appellera à ce créneau pour détailler votre devis, les contraintes éventuelles et les remises possibles.</div>
+          </div>
+        `;
+      } else {
+        section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#991b1b; font-size:13.5px;">${data.error || "La réservation a échoué, réessayez."}</div>`;
+      }
+    } catch (err) {
+      section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#991b1b; font-size:13.5px;">Impossible de confirmer le rendez-vous. Réessayez dans un instant.</div>`;
+    }
+  }
+
+  async function submitForm() {
+    renderLoading();
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nom: state.nom,
+          prenom: state.prenom,
+          telephone: state.telephone,
+          email: state.email || null,
+          adresse_projet: state.ville,
+          code_postal: state.code_postal,
+          type_projet: state.usage,
+          answers: {
+            usage: state.usage,
+            support_pieton: state.support_pieton,
+            etat_dalle: state.etat_dalle,
+            enlevement_carrelage: state.enlevement_carrelage,
+            etat_terrain_carrossable: state.etat_terrain_carrossable,
+            bordure: state.bordure,
+            bordure_metres: state.bordure_metres,
+            couleur_granulat: state.couleur_granulat,
+            surface: state.surface,
+            age_batiment: state.age_batiment,
+            delai: state.delai,
+            coloris: state.coloris,
+            ville: state.ville,
+            code_postal: state.code_postal,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        renderSuccess(data);
+      } else {
+        renderError(data.error || "Merci de réessayer dans quelques instants.");
+      }
+    } catch (err) {
+      renderError("Impossible de contacter le serveur pour le moment. Merci de réessayer.");
+    }
+  }
+
+  renderProgress();
+  renderStep();
+})();
+</script>
+</body>
+</html>
