@@ -158,13 +158,13 @@ const PRICING_CONFIG_ANC = {
     },
 
     pompeRelevageAmont: {
-      label: "Pompe de relevage en amont de la fosse",
+      label: "Poste de relevage en amont de la fosse — fourniture et pose",
       unite: "forfait",
-      prixHT: 1350,
+      prixHT: 1550,
     },
 
     pompeRelevageAval: {
-      label: "Pompe de relevage en aval de la fosse",
+      label: "Poste de relevage en aval de la fosse — fourniture et pose",
       unite: "forfait",
       prixHT: 2300,
     },
