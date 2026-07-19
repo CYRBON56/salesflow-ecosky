@@ -4,29 +4,51 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Validation des estimations ANC — RMS EcoSky</title>
+<script src="pricing-config-anc.js"></script>
 <style>
   :root { --bleu: #1F4E78; --bleu-clair: #2E75B6; --vert: #2e7d32; --fond: #f4f6f8; }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: var(--fond); color: #222; padding: 32px 24px; }
   h1 { color: var(--bleu); font-size: 1.4rem; margin-bottom: 4px; }
   p.sous-titre { color: #666; margin-bottom: 28px; }
-  .liste { display: flex; flex-direction: column; gap: 16px; max-width: 720px; margin: 0 auto; }
-  .carte {
-    background: #fff; border: 1px solid #dde3ea; border-radius: 12px; padding: 20px 24px;
-  }
+  .liste { display: flex; flex-direction: column; gap: 16px; max-width: 760px; margin: 0 auto; }
+  .carte { background: #fff; border: 1px solid #dde3ea; border-radius: 12px; padding: 20px 24px; }
   .carte h2 { margin: 0 0 4px; color: var(--bleu); font-size: 1.1rem; }
-  .carte .meta { color: #666; font-size: 0.88rem; margin-bottom: 12px; }
-  .carte .meta a { color: var(--bleu-clair); }
-  .champ-montant { display: flex; align-items: center; gap: 8px; margin: 14px 0; }
-  .champ-montant label { font-weight: bold; font-size: 0.9rem; }
-  .champ-montant input {
-    width: 140px; padding: 8px 10px; border: 1px solid #ccd3db; border-radius: 8px; font-size: 1rem;
+  .grille-champs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin: 14px 0; }
+  .grille-champs .champ-large { grid-column: 1 / -1; }
+  .grille-champs label { display: block; font-weight: bold; font-size: 0.82rem; margin-bottom: 4px; color: #444; }
+  .grille-champs input, .grille-champs select {
+    width: 100%; padding: 8px 10px; border: 1px solid #ccd3db; border-radius: 8px; font-size: 0.92rem; font-family: inherit;
   }
-  .champ-montant span { color: #666; font-size: 0.88rem; }
-  .attention { color: #b26a00; font-size: 0.85rem; margin-top: -6px; margin-bottom: 10px; }
+  .lien-etude { font-size: 0.85rem; margin-bottom: 6px; }
+  .lien-etude a { color: var(--bleu-clair); }
+
+  .lignes-devis { border-top: 1px solid #e3e7ec; margin-top: 16px; padding-top: 12px; }
+  .lignes-devis h3 { font-size: 0.9rem; color: var(--bleu); margin: 0 0 10px; }
+  .ligne-devis { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .ligne-devis input[type=text] {
+    flex: 1; padding: 7px 10px; border: 1px solid #ccd3db; border-radius: 8px; font-size: 0.88rem; font-family: inherit;
+  }
+  .ligne-devis input[type=number] {
+    width: 110px; padding: 7px 10px; border: 1px solid #ccd3db; border-radius: 8px; font-size: 0.88rem; text-align: right;
+  }
+  .ligne-devis span.unite { color: #666; font-size: 0.82rem; }
+  .ligne-devis button.suppr {
+    background: none; border: none; color: #b23; cursor: pointer; font-size: 1.1rem; padding: 0 4px; line-height: 1;
+  }
+  .btn-ajouter-ligne {
+    background: none; border: 1px dashed #ccd3db; color: var(--bleu); border-radius: 8px;
+    padding: 6px 12px; font-size: 0.85rem; cursor: pointer; margin-top: 4px;
+  }
+  .total-devis {
+    display: flex; justify-content: space-between; align-items: center; margin-top: 14px;
+    padding-top: 10px; border-top: 2px solid #e3e7ec; font-weight: bold; font-size: 1.1rem; color: var(--vert);
+  }
+
+  .attention { color: #b26a00; font-size: 0.85rem; margin: 10px 0; }
   button.valider {
     background: var(--bleu); color: #fff; border: none; border-radius: 8px;
-    padding: 10px 20px; font-weight: bold; cursor: pointer; font-size: 0.95rem;
+    padding: 10px 20px; font-weight: bold; cursor: pointer; font-size: 0.95rem; margin-top: 14px;
   }
   button.valider:hover { background: var(--bleu-clair); }
   button.valider:disabled { background: #9db3c4; cursor: not-allowed; }
@@ -37,7 +59,7 @@
 <body>
 
 <h1>Estimations ANC en attente de validation</h1>
-<p class="sous-titre">Vérifie chaque demande, ajuste le montant si besoin, puis valide pour envoyer le devis définitif au client.</p>
+<p class="sous-titre">Vérifie et corrige chaque champ, ajuste chaque poste du devis ligne par ligne, puis valide pour envoyer au client.</p>
 
 <div class="liste" id="liste">
   <div class="chargement">Chargement...</div>
@@ -46,55 +68,173 @@
 <script>
 (async function () {
   const conteneur = document.getElementById("liste");
+  const PRICING = (typeof PRICING_CONFIG_ANC !== "undefined") ? PRICING_CONFIG_ANC : { optionsComplementaires: {}, filieres: {} };
+
+  const OPTIONS_FILIERE = [
+    { valeur: "filtreSableDraineEtanche", label: "Filtre à sable drainé étanche" },
+    { valeur: "filtreSableDraineNonEtanche", label: "Filtre à sable drainé non étanche" },
+    { valeur: "tranchesEpandage", label: "Tranchées d'épandage" },
+    { valeur: "filtreCompact", label: "Filière compacte" },
+    { valeur: "microstation", label: "Microstation" },
+  ];
+
+  // Construit les lignes de devis initiales à partir de estimation_detail :
+  // une ligne "base" (fourniture + pose de la filière) + une ligne par poste
+  // complémentaire qui a un montant chiffré. Les postes sans montant (ex :
+  // poste de relevage juste signalé, brise-roche "si nécessaire") arrivent à
+  // 0 € — au technicien de les chiffrer ou de les supprimer.
+  function construireLignesInitiales(lead) {
+    const detail = lead.estimation_detail || {};
+    const lignes = [];
+
+    lignes.push({
+      label: `${detail.filiere || "Filière"} — fourniture et pose`,
+      montant: detail.prixBaseHT != null ? detail.prixBaseHT : 0,
+    });
+
+    (detail.complements || []).forEach((c) => {
+      const labelConfig = PRICING.optionsComplementaires && PRICING.optionsComplementaires[c.poste];
+      const label = labelConfig ? labelConfig.label : c.poste;
+      const montant = c.montantHT != null ? c.montantHT : (c.prixIndicatifHT != null ? c.prixIndicatifHT : 0);
+      lignes.push({ label, montant });
+    });
+
+    return lignes;
+  }
+
+  function rendreLigne(ligne) {
+    const div = document.createElement("div");
+    div.className = "ligne-devis";
+    div.innerHTML = `
+      <input type="text" class="ligne-label" value="${ligne.label}">
+      <input type="number" class="ligne-montant" step="10" value="${ligne.montant}">
+      <span class="unite">€ HT</span>
+      <button type="button" class="suppr" title="Supprimer cette ligne">×</button>
+    `;
+    return div;
+  }
 
   function rendreCarte(lead) {
-    const detail = lead.estimation_detail || {};
     const montantActuel = lead.estimation_totale_ht;
     const carte = document.createElement("div");
     carte.className = "carte";
     carte.dataset.leadId = lead.id;
 
+    const optionsHtml = OPTIONS_FILIERE.map(
+      (o) => `<option value="${o.valeur}" ${o.valeur === lead.filiere_indicative ? "selected" : ""}>${o.label}</option>`
+    ).join("");
+
     carte.innerHTML = `
       <h2>${lead.prenom || "—"}</h2>
-      <div class="meta">
-        ${lead.telephone || "—"} · ${lead.email || "—"}<br>
-        ${lead.adresse_projet || "—"}<br>
-        ${detail.filiere || lead.filiere_indicative || "—"} — ${lead.eh || "?"} EH
-        ${lead.etude_sol_pdf_url ? `· <a href="${lead.etude_sol_pdf_url}" target="_blank">étude de sol</a>` : ""}
+      ${lead.etude_sol_pdf_url ? `<div class="lien-etude"><a href="${lead.etude_sol_pdf_url}" target="_blank">Voir l'étude de sol</a></div>` : ""}
+      <div class="grille-champs">
+        <div>
+          <label>Prénom / Nom</label>
+          <input type="text" data-champ="prenom" value="${lead.prenom || ""}">
+        </div>
+        <div>
+          <label>Téléphone</label>
+          <input type="tel" data-champ="telephone" value="${lead.telephone || ""}">
+        </div>
+        <div>
+          <label>Email</label>
+          <input type="email" data-champ="email" value="${lead.email || ""}">
+        </div>
+        <div>
+          <label>EH</label>
+          <input type="number" data-champ="eh" min="1" max="19" value="${lead.eh || ""}">
+        </div>
+        <div class="champ-large">
+          <label>Adresse du projet</label>
+          <input type="text" data-champ="adresseProjet" value="${lead.adresse_projet || ""}">
+        </div>
+        <div class="champ-large">
+          <label>Filière</label>
+          <select data-champ="filiereIndicative">${optionsHtml}</select>
+        </div>
       </div>
-      ${montantActuel == null ? '<div class="attention">⚠️ Aucun montant calculé automatiquement (hors grille) — renseigne le montant final avant de valider.</div>' : ""}
-      <div class="champ-montant">
-        <label>Montant final :</label>
-        <input type="number" step="50" value="${montantActuel != null ? montantActuel : ""}" placeholder="€ HT">
-        <span>€ HT</span>
+      ${montantActuel == null ? '<div class="attention">⚠️ Certains postes ne sont pas encore chiffrés (hors grille) — complète les montants ci-dessous avant de valider.</div>' : ""}
+      <div class="lignes-devis">
+        <h3>Détail du devis</h3>
+        <div class="conteneur-lignes"></div>
+        <button type="button" class="btn-ajouter-ligne">+ Ajouter une ligne</button>
+        <div class="total-devis"><span>Total</span><span class="valeur-total">0 € HT</span></div>
       </div>
       <button class="valider">Valider et envoyer</button>
       <div class="confirmation" style="display:none;"></div>
     `;
 
-    const input = carte.querySelector("input");
+    const conteneurLignes = carte.querySelector(".conteneur-lignes");
+    const totalEl = carte.querySelector(".valeur-total");
     const bouton = carte.querySelector("button.valider");
     const confirmation = carte.querySelector(".confirmation");
+    const champsIdentite = carte.querySelectorAll("[data-champ]");
+
+    function recalculerTotal() {
+      let total = 0;
+      conteneurLignes.querySelectorAll(".ligne-devis").forEach((ligneEl) => {
+        total += Number(ligneEl.querySelector(".ligne-montant").value) || 0;
+      });
+      totalEl.textContent = total.toLocaleString("fr-FR") + " € HT";
+    }
+
+    function ajouterLigneAuDom(ligne) {
+      const ligneEl = rendreLigne(ligne);
+      ligneEl.querySelector(".ligne-montant").addEventListener("input", recalculerTotal);
+      ligneEl.querySelector(".suppr").addEventListener("click", () => {
+        ligneEl.remove();
+        recalculerTotal();
+      });
+      conteneurLignes.appendChild(ligneEl);
+    }
+
+    construireLignesInitiales(lead).forEach(ajouterLigneAuDom);
+    recalculerTotal();
+
+    carte.querySelector(".btn-ajouter-ligne").addEventListener("click", () => {
+      ajouterLigneAuDom({ label: "", montant: 0 });
+      recalculerTotal();
+    });
 
     bouton.addEventListener("click", async () => {
-      const montant = Number(input.value);
-      if (!montant || montant <= 0) {
-        alert("Renseigne un montant valide avant de valider.");
+      const lignes = [];
+      conteneurLignes.querySelectorAll(".ligne-devis").forEach((ligneEl) => {
+        const label = ligneEl.querySelector(".ligne-label").value.trim();
+        const montant = Number(ligneEl.querySelector(".ligne-montant").value) || 0;
+        if (label) lignes.push({ label, montant });
+      });
+
+      if (lignes.length === 0 || lignes.every((l) => l.montant === 0)) {
+        alert("Ajoute au moins une ligne avec un montant avant de valider.");
         return;
       }
+
+      const valeurs = {};
+      champsIdentite.forEach((champ) => { valeurs[champ.dataset.champ] = champ.value; });
+
       bouton.disabled = true;
       bouton.textContent = "Envoi en cours...";
       try {
         const reponse = await fetch("/api/valider-estimation-anc", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ leadId: lead.id, montantFinalHT: montant }),
+          body: JSON.stringify({
+            leadId: lead.id,
+            lignes,
+            prenom: valeurs.prenom,
+            telephone: valeurs.telephone,
+            email: valeurs.email,
+            adresseProjet: valeurs.adresseProjet,
+            eh: valeurs.eh,
+            filiereIndicative: valeurs.filiereIndicative,
+          }),
         });
         if (!reponse.ok) throw new Error("Échec validation");
         confirmation.style.display = "block";
         confirmation.textContent = "✓ Devis envoyé au client";
         bouton.style.display = "none";
-        input.disabled = true;
+        champsIdentite.forEach((champ) => (champ.disabled = true));
+        conteneurLignes.querySelectorAll("input, button").forEach((el) => (el.disabled = true));
       } catch (err) {
         bouton.disabled = false;
         bouton.textContent = "Valider et envoyer";
