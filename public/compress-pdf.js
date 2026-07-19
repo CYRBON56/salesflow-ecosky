@@ -31,6 +31,31 @@ try {
  * @param {number} options.quality - qualité JPEG (0 à 1)
  * @returns {Promise<File>} - le fichier compressé (ou l'original si déjà assez léger / échec)
  */
+/**
+ * Extrait le texte brut de toutes les pages d'un PDF, À APPELER AVANT compression
+ * (la compression transforme les pages en images et fait donc disparaître le texte).
+ * @param {File} file - le PDF original, non compressé
+ * @returns {Promise<string>} - le texte concaténé de toutes les pages (chaîne vide si échec)
+ */
+async function extractPdfText(file) {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let texteComplet = "";
+    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+      const page = await pdfDoc.getPage(pageNum);
+      const contenu = await page.getTextContent();
+      const texteLigne = contenu.items.map((item) => item.str).join(" ");
+      texteComplet += texteLigne + "\n";
+    }
+    console.log(`[compress-pdf] Texte extrait avant compression : ${texteComplet.length} caractères`);
+    return texteComplet;
+  } catch (err) {
+    console.error("[compress-pdf] Extraction du texte échouée :", err);
+    return "";
+  }
+}
+
 async function compressPdfFile(file, options = {}) {
   const {
     maxSizeBytes = 2.9 * 1024 * 1024,
