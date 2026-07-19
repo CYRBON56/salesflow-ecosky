@@ -119,7 +119,7 @@ const PRICING_CONFIG_ANC = {
   optionsComplementaires: {
 
     briseRocheHydraulique: {
-      label: "Utilisation du brise-roche hydraulique (en cas de roche)",
+      label: "Utilisation du brise-roche hydraulique",
       unite: "forfait / jour",
       prixHT: 1250,
     },
