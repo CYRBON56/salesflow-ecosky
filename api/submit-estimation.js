@@ -5,6 +5,7 @@
 // lien du PDF à la fois au client et au propriétaire de RMS ECOSKY.
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { LOGO_ECOSKY_BASE64 } from "./_logo-ecosky-base64.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -17,9 +18,13 @@ const ALLOWED_DEPARTMENTS = ["56", "29", "22", "35"];
 
 const ENTREPRISE = {
   nom: "ECOSKY BY RMS",
+  raisonSociale: "RMS EcoSky — RESINE MARBRE SOL, SASU au capital de 50 000 €",
   adresse: "23 route de Corn er Hoët",
   ville: "56400 BRECH",
   siret: "SIRET : 939 997 870 00018 — APE 4399D",
+  rcs: "RCS Lorient 939 997 870",
+  // RCS : ville du greffe à confirmer avant activation (ex. "RCS Lorient 939 997 870")
+  assurance: "Assurance RC décennale n° SV75020721/11590 (ERGO France)",
   contact: "infos@ecosky.fr / c.bon@ecosky.fr",
 };
 
@@ -224,12 +229,19 @@ const USAGE_LABELS = { pieton: "Usage piéton", carrossable: "Usage carrossable 
 // par le client dans le formulaire. Utilisée dans le PDF pour lister
 // précisément ce que comprend l'intervention.
 function buildDesignationLines(answers) {
-  if (answers.usage === "pieton" && answers.support_pieton === "dalle_beton") {
+  if (answers.usage === "pieton") {
     return [
-      "POSE SUR BÉTON :",
-      "Surfaçage de la surface au disque diamant, aspiration des poussières,",
-      "lavage Karcher si besoin, pose de la primaire d'accrochage, pose des",
-      "baguettes si besoin, pose du revêtement.",
+      "PRESTATION COMPRISE (forfait de base) :",
+      "Ponçage / surfaçage de la surface au disque diamant, aspiration des",
+      "poussières, nettoyage complet du support, pose de la primaire",
+      "d'accrochage, application du revêtement résine EcoSky'Gum.",
+      "OPTIONS SELON L'ÉTAT DU SUPPORT (en supplément) :",
+      "- Remise à niveau / réparation de la dalle si détériorée",
+      "- Pose d'un filet de renfort (trame PVC) sur zones fragilisées",
+      "- Pose et collage des baguettes de finition (métrage variable)",
+      "Ces options ne peuvent être chiffrées qu'après déplacement d'un",
+      "technicien sur le chantier — l'estimation ci-dessus ne porte que sur",
+      "les éléments qui peuvent être déterminés à distance.",
     ];
   }
   if (answers.usage === "carrossable" && answers.etat_terrain_carrossable === "terre_nue") {
@@ -278,16 +290,30 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
     page.drawLine({ start: { x: marginX, y: yy }, end: { x: pageWidth - marginX, y: yy }, thickness: 1, color });
   }
 
+  // Logo en haut à gauche
+  let headerTextX = marginX;
+  try {
+    const logoBytes = Uint8Array.from(Buffer.from(LOGO_ECOSKY_BASE64, "base64"));
+    const logoImage = await doc.embedJpg(logoBytes);
+    const logoWidth = 60;
+    const logoHeight = (logoImage.height / logoImage.width) * logoWidth;
+    page.drawImage(logoImage, { x: marginX, y: 800 - logoHeight + 8, width: logoWidth, height: logoHeight });
+    headerTextX = marginX + logoWidth + 12;
+  } catch (logoErr) {
+    // Un échec d'intégration du logo ne doit jamais bloquer la génération du PDF.
+    console.error("Logo PDF embed error:", logoErr.message);
+  }
+
   // En-tête entreprise (gauche)
-  text(ENTREPRISE.nom, marginX, y, { bold: true, size: 15, color: green });
+  text(ENTREPRISE.nom, headerTextX, y, { bold: true, size: 15, color: green });
   y -= 16;
-  text(ENTREPRISE.adresse, marginX, y, { size: 9, color: grey });
+  text(ENTREPRISE.adresse, headerTextX, y, { size: 9, color: grey });
   y -= 12;
-  text(ENTREPRISE.ville, marginX, y, { size: 9, color: grey });
+  text(ENTREPRISE.ville, headerTextX, y, { size: 9, color: grey });
   y -= 12;
-  text(ENTREPRISE.siret, marginX, y, { size: 9, color: grey });
+  text(ENTREPRISE.siret, headerTextX, y, { size: 9, color: grey });
   y -= 12;
-  text(ENTREPRISE.contact, marginX, y, { size: 9, color: grey });
+  text(ENTREPRISE.contact, headerTextX, y, { size: 9, color: grey });
 
   // Titre ESTIMATEUR (droite)
   text("ESTIMATEUR", pageWidth - marginX - 150, 800, { bold: true, size: 22, color: dark });
@@ -421,6 +447,23 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
     size: 9,
     color: grey,
   });
+
+  y -= 20;
+  line(y);
+  y -= 14;
+  text(
+    `${ENTREPRISE.raisonSociale} — ${ENTREPRISE.siret} — ${ENTREPRISE.rcs}`,
+    marginX,
+    y,
+    { size: 7.5, color: grey }
+  );
+  y -= 11;
+  text(
+    `${ENTREPRISE.assurance} — ${ENTREPRISE.adresse}, ${ENTREPRISE.ville}`,
+    marginX,
+    y,
+    { size: 7.5, color: grey }
+  );
 
   return doc.save();
 }
@@ -564,4 +607,5 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
