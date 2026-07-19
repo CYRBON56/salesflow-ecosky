@@ -181,12 +181,13 @@ export default async function handler(req, res) {
       statut: "en_attente_validation",
     };
 
-    // Upsert par téléphone (table leads_anc, cf. sql-creation-leads-anc.sql)
-    // — même logique que submit-estimation.js côté résine : évite de planter
-    // sur la contrainte unique si le client resoumet le formulaire.
+    // Insertion systématique (table leads_anc, cf. sql-creation-leads-anc.sql)
+    // — chaque soumission crée sa propre ligne, même si le téléphone est déjà
+    // connu (permet plusieurs devis pour la même personne, par ex. pour un
+    // deuxième projet ou un nouveau test).
     const { data: leadEnregistre, error: erreurSupabase } = await supabaseAnc
       .from("leads_anc")
-      .upsert(enregistrementLead, { onConflict: "telephone" })
+      .insert(enregistrementLead)
       .select()
       .single();
 
