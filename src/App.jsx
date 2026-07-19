@@ -162,10 +162,21 @@ export default function SalesFlowSystem() {
       supabase.removeChannel(clicksChannel);
     };
   }, []);
+  const LEADS_ADMIN_URL = "/api/leads-admin";
+
   const persistSettings = useCallback(async (next) => {
     setSettings(next);
-    const { error: err } = await supabase.from("settings").update(settingsToRow(next)).eq("id", 1);
-    if (err) setError("Erreur de sauvegarde des réglages.");
+    try {
+      const res = await fetch(LEADS_ADMIN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update_settings", row: settingsToRow(next) }),
+      });
+      const data = await res.json();
+      if (!data.success) setError("Erreur de sauvegarde des réglages.");
+    } catch (e) {
+      setError("Erreur de sauvegarde des réglages.");
+    }
   }, []);
   const handleFile = (file) => {
     Papa.parse(file, {
@@ -211,30 +222,52 @@ export default function SalesFlowSystem() {
       setCsvPreview(null);
       return;
     }
-    const { data, error: err } = await supabase.from("leads").insert(imported).select();
-    if (err) {
-      setError("Erreur lors de l'import dans Supabase : " + err.message);
-      return;
+    try {
+      const res = await fetch(LEADS_ADMIN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "import_leads", leads: imported }),
+      });
+      const result = await res.json();
+      if (!result.success) {
+        setError("Erreur lors de l'import : " + (result.error || ""));
+        return;
+      }
+      setLeads((prev) => [...(result.data || []).map(mapRowToLead), ...prev]);
+      setShowImport(false);
+      setCsvPreview(null);
+      setError("");
+    } catch (e) {
+      setError("Erreur lors de l'import.");
     }
-    setLeads((prev) => [...(data || []).map(mapRowToLead), ...prev]);
-    setShowImport(false);
-    setCsvPreview(null);
-    setError("");
   };
   const updateLead = async (id, patch) => {
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
-    const dbPatch = { ...patch };
-    if ("stage" in dbPatch) {
-      dbPatch.statut = dbPatch.stage;
-      delete dbPatch.stage;
+    try {
+      const res = await fetch(LEADS_ADMIN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update_lead", id, patch }),
+      });
+      const data = await res.json();
+      if (!data.success) setError("Erreur de mise à jour du lead.");
+    } catch (e) {
+      setError("Erreur de mise à jour du lead.");
     }
-    const { error: err } = await supabase.from("leads").update(dbPatch).eq("id", id);
-    if (err) setError("Erreur de mise à jour du lead.");
   };
   const deleteLead = async (id) => {
     setLeads((prev) => prev.filter((l) => l.id !== id));
-    const { error: err } = await supabase.from("leads").delete().eq("id", id);
-    if (err) setError("Erreur de suppression du lead.");
+    try {
+      const res = await fetch(LEADS_ADMIN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_lead", id }),
+      });
+      const data = await res.json();
+      if (!data.success) setError("Erreur de suppression du lead.");
+    } catch (e) {
+      setError("Erreur de suppression du lead.");
+    }
   };
   const loadWhatsApp = useCallback(async (telephone) => {
     setWaData((prev) => ({ ...prev, [telephone]: { ...(prev[telephone] || {}), loading: true } }));
