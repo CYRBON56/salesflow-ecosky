@@ -12,10 +12,10 @@
  * répercuter le changement dans LES DEUX fichiers — ce sont deux copies
  * indépendantes, pas un fichier partagé.
  *
- * Les valeurs prixParEH sont à null : à compléter par Cyrille (cf.
- * Grille_filieres_EH.xlsx). Tant qu'un prix est null pour l'EH demandé, le
- * formulaire affiche « estimation à confirmer par un technicien » au lieu d'un
- * montant chiffré.
+ * Filtre à sable (étanche et non étanche) et tranchées d'épandage : chiffrés
+ * jusqu'à 8 EH. Filtre compact et microstation : chiffrés jusqu'à 10 EH.
+ * Au-delà, prixParEH reste null → le formulaire affiche « estimation à
+ * confirmer par un technicien ».
  */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) {
@@ -24,13 +24,6 @@
     root.PRICING_CONFIG_ANC = factory();
   }
 }(typeof self !== "undefined" ? self : this, function () {
-
-  function grillePrixVide() {
-    return {
-      4: null, 5: null, 6: null, 7: null, 8: null, 9: null, 10: null,
-      11: null, 12: null, 13: null, 14: null, 15: null, 16: null, 17: null, 18: null, 19: null,
-    };
-  }
 
   return {
 
@@ -54,7 +47,11 @@
           "Fourniture et pose des coudes",
           "Fourniture et pose du géotextile de recouvrement",
         ],
-        prixParEH: grillePrixVide(),
+        prixParEH: {
+          4: 7500, 5: 8500, 6: 9500, 7: 10500, 8: 11500,
+          9: null, 10: null, 11: null, 12: null, 13: null,
+          14: null, 15: null, 16: null, 17: null, 18: null, 19: null,
+        },
       },
 
       filtreSableDraineNonEtanche: {
@@ -74,7 +71,11 @@
           "Fourniture et pose des coudes",
           "Fourniture et pose du géotextile de recouvrement",
         ],
-        prixParEH: grillePrixVide(),
+        prixParEH: {
+          4: 6500, 5: 7500, 6: 8500, 7: 9500, 8: 10500,
+          9: null, 10: null, 11: null, 12: null, 13: null,
+          14: null, 15: null, 16: null, 17: null, 18: null, 19: null,
+        },
       },
 
       tranchesEpandage: {
@@ -89,7 +90,11 @@
           "Fourniture et pose du regard de bouclage",
           "Fourniture et pose du géotextile de recouvrement",
         ],
-        prixParEH: grillePrixVide(),
+        prixParEH: {
+          4: 6500, 5: 7500, 6: 8500, 7: 9500, 8: 10500,
+          9: null, 10: null, 11: null, 12: null, 13: null,
+          14: null, 15: null, 16: null, 17: null, 18: null, 19: null,
+        },
       },
 
       filtreCompact: {
@@ -99,7 +104,10 @@
           "Terrassement",
           "Remblaiement",
         ],
-        prixParEH: grillePrixVide(),
+        prixParEH: {
+          4: 9000, 5: 10000, 6: 11000, 7: 12000, 8: 13000, 9: 14000, 10: 15000,
+          11: null, 12: null, 13: null, 14: null, 15: null, 16: null, 17: null, 18: null, 19: null,
+        },
       },
 
       microstation: {
@@ -109,7 +117,10 @@
           "Terrassement",
           "Remblaiement",
         ],
-        prixParEH: grillePrixVide(),
+        prixParEH: {
+          4: 8000, 5: 9000, 6: 10000, 7: 11000, 8: 12000, 9: 13000, 10: 14000,
+          11: null, 12: null, 13: null, 14: null, 15: null, 16: null, 17: null, 18: null, 19: null,
+        },
       },
 
     },
@@ -149,6 +160,18 @@
         unite: "€ HT / tonne, transport inclus",
         prixHT: 100,
         note: "à partir de",
+      },
+
+      pompeRelevageAmont: {
+        label: "Pompe de relevage en amont de la fosse",
+        unite: "forfait",
+        prixHT: 1350,
+      },
+
+      pompeRelevageAval: {
+        label: "Pompe de relevage en aval de la fosse",
+        unite: "forfait",
+        prixHT: 2300,
       },
 
     },
