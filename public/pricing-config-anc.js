@@ -136,10 +136,16 @@
       },
 
       ventilationToiture: {
-        label: "Pose de la ventilation en toiture",
+        label: "Ventilation secondaire en toiture",
         unite: "forfait",
         prixHT: 400,
         note: "à partir de",
+      },
+
+      trancheeTechniqueEvacuation: {
+        label: "Tranchée technique pour la pose des tuyaux d'évacuation",
+        unite: "€ HT / mètre linéaire",
+        prixHT: 25,
       },
 
       terrassementRaccordement: {
