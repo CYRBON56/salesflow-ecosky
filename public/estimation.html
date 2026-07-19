@@ -203,7 +203,7 @@
       <div class="header-block">
         <div class="eyebrow">RMS EcoSky — Estimation détaillée</div>
         <h1>Votre estimation personnalisée</h1>
-        <p class="sub" style="margin-bottom:0;">Répondez à quelques questions sur votre projet pour recevoir une estimation la plus précise possible, envoyée directement par SMS.</p>
+        <p class="sub" style="margin-bottom:0;">Répondez à quelques questions sur votre projet pour recevoir une estimation la plus précise possible, envoyée directement par mail.</p>
       </div>
       <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px; font-size:12.5px; color:#4a5a54;">
         <span>✅ Sans engagement</span>
@@ -583,7 +583,14 @@
     if (s.type === "multi-color") return Array.isArray(state[s.key]) && state[s.key].length > 0;
     if (s.type === "number") return state[s.key] && parseFloat(state[s.key]) > 0;
     if (s.type === "location") return state.code_postal && state.code_postal.length === 5;
-    if (s.type === "identity") return state.nom && state.telephone && state.telephone.length >= 8;
+    if (s.type === "identity")
+      return (
+        state.nom &&
+        state.telephone &&
+        state.telephone.length >= 8 &&
+        state.email &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email)
+      );
     return true;
   }
 
@@ -693,9 +700,9 @@
         <input type="text" id="inputNom" value="${state.nom}" />
         <label class="field-label">Prénom</label>
         <input type="text" id="inputPrenom" value="${state.prenom}" />
-        <label class="field-label">Téléphone (pour recevoir l'estimation par SMS)</label>
+        <label class="field-label">Téléphone (pour être recontacté par un technicien)</label>
         <input type="tel" id="inputTel" value="${state.telephone}" placeholder="06 XX XX XX XX" />
-        <label class="field-label">Email (optionnel)</label>
+        <label class="field-label">Email (pour recevoir l'estimation)</label>
         <input type="email" id="inputEmail" value="${state.email}" />
       `;
     }
@@ -872,7 +879,7 @@
       ${priceBlock}
       <p class="disclaimer">
         Cette estimation reste indicative et devra être confirmée par l'un de nos techniciens lors
-        d'un appel téléphonique. Vous recevrez ce récapitulatif par SMS dans quelques instants.
+        d'un appel téléphonique. Vous recevrez ce récapitulatif par mail dans quelques instants.
       </p>
       <div id="appointmentSection">
         ${remiseBlock}
