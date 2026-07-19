@@ -33,15 +33,42 @@
     position: sticky;
     top: 0;
     height: 100vh;
-  }
-  .panneau-video video {
-    max-width: 100%;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-    margin-bottom: 24px;
+    overflow-y: auto;
   }
   .panneau-video h1 { font-size: 1.5rem; text-align: center; margin: 0 0 8px; }
-  .panneau-video p { text-align: center; opacity: 0.9; font-size: 0.95rem; }
+  .panneau-video p.intro { text-align: center; opacity: 0.9; font-size: 0.95rem; margin-bottom: 28px; }
+  .filieres-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    width: 100%;
+    max-width: 420px;
+  }
+  .filiere-card {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    aspect-ratio: 4 / 3;
+    background: rgba(255,255,255,0.08);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+  }
+  .filiere-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .filiere-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10px 12px 8px;
+    font-size: 0.78rem;
+    font-weight: bold;
+    color: #fff;
+    background: linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0));
+  }
   .panneau-formulaire { flex: 1 1 58%; padding: 32px 48px; display: flex; flex-direction: column; }
   .bandeau-confiance {
     display: flex; gap: 16px; flex-wrap: wrap;
@@ -125,6 +152,7 @@
     .panneau-video { height: auto; position: static; padding: 24px; }
     .panneau-formulaire { padding: 24px; }
     .choix-cartes { grid-template-columns: 1fr; }
+    .filieres-grid { max-width: 100%; }
   }
 </style>
 </head>
@@ -133,12 +161,28 @@
 <div class="layout">
 
   <div class="panneau-video">
-    <video autoplay loop muted playsinline poster="anc-poster.jpg">
-      <source src="anc-video.mp4" type="video/mp4">
-    </video>
     <h1>Votre assainissement non collectif</h1>
-    <p>Déposez votre étude de sol, on récupère automatiquement les informations
+    <p class="intro">Déposez votre étude de sol, on récupère automatiquement les informations
        pour vous proposer une estimation — à valider avec un technicien.</p>
+
+    <div class="filieres-grid">
+      <div class="filiere-card">
+        <img src="filiere-epandage.jpg" alt="Fosse toutes eaux et épandage" loading="lazy">
+        <span class="filiere-label">Fosse toutes eaux + épandage</span>
+      </div>
+      <div class="filiere-card">
+        <img src="filiere-filtre-sable.jpg" alt="Filtre à sable" loading="lazy">
+        <span class="filiere-label">Filtre à sable</span>
+      </div>
+      <div class="filiere-card">
+        <img src="filiere-microstation.jpg" alt="Microstation" loading="lazy">
+        <span class="filiere-label">Microstation</span>
+      </div>
+      <div class="filiere-card">
+        <img src="filiere-filtre-compact.jpg" alt="Filtre compact" loading="lazy">
+        <span class="filiere-label">Filtre compact</span>
+      </div>
+    </div>
   </div>
 
   <div class="panneau-formulaire">
