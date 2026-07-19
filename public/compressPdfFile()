@@ -15,8 +15,12 @@
  */
 
 // À placer une seule fois, avant la fonction compressPdfFile
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js";
+try {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+} catch (e) {
+  console.error("pdf.js n'a pas pu être initialisé — la compression sera désactivée.", e);
+}
 
 /**
  * Compresse un fichier PDF (File/Blob) si besoin.
@@ -33,8 +37,16 @@ async function compressPdfFile(file, options = {}) {
     scale = 1.2,
   } = options;
 
+  console.log(`[compress-pdf] Fichier reçu : ${(file.size / 1024 / 1024).toFixed(2)} Mo`);
+
   // Si le fichier est déjà assez léger, on ne touche à rien
   if (file.size <= maxSizeBytes) {
+    console.log("[compress-pdf] Déjà sous la limite, pas de compression nécessaire.");
+    return file;
+  }
+
+  if (typeof pdfjsLib === "undefined" || typeof PDFLib === "undefined") {
+    console.error("[compress-pdf] pdf.js ou pdf-lib non chargé — envoi du fichier original sans compression.");
     return file;
   }
 
@@ -83,11 +95,12 @@ async function compressPdfFile(file, options = {}) {
     }
 
     const compressedBlob = new Blob([dernierResultat], { type: "application/pdf" });
+    console.log(`[compress-pdf] Résultat final : ${(compressedBlob.size / 1024 / 1024).toFixed(2)} Mo`);
     return new File([compressedBlob], file.name.replace(/\.pdf$/i, "-compresse.pdf"), {
       type: "application/pdf",
     });
   } catch (err) {
-    console.error("Compression PDF échouée, envoi du fichier original :", err);
+    console.error("[compress-pdf] Compression échouée, envoi du fichier original :", err);
     return file; // on ne bloque jamais l'utilisateur si la compression plante
   }
 }
