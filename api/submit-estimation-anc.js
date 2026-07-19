@@ -130,7 +130,7 @@ export default async function handler(req, res) {
     // Brise-roche et évacuation des terres excédentaires : options systématiquement
     // listées sur chaque devis (informatif, non chiffré dans le total tant que le
     // technicien ne confirme pas leur nécessité sur place).
-    detailComplements.push({ poste: "briseRocheHydraulique", prixIndicatifHT: options.briseRocheHydraulique.prixHT, note: "optionnel, si roche rencontrée" });
+    detailComplements.push({ poste: "briseRocheHydraulique", prixIndicatifHT: options.briseRocheHydraulique.prixHT, note: "en option" });
 
     if (ventilation === "oui") {
       complementsHT += options.ventilationToiture.prixHT;
