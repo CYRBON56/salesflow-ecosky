@@ -25,8 +25,8 @@
  * publique dans public/ pour éviter toute confusion lors des uploads GitHub.
  */
 
-const { createClient } = require("@supabase/supabase-js");
-const PRICING_CONFIG_ANC = require("./anc-pricing-config-server.js");
+import { createClient } from "@supabase/supabase-js";
+import PRICING_CONFIG_ANC from "./anc-pricing-config-server.js";
 
 const supabaseAnc = createClient(
   process.env.SUPABASE_ANC_URL,
@@ -89,7 +89,7 @@ function emailNotificationOwner({ prenom, telephone, email, adresseProjet, filie
   `;
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Méthode non autorisée" });
     return;
