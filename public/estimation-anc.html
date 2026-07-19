@@ -295,6 +295,11 @@
           <input type="number" id="longueurRaccordement" name="longueurRaccordement" min="0" value="10">
           <small>Estimation à vue d'œil — sera vérifiée sur place.</small>
         </div>
+        <div class="champ">
+          <label for="longueurTrancheeEvacuation">Longueur de tranchée technique pour les tuyaux d'évacuation (mètres)</label>
+          <input type="number" id="longueurTrancheeEvacuation" name="longueurTrancheeEvacuation" min="0" value="5">
+          <small>Estimation à vue d'œil — sera vérifiée sur place.</small>
+        </div>
       </div>
 
       <!-- Étape 5 : récapitulatif + estimation -->
@@ -341,6 +346,7 @@
     roche: null,
     ventilation: null,
     longueurRaccordement: 10,
+    longueurTrancheeEvacuation: 5,
     etudePdfUrl: null,
     extractionReussie: false,
   };
@@ -513,6 +519,7 @@
   document.getElementById("email").addEventListener("input", e => donnees.email = e.target.value);
   document.getElementById("adresseProjet").addEventListener("input", e => donnees.adresseProjet = e.target.value);
   document.getElementById("longueurRaccordement").addEventListener("input", e => donnees.longueurRaccordement = Number(e.target.value));
+  document.getElementById("longueurTrancheeEvacuation").addEventListener("input", e => donnees.longueurTrancheeEvacuation = Number(e.target.value));
   document.getElementById("filiereSelect").addEventListener("change", e => donnees.filiere = e.target.value);
 
   const champPieces = document.getElementById("piecesPrincipales");
@@ -537,19 +544,32 @@
     let coutOptions = 0;
     let lignesOptions = [];
 
-    if (donnees.roche === "oui") {
-      lignesOptions.push(`Brise-roche hydraulique (si nécessaire) : ${options.briseRocheHydraulique.prixHT} € HT / jour`);
-    }
+    // Brise-roche, ventilation secondaire et évacuation des terres excédentaires
+    // sont des options systématiquement proposées à chaque client, qu'elles
+    // soient signalées par l'étude de sol ou non — le client choisit ensuite
+    // avec le technicien si elles s'appliquent à son chantier.
+    lignesOptions.push(`Brise-roche hydraulique (en option, si roche rencontrée) : ${options.briseRocheHydraulique.prixHT} € HT / jour`);
+
     if (donnees.ventilation === "oui") {
       coutOptions += options.ventilationToiture.prixHT;
-      lignesOptions.push(`Ventilation en toiture : à partir de ${options.ventilationToiture.prixHT} € HT`);
+      lignesOptions.push(`Ventilation secondaire en toiture : à partir de ${options.ventilationToiture.prixHT} € HT`);
+    } else {
+      lignesOptions.push(`Ventilation secondaire en toiture (en option) : à partir de ${options.ventilationToiture.prixHT} € HT`);
     }
+
     if (donnees.longueurRaccordement > 0) {
       const coutRaccordement = donnees.longueurRaccordement * options.terrassementRaccordement.prixHT;
       coutOptions += coutRaccordement;
       lignesOptions.push(`Terrassement de raccordement : ${donnees.longueurRaccordement} m × ${options.terrassementRaccordement.prixHT} € HT = ${coutRaccordement.toLocaleString("fr-FR")} € HT`);
     }
-    lignesOptions.push(`Évacuation des déblais : à partir de ${options.evacuationDeblais.prixHT} € HT / tonne`);
+
+    if (donnees.longueurTrancheeEvacuation > 0) {
+      const coutTrancheeEvacuation = donnees.longueurTrancheeEvacuation * options.trancheeTechniqueEvacuation.prixHT;
+      coutOptions += coutTrancheeEvacuation;
+      lignesOptions.push(`Tranchée technique tuyaux d'évacuation : ${donnees.longueurTrancheeEvacuation} m × ${options.trancheeTechniqueEvacuation.prixHT} € HT = ${coutTrancheeEvacuation.toLocaleString("fr-FR")} € HT`);
+    }
+
+    lignesOptions.push(`Évacuation des terres excédentaires (en option) : à partir de ${options.evacuationDeblais.prixHT} € HT / tonne`);
 
     let htmlRecap = `<h3>Logement de ${eh} EH — filière : ${filiere.label}</h3>`;
     if (donnees.extractionReussie) {
@@ -593,6 +613,7 @@
       etudePdfUrl: donnees.etudePdfUrl,
       roche: donnees.roche,
       longueurRaccordement: donnees.longueurRaccordement,
+      longueurTrancheeEvacuation: donnees.longueurTrancheeEvacuation,
       ventilation: donnees.ventilation,
       posteRelevage: donnees.posteRelevage,
       filiereIndicative: donnees.filiere,
