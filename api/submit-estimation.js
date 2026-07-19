@@ -13,6 +13,10 @@ const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
 const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER; // numéro du propriétaire RMS ECOSKY
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+// Adresse d'envoi : doit appartenir à un domaine vérifié dans Resend (ex. estimation@ecoskybyrms.fr)
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "estimation@ecoskybyrms.fr";
+const OWNER_EMAIL = process.env.OWNER_EMAIL || "infos@ecosky.fr";
 
 const ALLOWED_DEPARTMENTS = ["56", "29", "22", "35"];
 
@@ -81,6 +85,42 @@ async function sendSms(to, body) {
     return true;
   } catch (err) {
     console.error("sendSms error:", err.message);
+    return false;
+  }
+}
+
+// Envoi d'email via l'API Resend (https://resend.com). Contrairement au SMS
+// Twilio (bloqué en mode trial pour tout numéro non vérifié), l'email n'a
+// pas cette limitation — c'est pourquoi il sert de canal de secours/parallèle
+// tant que le compte Twilio n'est pas passé en payant. PDF joint en base64
+// quand disponible ; sinon, le mail part quand même avec le texte seul.
+async function sendEmail({ to, subject, html, pdfBytes, pdfFilename }) {
+  if (!RESEND_API_KEY || !to) {
+    console.error("Resend: configuration manquante ou destinataire absent, email non envoyé.");
+    return false;
+  }
+  try {
+    const payload = { from: RESEND_FROM_EMAIL, to: [to], subject, html };
+    if (pdfBytes) {
+      payload.attachments = [
+        { filename: pdfFilename || "estimation.pdf", content: Buffer.from(pdfBytes).toString("base64") },
+      ];
+    }
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      console.error("Resend email error:", await res.text());
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("sendEmail error:", err.message);
     return false;
   }
 }
@@ -516,8 +556,9 @@ export default async function handler(req, res) {
     const numero = await nextEstimationNumber();
 
     let pdfUrl = null;
+    let pdfBytes = null;
     try {
-      const pdfBytes = await generateEstimatePdf({
+      pdfBytes = await generateEstimatePdf({
         numero,
         nom,
         prenom,
@@ -532,7 +573,7 @@ export default async function handler(req, res) {
       pdfUrl = await uploadPdfToSupabase(pdfBytes, filename);
     } catch (pdfErr) {
       // Un échec de génération/upload du PDF ne doit jamais empêcher
-      // l'enregistrement du lead ni l'envoi du SMS avec le texte seul.
+      // l'enregistrement du lead ni l'envoi du SMS/email avec le texte seul.
       console.error("PDF estimateur error:", pdfErr.message);
     }
 
@@ -598,6 +639,49 @@ export default async function handler(req, res) {
       `${estimation.texte}${pdfUrl ? "\nPDF : " + pdfUrl : ""}`;
     await sendSms(TWILIO_TO_NUMBER, ownerMessage);
 
+    // Email au client avec son estimateur en pièce jointe. Canal indépendant
+    // du SMS Twilio (qui reste bloqué en mode trial pour les numéros non
+    // vérifiés) — l'email part donc même quand le SMS client échoue.
+    if (email && inZone) {
+      const remiseHtml = estimation.chiffrable
+        ? `<p style="color:#1e6f4c;">🎁 <strong>Remise de ${estimation.remisePourcent}% possible selon le volume</strong> (${estimation.montantApresRemise}€ TTC au lieu de ${estimation.montantTTC}€) — contactez un technicien pour voir si vous pouvez en bénéficier.</p>`
+        : "";
+      const clientHtml =
+        `<p>Bonjour ${prenom || ""},</p>` +
+        `<p>Merci pour votre demande sur RMS EcoSky ! Voici votre estimation :</p>` +
+        `<p style="font-size:16px; font-weight:bold; color:#1e6f4c;">${estimation.texte}</p>` +
+        `<p>Cette estimation reste indicative et sera confirmée par l'un de nos techniciens lors d'un appel.</p>` +
+        remiseHtml +
+        `<p>Vous trouverez le détail complet de votre estimateur (n°${numero}) en pièce jointe.</p>` +
+        `<p>À très vite !<br/>RMS EcoSky</p>`;
+      await sendEmail({
+        to: email,
+        subject: `Votre estimation RMS EcoSky n°${numero}`,
+        html: clientHtml,
+        pdfBytes,
+        pdfFilename: `estimation-${numero}.pdf`,
+      });
+    } else if (email && !inZone) {
+      await sendEmail({
+        to: email,
+        subject: "Votre demande RMS EcoSky",
+        html: "<p>Bonjour, merci pour votre demande. Malheureusement RMS ECOSKY n'intervient pas dans votre secteur pour le moment. Bonne continuation dans votre projet !</p>",
+      });
+    }
+
+    // Email au propriétaire : copie de la notification, avec le PDF joint
+    await sendEmail({
+      to: OWNER_EMAIL,
+      subject: `🔔 Nouvelle estimation détaillée n°${numero} — ${prenom || ""} ${nom}`,
+      html:
+        `<p>${prenom || ""} ${nom} — ${telephone}</p>` +
+        `<p>${type_projet || ""}${code_postal ? " — " + code_postal : ""}</p>` +
+        `<p>${estimation.texte}</p>` +
+        (pdfUrl ? `<p>PDF : <a href="${pdfUrl}">${pdfUrl}</a></p>` : ""),
+      pdfBytes,
+      pdfFilename: `estimation-${numero}.pdf`,
+    });
+
     return res.status(200).json({ success: true, estimation, lead_id: lead?.[0]?.id, numero, pdf_url: pdfUrl });
   } catch (err) {
     console.error("submit-estimation error:", err.message);
@@ -607,5 +691,6 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
