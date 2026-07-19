@@ -6,9 +6,7 @@
  * les informations structurées utiles au formulaire ANC : coordonnées du
  * demandeur, filière préconisée, EH, dimensions, contraintes.
  *
- * Dépendances à ajouter dans package.json (npm install côté repo) :
- *   - pdf-parse
- *   - @anthropic-ai/sdk
+ * Dépendances (déjà ajoutées dans package.json) : pdf-parse, @anthropic-ai/sdk
  *
  * Variables d'environnement Vercel à ajouter :
  *   - ANTHROPIC_API_KEY
@@ -22,9 +20,9 @@
  * à cet endpoint, au lieu du base64 complet.
  */
 
-const { createClient } = require("@supabase/supabase-js");
-const pdfParse = require("pdf-parse");
-const Anthropic = require("@anthropic-ai/sdk");
+import { createClient } from "@supabase/supabase-js";
+import pdfParse from "pdf-parse";
+import Anthropic from "@anthropic-ai/sdk";
 
 const supabaseAnc = createClient(
   process.env.SUPABASE_ANC_URL,
@@ -74,7 +72,7 @@ Texte de l'étude :
 {{TEXTE_ETUDE}}
 """`;
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Méthode non autorisée" });
     return;
@@ -140,4 +138,4 @@ module.exports = async function handler(req, res) {
     console.error("extraire-etude-anc error:", err);
     res.status(500).json({ error: "Erreur lors de l'analyse de l'étude" });
   }
-};
+}
