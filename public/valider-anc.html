@@ -78,12 +78,10 @@
     { valeur: "microstation", label: "Microstation" },
   ];
 
-  // Libellés pour les postes qui n'ont pas d'entrée dans PRICING.optionsComplementaires
-  // (ex : posteDeRelevage n'est qu'un signal booléen côté formulaire client, le
-  // choix entre pompe amont/aval et son tarif se fait ici par le technicien).
-  const LABELS_MANUELS = {
-    posteDeRelevage: "Poste de relevage (à chiffrer : amont 1350€HT ou aval 2300€HT)",
-  };
+  // Libellés pour d'éventuels postes qui n'auraient pas d'entrée dans
+  // PRICING.optionsComplementaires (filet de sécurité, normalement vide
+  // depuis que le poste de relevage amont/aval est chiffré directement).
+  const LABELS_MANUELS = {};
 
   // Construit les lignes de devis initiales à partir de estimation_detail :
   // une ligne "base" (fourniture + pose de la filière) + une ligne par poste
