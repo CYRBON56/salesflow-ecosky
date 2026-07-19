@@ -391,12 +391,13 @@
     btnAnalyser.innerHTML = '<span class="spinner"></span> Analyse en cours...';
 
     try {
+      const texteExtrait = await extractPdfText(inputFichier.files[0]);
       const fichierAEnvoyer = await compressPdfFile(inputFichier.files[0]);
       const base64 = await fichierEnBase64(fichierAEnvoyer);
       const reponse = await fetch("/api/extraire-etude-anc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fichierBase64: base64, nomFichier: fichierAEnvoyer.name }),
+        body: JSON.stringify({ fichierBase64: base64, nomFichier: fichierAEnvoyer.name, texteExtrait }),
       });
       if (!reponse.ok) throw new Error("Échec extraction");
       const resultat = await reponse.json();
