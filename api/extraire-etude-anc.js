@@ -1,23 +1,25 @@
 /**
  * api/extraire-etude-anc.js
  *
- * Reçoit le PDF de l'étude de sol (base64), l'héberge dans Supabase Storage
- * (bucket media-anc), en extrait le texte, puis demande à Claude de retourner
- * les informations structurées utiles au formulaire ANC : coordonnées du
- * demandeur, filière préconisée, EH, dimensions, contraintes.
+ * Reçoit le PDF de l'étude de sol (base64, déjà compressé côté navigateur pour
+ * rester sous la limite de payload Vercel), l'héberge dans Supabase Storage
+ * (bucket media-anc), récupère le texte de l'étude, puis demande à Claude de
+ * retourner les informations structurées utiles au formulaire ANC.
+ *
+ * IMPORTANT — texte pré-extrait côté client :
+ * Le fichier PDF envoyé ici est compressé côté navigateur (public/compress-pdf.js),
+ * ce qui transforme chaque page en image et fait donc disparaître son texte.
+ * pdf-parse ne peut alors plus rien lire dans ce PDF compressé.
+ * Le formulaire extrait donc le texte AVANT compression (via pdf.js côté
+ * navigateur) et l'envoie dans le champ `texteExtrait` : on utilise ce texte
+ * en priorité, et on ne retente pdf-parse sur le buffer que si ce champ est
+ * absent ou vide (fallback, PDF non compressé par ex.).
  *
  * Dépendances (déjà ajoutées dans package.json) : pdf-parse, @anthropic-ai/sdk
  *
  * Variables d'environnement Vercel à ajouter :
  *   - ANTHROPIC_API_KEY
  *   (+ les SUPABASE_ANC_URL / SUPABASE_ANC_SERVICE_ROLE_KEY déjà en place)
- *
- * Limite à connaître : le body des fonctions Vercel est plafonné à 4.5 Mo.
- * La plupart des études de sol (texte + petits plans) passent, mais une étude
- * très riche en images haute résolution peut dépasser cette limite — si ça
- * arrive en pratique, il faudra faire uploader le PDF directement par le
- * client vers Supabase Storage (URL signée) puis ne transmettre que l'URL
- * à cet endpoint, au lieu du base64 complet.
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -79,7 +81,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { fichierBase64, nomFichier } = req.body;
+    const { fichierBase64, nomFichier, texteExtrait } = req.body;
     if (!fichierBase64) {
       res.status(400).json({ error: "Fichier manquant" });
       return;
@@ -97,9 +99,14 @@ export default async function handler(req, res) {
     const { data: urlPublique } = supabaseAnc.storage.from("media-anc").getPublicUrl(cheminStorage);
     const etudePdfUrl = urlPublique.publicUrl;
 
-    // --- 2. Extraction du texte du PDF ---
-    const resultatPdf = await pdfParse(bufferPdf);
-    const texteEtude = resultatPdf.text.slice(0, 40000); // garde-fou taille de prompt
+    // --- 2. Texte de l'étude : priorité au texte pré-extrait côté navigateur ---
+    // (le PDF reçu ici est compressé/rasterisé, pdf-parse n'y trouverait plus rien)
+    let texteEtude = (texteExtrait || "").trim();
+    if (!texteEtude) {
+      const resultatPdf = await pdfParse(bufferPdf);
+      texteEtude = resultatPdf.text;
+    }
+    texteEtude = texteEtude.slice(0, 40000); // garde-fou taille de prompt
 
     // --- 3. Extraction structurée via Claude ---
     const prompt = PROMPT_EXTRACTION.replace("{{TEXTE_ETUDE}}", texteEtude);
