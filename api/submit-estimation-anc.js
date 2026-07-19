@@ -151,8 +151,12 @@ export default async function handler(req, res) {
       detailComplements.push({ poste: "trancheeTechniqueEvacuation", metresLineaires: longueurTrancheeEvacuation, montantHT: montant });
     }
 
-    if (posteRelevage === true) {
-      detailComplements.push({ poste: "posteDeRelevage", note: "confirmé par l'étude de sol ou le client — à intégrer au devis technicien" });
+    if (posteRelevage === "amont") {
+      complementsHT += options.pompeRelevageAmont.prixHT;
+      detailComplements.push({ poste: "pompeRelevageAmont", montantHT: options.pompeRelevageAmont.prixHT });
+    } else if (posteRelevage === "aval") {
+      complementsHT += options.pompeRelevageAval.prixHT;
+      detailComplements.push({ poste: "pompeRelevageAval", montantHT: options.pompeRelevageAval.prixHT });
     }
     detailComplements.push({ poste: "evacuationDeblais", prixIndicatifHT: options.evacuationDeblais.prixHT, note: "en option" });
 
