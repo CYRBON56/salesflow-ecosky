@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Estimation Assainissement Non Collectif — RMS EcoSky</title>
 <script src="pricing-config-anc.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="compress-pdf.js"></script>
 <style>
   :root {
     --bleu: #1F4E78;
@@ -388,11 +391,12 @@
     btnAnalyser.innerHTML = '<span class="spinner"></span> Analyse en cours...';
 
     try {
-      const base64 = await fichierEnBase64(inputFichier.files[0]);
+      const fichierAEnvoyer = await compressPdfFile(inputFichier.files[0]);
+      const base64 = await fichierEnBase64(fichierAEnvoyer);
       const reponse = await fetch("/api/extraire-etude-anc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fichierBase64: base64, nomFichier: inputFichier.files[0].name }),
+        body: JSON.stringify({ fichierBase64: base64, nomFichier: fichierAEnvoyer.name }),
       });
       if (!reponse.ok) throw new Error("Échec extraction");
       const resultat = await reponse.json();
