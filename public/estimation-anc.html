@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estimation Assainissement Non Collectif — RMS EcoSky</title>
+<script src="pricing-config-anc.js"></script>
+<style>
+  :root {
+    --bleu: #1F4E78;
+    --bleu-clair: #2E75B6;
+    --vert: #2e7d32;
+    --fond: #f4f6f8;
+    --jaune: #fff8e1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: var(--fond);
+    color: #222;
+  }
+  .layout {
+    display: flex;
+    min-height: 100vh;
+  }
+  .panneau-video {
+    flex: 1 1 42%;
+    background: linear-gradient(135deg, var(--bleu), var(--bleu-clair));
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .panneau-video video {
+    max-width: 100%;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    margin-bottom: 24px;
+  }
+  .panneau-video h1 {
+    font-size: 1.5rem;
+    text-align: center;
+    margin: 0 0 8px;
+  }
+  .panneau-video p {
+    text-align: center;
+    opacity: 0.9;
+    font-size: 0.95rem;
+  }
+  .panneau-formulaire {
+    flex: 1 1 58%;
+    padding: 32px 48px;
+    display: flex;
+    flex-direction: column;
+  }
+  .bandeau-confiance {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: #fff;
+    border: 1px solid #dde3ea;
+    border-radius: 10px;
+    padding: 12px 18px;
+    margin-bottom: 24px;
+    font-size: 0.85rem;
+    color: var(--bleu);
+    font-weight: bold;
+  }
+  .bandeau-confiance span { white-space: nowrap; }
+  .progression {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 24px;
+  }
+  .progression .segment {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: #dde3ea;
+  }
+  .progression .segment.actif { background: var(--bleu-clair); }
+  .etape { display: none; }
+  .etape.active { display: block; animation: apparition 0.25s ease-in; }
+  @keyframes apparition { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .etape h2 {
+    color: var(--bleu);
+    font-size: 1.3rem;
+    margin-bottom: 6px;
+  }
+  .etape .sous-titre {
+    color: #666;
+    margin-bottom: 20px;
+    font-size: 0.92rem;
+  }
+  .champ { margin-bottom: 18px; }
+  .champ label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+  }
+  .champ input[type=text],
+  .champ input[type=tel],
+  .champ input[type=email],
+  .champ input[type=number],
+  .champ input[type=file],
+  .champ select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ccd3db;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+  .champ small { color: #888; font-size: 0.8rem; }
+  .choix-cartes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .choix-carte {
+    border: 2px solid #ccd3db;
+    border-radius: 10px;
+    padding: 14px;
+    cursor: pointer;
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+    transition: 0.15s;
+  }
+  .choix-carte:hover { border-color: var(--bleu-clair); }
+  .choix-carte.selectionne {
+    border-color: var(--bleu-clair);
+    background: #eaf2fb;
+    color: var(--bleu);
+  }
+  .boutons-navigation {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 24px;
+  }
+  button {
+    font-family: inherit;
+    font-size: 0.95rem;
+    padding: 12px 22px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .btn-precedent {
+    background: #eee;
+    color: #333;
+  }
+  .btn-suivant, .btn-envoyer {
+    background: var(--bleu);
+    color: #fff;
+  }
+  .btn-suivant:hover, .btn-envoyer:hover { background: var(--bleu-clair); }
+  .recap {
+    background: #fff;
+    border: 1px solid #dde3ea;
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .recap h3 { margin-top: 0; color: var(--bleu); font-size: 1rem; }
+  .recap ul { padding-left: 18px; margin: 8px 0; font-size: 0.88rem; color: #444; }
+  .recap .montant {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: var(--vert);
+    margin-top: 10px;
+  }
+  .recap .attente {
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #b26a00;
+    background: var(--jaune);
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-top: 10px;
+  }
+  .note-validation {
+    font-size: 0.82rem;
+    color: #888;
+    margin-top: 6px;
+  }
+  .footer-legal {
+    margin-top: auto;
+    padding-top: 24px;
+    font-size: 0.72rem;
+    color: #999;
+    border-top: 1px solid #e3e7ec;
+  }
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    .panneau-video { height: auto; position: static; padding: 24px; }
+    .panneau-formulaire { padding: 24px; }
+    .choix-cartes { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- Panneau vidéo produit — même principe que estimation.html (résine) -->
+  <div class="panneau-video">
+    <video autoplay loop muted playsinline poster="anc-poster.jpg">
+      <source src="anc-video.mp4" type="video/mp4">
+    </video>
+    <h1>Votre assainissement non collectif</h1>
+    <p>Fosse toutes eaux, filtre à sable, tranchées d'épandage, filière compacte
+       ou microstation — une estimation rapide, à valider avec un technicien.</p>
+  </div>
+
+  <!-- Panneau formulaire -->
+  <div class="panneau-formulaire">
+
+    <div class="bandeau-confiance">
+      <span>✅ Sans engagement</span>
+      <span>⏱️ Réponse sous 24h</span>
+      <span>🔒 Données confidentielles</span>
+    </div>
+
+    <div class="progression">
+      <div class="segment actif" data-segment="1"></div>
+      <div class="segment" data-segment="2"></div>
+      <div class="segment" data-segment="3"></div>
+      <div class="segment" data-segment="4"></div>
+      <div class="segment" data-segment="5"></div>
+    </div>
+
+    <form id="formulaireANC">
+
+      <!-- Étape 1 : type de projet -->
+      <div class="etape active" data-etape="1">
+        <h2>Votre projet</h2>
+        <p class="sous-titre">Quelques informations pour cadrer votre demande.</p>
+        <div class="champ">
+          <label>Type de projet</label>
+          <div class="choix-cartes" id="choixTypeProjet">
+            <div class="choix-carte" data-valeur="construction_neuve">Construction neuve</div>
+            <div class="choix-carte" data-valeur="rehabilitation">Réhabilitation / mise aux normes</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Étape 2 : coordonnées (téléphone collecté tôt, comme sur le formulaire résine) -->
+      <div class="etape" data-etape="2">
+        <h2>Vos coordonnées</h2>
+        <p class="sous-titre">Pour vous recontacter et vous transmettre votre estimation.</p>
+        <div class="champ">
+          <label for="prenom">Prénom / Nom</label>
+          <input type="text" id="prenom" name="prenom" required>
+        </div>
+        <div class="champ">
+          <label for="telephone">Téléphone</label>
+          <input type="tel" id="telephone" name="telephone" required>
+        </div>
+        <div class="champ">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required>
+        </div>
+        <div class="champ">
+          <label for="adresseProjet">Adresse du projet</label>
+          <input type="text" id="adresseProjet" name="adresseProjet" required>
+        </div>
+      </div>
+
+      <!-- Étape 3 : logement -->
+      <div class="etape" data-etape="3">
+        <h2>Votre logement</h2>
+        <p class="sous-titre">1 pièce principale (chambre, séjour) = 1 EH (équivalent-habitant), selon le DTU 64.1.</p>
+        <div class="champ">
+          <label for="piecesPrincipales">Nombre de pièces principales</label>
+          <input type="number" id="piecesPrincipales" name="piecesPrincipales" min="1" max="19" value="4" required>
+          <small id="indicationEH">Soit environ 4 EH</small>
+        </div>
+        <div class="champ">
+          <label for="etudeSol">Avez-vous déjà une étude de sol / de filière ?</label>
+          <select id="etudeSol" name="etudeSol">
+            <option value="non">Non, pas encore</option>
+            <option value="oui">Oui</option>
+          </select>
+        </div>
+        <div class="champ" id="champUploadEtude" style="display:none;">
+          <label for="fichierEtude">Joindre l'étude (PDF)</label>
+          <input type="file" id="fichierEtude" name="fichierEtude" accept="application/pdf">
+          <small>Optionnel — utile pour affiner l'estimation et gagner du temps.</small>
+        </div>
+      </div>
+
+      <!-- Étape 4 : terrain -->
+      <div class="etape" data-etape="4">
+        <h2>Votre terrain</h2>
+        <p class="sous-titre">Ces éléments permettent d'affiner l'estimation (raccordements, contraintes).</p>
+        <div class="champ">
+          <label>Roche connue ou suspectée sur le terrain ?</label>
+          <div class="choix-cartes" id="choixRoche">
+            <div class="choix-carte" data-valeur="non">Non</div>
+            <div class="choix-carte" data-valeur="oui">Oui</div>
+            <div class="choix-carte" data-valeur="ne_sait_pas">Je ne sais pas</div>
+          </div>
+        </div>
+        <div class="champ">
+          <label for="longueurRaccordement">Distance estimée maison → zone d'assainissement (mètres)</label>
+          <input type="number" id="longueurRaccordement" name="longueurRaccordement" min="0" value="10">
+          <small>Estimation à vue d'œil — sera vérifiée sur place.</small>
+        </div>
+        <div class="champ">
+          <label>Exutoire disponible</label>
+          <div class="choix-cartes" id="choixExutoire">
+            <div class="choix-carte" data-valeur="infiltration">Infiltration dans le sol</div>
+            <div class="choix-carte" data-valeur="fosse">Fossé / réseau pluvial</div>
+          </div>
+        </div>
+        <div class="champ">
+          <label>Ventilation à créer en toiture ?</label>
+          <div class="choix-cartes" id="choixVentilation">
+            <div class="choix-carte" data-valeur="oui">Oui</div>
+            <div class="choix-carte" data-valeur="non">Non, déjà existante</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Étape 5 : récapitulatif + estimation -->
+      <div class="etape" data-etape="5">
+        <h2>Votre estimation</h2>
+        <p class="sous-titre">Estimation indicative — un technicien la valide avant envoi définitif.</p>
+        <div class="recap" id="recapitulatif"></div>
+        <div class="note-validation">
+          Cette estimation sera vérifiée par un technicien RMS EcoSky avant de vous
+          être confirmée par email (délai indicatif : sous 24h).
+        </div>
+      </div>
+
+      <div class="boutons-navigation">
+        <button type="button" class="btn-precedent" id="btnPrecedent" style="visibility:hidden;">← Précédent</button>
+        <button type="button" class="btn-suivant" id="btnSuivant">Suivant →</button>
+        <button type="submit" class="btn-envoyer" id="btnEnvoyer" style="display:none;">Envoyer ma demande</button>
+      </div>
+
+    </form>
+
+    <div class="footer-legal">
+      RMS EcoSky — RESINE MARBRE SOL, SASU au capital de 50 000€ —
+      23 Route de Corn Er Hoët, 56400 Brech — SIRET 939 997 870 00018 —
+      RCS Lorient 939 997 870 — Assurance RC décennale n° SV75020721/11590 (ERGO France)
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const NB_ETAPES = 5;
+  let etapeCourante = 1;
+
+  const filieres = PRICING_CONFIG_ANC.filieres;
+  const options = PRICING_CONFIG_ANC.optionsComplementaires;
+
+  const donnees = {
+    typeProjet: null,
+    prenom: "", telephone: "", email: "", adresseProjet: "",
+    piecesPrincipales: 4,
+    etudeSol: "non",
+    roche: null,
+    longueurRaccordement: 10,
+    exutoire: null,
+    ventilation: null,
+  };
+
+  // --- Navigation entre étapes ---
+  function afficherEtape(n) {
+    document.querySelectorAll(".etape").forEach(e => {
+      e.classList.toggle("active", Number(e.dataset.etape) === n);
+    });
+    document.querySelectorAll(".progression .segment").forEach(s => {
+      s.classList.toggle("actif", Number(s.dataset.segment) <= n);
+    });
+    document.getElementById("btnPrecedent").style.visibility = n === 1 ? "hidden" : "visible";
+    document.getElementById("btnSuivant").style.display = n === NB_ETAPES ? "none" : "inline-block";
+    document.getElementById("btnEnvoyer").style.display = n === NB_ETAPES ? "inline-block" : "none";
+    if (n === NB_ETAPES) genererRecapitulatif();
+  }
+
+  document.getElementById("btnSuivant").addEventListener("click", () => {
+    if (etapeCourante < NB_ETAPES) {
+      etapeCourante++;
+      afficherEtape(etapeCourante);
+    }
+  });
+  document.getElementById("btnPrecedent").addEventListener("click", () => {
+    if (etapeCourante > 1) {
+      etapeCourante--;
+      afficherEtape(etapeCourante);
+    }
+  });
+
+  // --- Cartes à choix (type de projet, roche, exutoire, ventilation) ---
+  function initChoixCartes(idConteneur, cleDonnee) {
+    const conteneur = document.getElementById(idConteneur);
+    conteneur.querySelectorAll(".choix-carte").forEach(carte => {
+      carte.addEventListener("click", () => {
+        conteneur.querySelectorAll(".choix-carte").forEach(c => c.classList.remove("selectionne"));
+        carte.classList.add("selectionne");
+        donnees[cleDonnee] = carte.dataset.valeur;
+      });
+    });
+  }
+  initChoixCartes("choixTypeProjet", "typeProjet");
+  initChoixCartes("choixRoche", "roche");
+  initChoixCartes("choixExutoire", "exutoire");
+  initChoixCartes("choixVentilation", "ventilation");
+
+  // --- Champs simples ---
+  document.getElementById("prenom").addEventListener("input", e => donnees.prenom = e.target.value);
+  document.getElementById("telephone").addEventListener("input", e => donnees.telephone = e.target.value);
+  document.getElementById("email").addEventListener("input", e => donnees.email = e.target.value);
+  document.getElementById("adresseProjet").addEventListener("input", e => donnees.adresseProjet = e.target.value);
+  document.getElementById("longueurRaccordement").addEventListener("input", e => donnees.longueurRaccordement = Number(e.target.value));
+
+  const champPieces = document.getElementById("piecesPrincipales");
+  const indicationEH = document.getElementById("indicationEH");
+  champPieces.addEventListener("input", () => {
+    let v = Math.min(19, Math.max(1, Number(champPieces.value) || 1));
+    donnees.piecesPrincipales = v;
+    // 1 pièce principale = 1 EH (DTU 64.1) — bornée à la grille 4-19 EH
+    const eh = Math.min(19, Math.max(4, v));
+    indicationEH.textContent = "Soit environ " + eh + " EH";
+  });
+
+  const selectEtude = document.getElementById("etudeSol");
+  const champUpload = document.getElementById("champUploadEtude");
+  selectEtude.addEventListener("change", () => {
+    donnees.etudeSol = selectEtude.value;
+    champUpload.style.display = selectEtude.value === "oui" ? "block" : "none";
+  });
+
+  // --- Calcul de l'estimation ---
+  function ehRetenu() {
+    return Math.min(19, Math.max(4, donnees.piecesPrincipales || 4));
+  }
+
+  // Filière par défaut proposée : à ce stade (sans étude de sol validée), on ne peut
+  // pas savoir avec certitude quelle filière conviendra (ça dépend de la perméabilité
+  // du sol). On affiche donc une fourchette indicative sur la filière la plus
+  // couramment posée (filtre compact) et on laisse le technicien confirmer.
+  const FILIERE_PAR_DEFAUT = "filtreCompact";
+
+  function genererRecapitulatif() {
+    const eh = ehRetenu();
+    const filiere = filieres[FILIERE_PAR_DEFAUT];
+    const prixBase = filiere.prixParEH[eh];
+
+    let coutOptions = 0;
+    let lignesOptions = [];
+
+    if (donnees.roche === "oui") {
+      lignesOptions.push(`Brise-roche hydraulique (si nécessaire) : ${options.briseRocheHydraulique.prixHT} € HT / jour`);
+    }
+    if (donnees.ventilation === "oui") {
+      coutOptions += options.ventilationToiture.prixHT;
+      lignesOptions.push(`Ventilation en toiture : à partir de ${options.ventilationToiture.prixHT} € HT`);
+    }
+    if (donnees.longueurRaccordement > 0) {
+      const coutRaccordement = donnees.longueurRaccordement * options.terrassementRaccordement.prixHT;
+      coutOptions += coutRaccordement;
+      lignesOptions.push(`Terrassement de raccordement : ${donnees.longueurRaccordement} m × ${options.terrassementRaccordement.prixHT} € HT = ${coutRaccordement.toLocaleString("fr-FR")} € HT`);
+    }
+    if (donnees.exutoire === "infiltration") {
+      lignesOptions.push(`Lit d'infiltration (si nécessaire) : ${options.litInfiltration.prixHT} € HT / m²`);
+    }
+    lignesOptions.push(`Évacuation des déblais : à partir de ${options.evacuationDeblais.prixHT} € HT / tonne`);
+
+    let htmlRecap = `<h3>Logement de ${eh} EH — filière indicative : ${filiere.label}</h3>`;
+    htmlRecap += `<ul>${filiere.composantsInclus.map(c => `<li>${c}</li>`).join("")}</ul>`;
+
+    if (lignesOptions.length) {
+      htmlRecap += `<h3>Postes complémentaires possibles</h3><ul>${lignesOptions.map(l => `<li>${l}</li>`).join("")}</ul>`;
+    }
+
+    if (typeof prixBase === "number") {
+      const total = prixBase + coutOptions;
+      htmlRecap += `<div class="montant">Estimation indicative : ${total.toLocaleString("fr-FR")} € HT</div>`;
+    } else {
+      htmlRecap += `<div class="attente">Le prix forfaitaire de base n'est pas encore configuré pour ce nombre d'EH — un technicien vous transmettra un chiffrage précis sous 24h.</div>`;
+    }
+
+    document.getElementById("recapitulatif").innerHTML = htmlRecap;
+  }
+
+  // --- Envoi du formulaire ---
+  document.getElementById("formulaireANC").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById("btnEnvoyer");
+    btn.disabled = true;
+    btn.textContent = "Envoi en cours...";
+
+    const eh = ehRetenu();
+    const filiere = filieres[FILIERE_PAR_DEFAUT];
+    const prixBase = filiere.prixParEH[eh];
+
+    const payload = {
+      typeProjet: "anc",
+      sousType: donnees.typeProjet,
+      prenom: donnees.prenom,
+      telephone: donnees.telephone,
+      email: donnees.email,
+      adresseProjet: donnees.adresseProjet,
+      piecesPrincipales: donnees.piecesPrincipales,
+      eh: eh,
+      etudeSolFournie: donnees.etudeSol === "oui",
+      roche: donnees.roche,
+      longueurRaccordement: donnees.longueurRaccordement,
+      exutoire: donnees.exutoire,
+      ventilation: donnees.ventilation,
+      filiereIndicative: FILIERE_PAR_DEFAUT,
+      estimationIndicativeHT: typeof prixBase === "number" ? prixBase : null,
+      // Contrairement au formulaire résine, l'estimation ANC n'est PAS envoyée
+      // automatiquement au client : elle attend une validation technicien.
+      estimationValidee: false,
+    };
+
+    try {
+      const reponse = await fetch("/api/submit-estimation-anc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!reponse.ok) throw new Error("Échec de l'envoi");
+      document.getElementById("recapitulatif").innerHTML =
+        `<h3>Merci ${donnees.prenom} !</h3><p>Votre demande a bien été reçue. Un technicien RMS EcoSky va vérifier votre estimation et vous recontacter sous 24h.</p>`;
+      document.querySelector(".boutons-navigation").style.display = "none";
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "Envoyer ma demande";
+      alert("Une erreur est survenue, merci de réessayer ou de nous appeler directement.");
+    }
+  });
+
+  afficherEtape(1);
+})();
+</script>
+
+</body>
+</html>
