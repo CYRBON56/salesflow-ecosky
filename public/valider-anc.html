@@ -78,11 +78,22 @@
     { valeur: "microstation", label: "Microstation" },
   ];
 
+  // Libellés pour les postes qui n'ont pas d'entrée dans PRICING.optionsComplementaires
+  // (ex : posteDeRelevage n'est qu'un signal booléen côté formulaire client, le
+  // choix entre pompe amont/aval et son tarif se fait ici par le technicien).
+  const LABELS_MANUELS = {
+    posteDeRelevage: "Poste de relevage (à chiffrer : amont 1350€HT ou aval 2300€HT)",
+  };
+
   // Construit les lignes de devis initiales à partir de estimation_detail :
   // une ligne "base" (fourniture + pose de la filière) + une ligne par poste
-  // complémentaire qui a un montant chiffré. Les postes sans montant (ex :
-  // poste de relevage juste signalé, brise-roche "si nécessaire") arrivent à
-  // 0 € — au technicien de les chiffrer ou de les supprimer.
+  // complémentaire. Les postes purement informatifs (prixIndicatifHT, notés
+  // "en option" ou "si nécessaire" côté formulaire client — brise-roche,
+  // ventilation non cochée, évacuation des terres, poste de relevage) partent
+  // à 0 € par défaut : ce sont des options que le technicien active lui-même
+  // en renseignant un montant, plutôt que des coûts automatiquement inclus.
+  // Seuls les postes déjà confirmés par le client (montantHT présent) gardent
+  // leur valeur chiffrée.
   function construireLignesInitiales(lead) {
     const detail = lead.estimation_detail || {};
     const lignes = [];
@@ -94,8 +105,12 @@
 
     (detail.complements || []).forEach((c) => {
       const labelConfig = PRICING.optionsComplementaires && PRICING.optionsComplementaires[c.poste];
-      const label = labelConfig ? labelConfig.label : c.poste;
-      const montant = c.montantHT != null ? c.montantHT : (c.prixIndicatifHT != null ? c.prixIndicatifHT : 0);
+      let label = labelConfig ? labelConfig.label : (LABELS_MANUELS[c.poste] || c.poste);
+      const estConfirme = c.montantHT != null;
+      const montant = estConfirme ? c.montantHT : 0;
+      if (!estConfirme && c.prixIndicatifHT != null) {
+        label += ` (en option — indicatif ${c.prixIndicatifHT} € HT${c.unite ? "" : ""})`;
+      }
       lignes.push({ label, montant });
     });
 
