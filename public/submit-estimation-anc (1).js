@@ -2,40 +2,36 @@
  * api/submit-estimation-anc.js
  *
  * Reçoit les données du formulaire public/estimation-anc.html, calcule
- * l'estimation à partir de pricing-config-anc.js, et enregistre le lead
- * dans un projet Supabase DÉDIÉ à l'ANC (table leads_anc), séparé du
+ * l'estimation à partir de anc-pricing-config-server.js, et enregistre le
+ * lead dans un projet Supabase DÉDIÉ à l'ANC (table leads_anc), séparé du
  * Supabase résine (wklddwumirkdjkbxvzyj).
  *
  * Différence clé avec api/submit-estimation.js (résine) :
  *   - la résine envoie automatiquement le PDF/SMS/email au client dès la soumission
  *   - l'ANC N'ENVOIE RIEN au client à ce stade : le lead est marqué en attente,
- *     et c'est api/valider-estimation-anc.js (déclenché depuis le dashboard par
- *     Cyrille ou Fanny) qui génère le PDF définitif et l'envoie une fois vérifié.
+ *     et c'est un futur api/valider-estimation-anc.js (déclenché depuis le
+ *     dashboard par Cyrille ou Fanny) qui génère le PDF définitif et l'envoie
+ *     une fois vérifié.
  *
  * Variables d'environnement Vercel à créer pour CE projet (nouveau Supabase,
  * distinct de SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY utilisées pour la résine) :
  *   - SUPABASE_ANC_URL
  *   - SUPABASE_ANC_SERVICE_ROLE_KEY   (jamais exposée côté navigateur)
  *
- * Reste en TODO (dépend de code existant non fourni ici, à ajouter au besoin) :
+ * Reste en TODO :
  *   - notification interne (SMS/email à OWNER) pour prévenir qu'une estimation
  *     ANC attend validation
- *
- * Note : la grille de prix est chargée depuis anc-pricing-config-server.js
- * (et NON pricing-config-anc.js) — nom volontairement différent de la copie
- * publique dans public/ pour éviter toute confusion lors des uploads GitHub
- * (deux fichiers identiques portant le même nom dans deux dossiers différents).
  */
 
-const { createClient } = require("@supabase/supabase-js");
-const PRICING_CONFIG_ANC = require("./anc-pricing-config-server.js");
+import { createClient } from "@supabase/supabase-js";
+import PRICING_CONFIG_ANC from "./anc-pricing-config-server.js";
 
 const supabaseAnc = createClient(
   process.env.SUPABASE_ANC_URL,
   process.env.SUPABASE_ANC_SERVICE_ROLE_KEY
 );
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Méthode non autorisée" });
     return;
@@ -43,7 +39,6 @@ module.exports = async function handler(req, res) {
 
   try {
     const {
-      sousType,
       prenom,
       telephone,
       email,
@@ -51,10 +46,11 @@ module.exports = async function handler(req, res) {
       piecesPrincipales,
       eh,
       etudeSolFournie,
+      etudePdfUrl,
       roche,
       longueurRaccordement,
-      exutoire,
       ventilation,
+      posteRelevage,
       filiereIndicative,
     } = req.body;
 
@@ -84,8 +80,8 @@ module.exports = async function handler(req, res) {
     if (roche === "oui") {
       detailComplements.push({ poste: "briseRocheHydraulique", prixIndicatifHT: options.briseRocheHydraulique.prixHT, note: "optionnel, si roche rencontrée" });
     }
-    if (exutoire === "infiltration") {
-      detailComplements.push({ poste: "litInfiltration", prixUnitaireHT: options.litInfiltration.prixHT, note: "surface à définir" });
+    if (posteRelevage === true) {
+      detailComplements.push({ poste: "posteDeRelevage", note: "confirmé par l'étude de sol ou le client — à intégrer au devis technicien" });
     }
     detailComplements.push({ poste: "evacuationDeblais", prixIndicatifHT: options.evacuationDeblais.prixHT });
 
@@ -93,7 +89,6 @@ module.exports = async function handler(req, res) {
 
     const enregistrementLead = {
       type_projet: "anc",
-      sous_type_projet: sousType || null,
       prenom,
       telephone,
       email,
@@ -101,7 +96,8 @@ module.exports = async function handler(req, res) {
       pieces_principales: piecesPrincipales || null,
       eh: ehRetenu,
       etude_sol_fournie: !!etudeSolFournie,
-      contraintes_terrain: { roche, longueurRaccordement, exutoire, ventilation },
+      etude_sol_pdf_url: etudePdfUrl || null,
+      contraintes_terrain: { roche, longueurRaccordement, ventilation, posteRelevage },
       filiere_indicative: filiereIndicative,
       estimation_detail: {
         filiere: filiere.label,
@@ -138,4 +134,4 @@ module.exports = async function handler(req, res) {
     console.error("submit-estimation-anc error:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
-};
+}
