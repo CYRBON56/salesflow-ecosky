@@ -628,8 +628,15 @@
         body: JSON.stringify(payload),
       });
       if (!reponse.ok) throw new Error("Échec de l'envoi");
-      document.getElementById("recapitulatif").innerHTML =
-        `<h3>Merci ${donnees.prenom} !</h3><p>Votre demande a bien été reçue. Un technicien RMS EcoSky va vérifier votre estimation et vous recontacter sous 24h.</p>`;
+      document.getElementById("recapitulatif").innerHTML = `
+        <h3>Bonjour ${donnees.prenom},</h3>
+        <p>Nous avons bien reçu votre demande d'estimation pour votre projet d'assainissement non collectif
+           (${filiere.label}, logement de ${eh} EH).</p>
+        <p>Un technicien RMS EcoSky va vérifier votre estimation à partir de votre étude de sol et vous la
+           confirmera par email <strong>sous 24h</strong>.</p>
+        <p style="color:#666; font-size:0.85rem;">Cette première estimation est indicative — le montant définitif
+           vous sera transmis après validation technicien.</p>
+      `;
       document.querySelector(".boutons-navigation").style.display = "none";
     } catch (err) {
       btn.disabled = false;
