@@ -94,18 +94,28 @@ async function sendSms(to, body) {
 // pas cette limitation — c'est pourquoi il sert de canal de secours/parallèle
 // tant que le compte Twilio n'est pas passé en payant. PDF joint en base64
 // quand disponible ; sinon, le mail part quand même avec le texte seul.
-async function sendEmail({ to, subject, html, pdfBytes, pdfFilename }) {
+async function sendEmail({ to, subject, html, pdfBytes, pdfFilename, includeLogo }) {
   if (!RESEND_API_KEY || !to) {
     console.error("Resend: configuration manquante ou destinataire absent, email non envoyé.");
     return false;
   }
   try {
     const payload = { from: RESEND_FROM_EMAIL, to: [to], subject, html };
-    if (pdfBytes) {
-      payload.attachments = [
-        { filename: pdfFilename || "estimation.pdf", content: Buffer.from(pdfBytes).toString("base64") },
-      ];
+    const attachments = [];
+    if (includeLogo) {
+      attachments.push({
+        filename: "logo-ecosky.jpg",
+        content: LOGO_ECOSKY_BASE64,
+        content_id: "logo-ecosky",
+      });
     }
+    if (pdfBytes) {
+      attachments.push({
+        filename: pdfFilename || "estimation.pdf",
+        content: Buffer.from(pdfBytes).toString("base64"),
+      });
+    }
+    if (attachments.length > 0) payload.attachments = attachments;
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -123,6 +133,44 @@ async function sendEmail({ to, subject, html, pdfBytes, pdfFilename }) {
     console.error("sendEmail error:", err.message);
     return false;
   }
+}
+
+// Template HTML professionnel pour l'email client : en-tête avec logo,
+// message clair (transmission + rappel que le technicien doit affiner),
+// bloc estimation, et pied de page avec les mentions légales — cohérent
+// avec le PDF joint et le bandeau de confiance du formulaire.
+function buildClientEmailHtml({ prenom, estimation, numero, remiseHtml }) {
+  return `
+  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; color: #14312a;">
+    <div style="text-align:center; padding: 24px 0 8px;">
+      <img src="cid:logo-ecosky" alt="ECOSKY BY RMS" width="90" style="display:inline-block;" />
+    </div>
+    <div style="background: white; border: 1px solid #e2e0d5; border-radius: 14px; padding: 28px 26px;">
+      <p style="font-size: 15px; margin: 0 0 14px;">Bonjour ${prenom || ""},</p>
+      <p style="font-size: 15px; line-height: 1.6; margin: 0 0 18px;">
+        Nous vous transmettons votre estimation pour votre projet, comme demandé sur notre formulaire en ligne.
+      </p>
+      <div style="background: #eaf4ef; border: 1.5px solid #1e6f4c; border-radius: 10px; padding: 18px 20px; margin: 0 0 18px;">
+        <div style="font-size: 12.5px; color: #4a5a54; margin-bottom: 4px;">Estimation indicative</div>
+        <div style="font-size: 24px; font-weight: 800; color: #14312a; margin-bottom: 8px;">${estimation.chiffrable ? estimation.montantTTC + " € TTC" : ""}</div>
+        <div style="font-size: 13.5px; color: #4a5a54; line-height: 1.5;">${estimation.texte}</div>
+      </div>
+      ${remiseHtml}
+      <p style="font-size: 13.5px; line-height: 1.6; color: #4a5a54; margin: 18px 0 0; padding-top: 16px; border-top: 1px solid #e2e0d5;">
+        ⚠️ Cette estimation est indicative et devra être affinée avec un technicien RMS EcoSky, lors d'un appel
+        ou d'une visite sur site, avant toute confirmation définitive du prix.
+      </p>
+      <p style="font-size: 14px; margin: 18px 0 0;">
+        Le détail complet de votre estimateur (n°${numero}) se trouve en pièce jointe.
+      </p>
+      <p style="font-size: 14px; margin: 18px 0 0;">À très vite !<br/>L'équipe RMS EcoSky</p>
+    </div>
+    <div style="text-align:center; font-size: 11px; color: #8a9490; line-height: 1.6; padding: 18px 10px;">
+      RMS EcoSky — RESINE MARBRE SOL, SASU au capital de 50 000 € — SIRET 939 997 870 00018 — RCS Lorient 939 997 870<br/>
+      23 route de Corn Er Hoët, 56400 Brech — Assurance RC décennale n° SV75020721/11590 (ERGO France)<br/>
+      <a href="https://www.ecoskybyrms.fr" style="color:#1e6f4c;">ecoskybyrms.fr</a> — <a href="mailto:infos@ecosky.fr" style="color:#1e6f4c;">infos@ecosky.fr</a>
+    </div>
+  </div>`;
 }
 
 // ---------- Calcul de l'estimation ----------
@@ -644,22 +692,16 @@ export default async function handler(req, res) {
     // vérifiés) — l'email part donc même quand le SMS client échoue.
     if (email && inZone) {
       const remiseHtml = estimation.chiffrable
-        ? `<p style="color:#1e6f4c;">🎁 <strong>Remise de ${estimation.remisePourcent}% possible selon le volume</strong> (${estimation.montantApresRemise}€ TTC au lieu de ${estimation.montantTTC}€) — contactez un technicien pour voir si vous pouvez en bénéficier.</p>`
+        ? `<div style="background:#fff7e6; border:1.5px solid #e8b74a; border-radius:10px; padding:14px 16px; margin:0 0 18px; font-size:13.5px;">🎁 <strong>Remise de ${estimation.remisePourcent}% possible selon le volume</strong> (${estimation.montantApresRemise}€ TTC au lieu de ${estimation.montantTTC}€) — contactez un technicien pour voir si vous pouvez en bénéficier.</div>`
         : "";
-      const clientHtml =
-        `<p>Bonjour ${prenom || ""},</p>` +
-        `<p>Merci pour votre demande sur RMS EcoSky ! Voici votre estimation :</p>` +
-        `<p style="font-size:16px; font-weight:bold; color:#1e6f4c;">${estimation.texte}</p>` +
-        `<p>Cette estimation reste indicative et sera confirmée par l'un de nos techniciens lors d'un appel.</p>` +
-        remiseHtml +
-        `<p>Vous trouverez le détail complet de votre estimateur (n°${numero}) en pièce jointe.</p>` +
-        `<p>À très vite !<br/>RMS EcoSky</p>`;
+      const clientHtml = buildClientEmailHtml({ prenom, estimation, numero, remiseHtml });
       await sendEmail({
         to: email,
         subject: `Votre estimation RMS EcoSky n°${numero}`,
         html: clientHtml,
         pdfBytes,
         pdfFilename: `estimation-${numero}.pdf`,
+        includeLogo: true,
       });
     } else if (email && !inZone) {
       await sendEmail({
@@ -691,6 +733,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
 
 
 
