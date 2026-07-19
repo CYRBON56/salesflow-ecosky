@@ -1,4 +1,3 @@
-
 /**
  * Grille de prix — Estimateur Assainissement Non Collectif (ANC)
  * RMS EcoSky
@@ -16,6 +15,9 @@
  * jusqu'à 8 EH. Filtre compact et microstation : chiffrés jusqu'à 10 EH.
  * Au-delà, prixParEH reste null → le formulaire affiche « estimation à
  * confirmer par un technicien ».
+ *
+ * optionsComplementaires : prixHT à null → poste « sur devis / à confirmer
+ * par un technicien », même convention que prixParEH.
  */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) {
@@ -127,7 +129,16 @@
 
     // Postes complémentaires, communs à toutes les filières, ajoutés selon les
     // contraintes du terrain (roche, longueur de raccordement, exutoire, etc.)
+    // Regroupés par catégorie (même découpage que le chiffrage Excel de référence).
     optionsComplementaires: {
+
+      // --- Terrassement / conditions de sol ---------------------------------
+
+      terrassementClassique: {
+        label: "Terrassement classique (fouilles collecte, fosse, épandage)",
+        unite: "forfait",
+        prixHT: 1500,
+      },
 
       briseRocheHydraulique: {
         label: "Utilisation du brise-roche hydraulique",
@@ -135,11 +146,161 @@
         prixHT: 1250,
       },
 
+      reamenagementTerrainPente: {
+        label: "Réaménagement / nivellement terrain en pente",
+        unite: "forfait",
+        prixHT: 500,
+      },
+
+      protectionZoneChantier: {
+        label: "Protection de la zone d'ouvrage pendant travaux (interdiction circulation/stockage)",
+        unite: "forfait",
+        prixHT: 300,
+      },
+
+      // --- Prétraitement ------------------------------------------------------
+      // (fosse déjà incluse dans composantsInclus/prixParEH de chaque filière —
+      // ces lignes servent uniquement en cas de besoin d'un volume supérieur)
+
+      fosseToutesEaux3000_4000L: {
+        label: "Fosse toutes eaux béton 3000-4000 L (remplacement/surdimensionnement)",
+        unite: "unité",
+        prixHT: 2290,
+      },
+
+      fosseToutesEaux5000_6000L: {
+        label: "Fosse toutes eaux béton 5000-6000 L",
+        unite: "unité",
+        prixHT: 3990,
+      },
+
+      fosseToutesEaux8000LPlus: {
+        label: "Fosse toutes eaux béton 8000 L et plus",
+        unite: "unité",
+        prixHT: 6500,
+      },
+
+      prefiltreSeparate: {
+        label: "Préfiltre (fourniture + pose, si non intégré à la fosse)",
+        unite: "unité",
+        prixHT: null,
+        note: "à définir",
+      },
+
+      bacDegraisseur200L: {
+        label: "Bac dégraisseur 200 L (sortie cuisine à plus de 10 m de la fosse)",
+        unite: "unité",
+        prixHT: 700,
+      },
+
+      bacDegraisseur500L: {
+        label: "Bac dégraisseur 500 L (eaux usées + cuisine mutualisées)",
+        unite: "unité",
+        prixHT: 1100,
+      },
+
+      // --- Relevage -------------------------------------------------------
+
+      pompeRelevageAmont: {
+        label: "Poste de relevage en amont de la fosse — fourniture et pose",
+        unite: "forfait",
+        prixHT: 1550,
+      },
+
+      pompeRelevageAval: {
+        label: "Poste de relevage en aval de la fosse — fourniture et pose",
+        unite: "forfait",
+        prixHT: 2300,
+      },
+
+      pompeRelevageEauxClaires: {
+        label: "Poste de relevage eaux claires (sortie filière compacte)",
+        unite: "unité",
+        prixHT: 850,
+      },
+
+      pompeCanneTelescopique: {
+        label: "Pompe + canne télescopique (accessoire de relevage)",
+        unite: "unité",
+        prixHT: 250,
+      },
+
+      alarmeRelevage: {
+        label: "Alarme de fonctionnement (poste de relevage)",
+        unite: "unité",
+        prixHT: 250,
+      },
+
+      disjoncteurDifferentiel: {
+        label: "Disjoncteur différentiel séparé 16A/30mA (option)",
+        unite: "unité",
+        prixHT: 150,
+      },
+
+      branchementElectrique: {
+        label: "Branchement électrique par électricien agréé",
+        unite: "forfait",
+        prixHT: 350,
+      },
+
+      // --- Ventilation ------------------------------------------------------
+
+      ventilationPrimaire: {
+        label: "Ventilation primaire (remontée toiture, Ø100mm)",
+        unite: "unité",
+        prixHT: null,
+        note: "option, à définir",
+      },
+
       ventilationToiture: {
         label: "Ventilation secondaire en toiture",
         unite: "forfait",
         prixHT: 400,
         note: "à partir de",
+      },
+
+      extracteurStatiqueEolien: {
+        label: "Extracteur statique / éolien",
+        unite: "unité",
+        prixHT: 80,
+      },
+
+      // --- Collecte -----------------------------------------------------
+
+      teControleVisite: {
+        label: "Té de contrôle / té de visite par sortie EU",
+        unite: "unité",
+        prixHT: 25,
+      },
+
+      regardRepartition: {
+        label: "Regard de répartition",
+        unite: "unité",
+        prixHT: 100,
+      },
+
+      regardBouclage: {
+        label: "Regard de bouclage",
+        unite: "unité",
+        prixHT: 100,
+      },
+
+      canalisationRenforceeVoirie: {
+        label: "Canalisation renforcée sous voirie/passage véhicule (CR4/CR8)",
+        unite: "€ HT / mètre linéaire",
+        prixHT: 45,
+      },
+
+      dalleRepriseDeCharge: {
+        label: "Dalle de reprise de charge béton armé (passage véhicule)",
+        unite: "€ HT / m²",
+        prixHT: 100,
+      },
+
+      briseJet: {
+        label: "Brise-jet en amont de la zone d'infiltration",
+        unite: "unité",
+        prixHT: 35,
       },
 
       trancheeTechniqueEvacuation: {
@@ -155,11 +316,35 @@
         note: "longueur à définir au cas par cas selon le plan de masse",
       },
 
+      // --- Traitement secondaire (compléments hors base filière) -----------
+
+      trancheeEpandageSupplementaire: {
+        label: "Tranchée d'épandage supplémentaire (au-delà du linéaire de base inclus dans la filière)",
+        unite: "€ HT / mètre linéaire",
+        prixHT: 100,
+      },
+
       litInfiltration: {
-        label: "Fourniture et pose d'un lit d'infiltration",
+        label: "Fourniture et pose d'un lit d'infiltration / filtre tertiaire",
         unite: "€ HT / m²",
         prixHT: 100,
       },
+
+      // --- Remblai --------------------------------------------------------
+
+      apportTerreVegetale: {
+        label: "Apport de terre végétale de recouvrement",
+        unite: "€ HT / m³",
+        prixHT: 70,
+      },
+
+      geotextileRecouvrement: {
+        label: "Géotextile de recouvrement",
+        unite: "€ HT / m²",
+        prixHT: 15,
+      },
+
+      // --- Divers ---------------------------------------------------------
 
       evacuationDeblais: {
         label: "Évacuation des déblais terrigènes (terrassement fosse/cuve/filtres)",
@@ -168,16 +353,29 @@
         note: "à partir de",
       },
 
-      pompeRelevageAmont: {
-        label: "Poste de relevage en amont de la fosse — fourniture et pose",
+      neutralisationAncienDispositif: {
+        label: "Neutralisation d'un ancien dispositif d'assainissement (vidange + comblement)",
         unite: "forfait",
-        prixHT: 1550,
+        prixHT: 350,
       },
 
-      pompeRelevageAval: {
-        label: "Poste de relevage en aval de la fosse — fourniture et pose",
+      vidangeEntrepriseAgreee: {
+        label: "Vidange par une entreprise agréée",
         unite: "forfait",
-        prixHT: 2300,
+        prixHT: 350,
+      },
+
+      abattageArbresDebroussaillage: {
+        label: "Abattage d'arbres / débroussaillage préalable",
+        unite: "forfait",
+        prixHT: 500,
+      },
+
+      securisationOuvragesResiduels: {
+        label: "Sécurisation / nettoyage des ouvrages résiduels",
+        unite: "forfait",
+        prixHT: null,
+        note: "à définir",
       },
 
     },
