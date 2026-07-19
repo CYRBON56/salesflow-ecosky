@@ -20,10 +20,7 @@
     background: var(--fond);
     color: #222;
   }
-  .layout {
-    display: flex;
-    min-height: 100vh;
-  }
+  .layout { display: flex; min-height: 100vh; }
   .panneau-video {
     flex: 1 1 42%;
     background: linear-gradient(135deg, var(--bleu), var(--bleu-clair));
@@ -43,162 +40,86 @@
     box-shadow: 0 10px 30px rgba(0,0,0,0.25);
     margin-bottom: 24px;
   }
-  .panneau-video h1 {
-    font-size: 1.5rem;
-    text-align: center;
-    margin: 0 0 8px;
-  }
-  .panneau-video p {
-    text-align: center;
-    opacity: 0.9;
-    font-size: 0.95rem;
-  }
-  .panneau-formulaire {
-    flex: 1 1 58%;
-    padding: 32px 48px;
-    display: flex;
-    flex-direction: column;
-  }
+  .panneau-video h1 { font-size: 1.5rem; text-align: center; margin: 0 0 8px; }
+  .panneau-video p { text-align: center; opacity: 0.9; font-size: 0.95rem; }
+  .panneau-formulaire { flex: 1 1 58%; padding: 32px 48px; display: flex; flex-direction: column; }
   .bandeau-confiance {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    background: #fff;
-    border: 1px solid #dde3ea;
-    border-radius: 10px;
-    padding: 12px 18px;
-    margin-bottom: 24px;
-    font-size: 0.85rem;
-    color: var(--bleu);
-    font-weight: bold;
+    display: flex; gap: 16px; flex-wrap: wrap;
+    background: #fff; border: 1px solid #dde3ea; border-radius: 10px;
+    padding: 12px 18px; margin-bottom: 24px;
+    font-size: 0.85rem; color: var(--bleu); font-weight: bold;
   }
   .bandeau-confiance span { white-space: nowrap; }
-  .progression {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 24px;
-  }
-  .progression .segment {
-    flex: 1;
-    height: 6px;
-    border-radius: 3px;
-    background: #dde3ea;
-  }
+  .progression { display: flex; gap: 6px; margin-bottom: 24px; }
+  .progression .segment { flex: 1; height: 6px; border-radius: 3px; background: #dde3ea; }
   .progression .segment.actif { background: var(--bleu-clair); }
   .etape { display: none; }
   .etape.active { display: block; animation: apparition 0.25s ease-in; }
   @keyframes apparition { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-  .etape h2 {
-    color: var(--bleu);
-    font-size: 1.3rem;
-    margin-bottom: 6px;
-  }
-  .etape .sous-titre {
-    color: #666;
-    margin-bottom: 20px;
-    font-size: 0.92rem;
-  }
+  .etape h2 { color: var(--bleu); font-size: 1.3rem; margin-bottom: 6px; }
+  .etape .sous-titre { color: #666; margin-bottom: 20px; font-size: 0.92rem; }
   .champ { margin-bottom: 18px; }
-  .champ label {
-    display: block;
-    font-weight: bold;
-    margin-bottom: 6px;
-    font-size: 0.9rem;
-  }
-  .champ input[type=text],
-  .champ input[type=tel],
-  .champ input[type=email],
-  .champ input[type=number],
-  .champ input[type=file],
-  .champ select {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #ccd3db;
-    border-radius: 8px;
-    font-size: 0.95rem;
-    font-family: inherit;
+  .champ label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; }
+  .champ input[type=text], .champ input[type=tel], .champ input[type=email],
+  .champ input[type=number], .champ select {
+    width: 100%; padding: 10px 12px; border: 1px solid #ccd3db;
+    border-radius: 8px; font-size: 0.95rem; font-family: inherit;
   }
   .champ small { color: #888; font-size: 0.8rem; }
-  .choix-cartes {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
+  .champ.prerempli input, .champ.prerempli select {
+    background: #eefaf0; border-color: #a8d8ae;
   }
+  .badge-extrait {
+    display: inline-block; font-size: 0.72rem; font-weight: bold;
+    color: var(--vert); background: #e3f5e6; padding: 2px 8px;
+    border-radius: 10px; margin-left: 8px;
+  }
+  .choix-cartes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .choix-carte {
-    border: 2px solid #ccd3db;
-    border-radius: 10px;
-    padding: 14px;
-    cursor: pointer;
-    text-align: center;
-    font-weight: bold;
-    font-size: 0.9rem;
-    transition: 0.15s;
+    border: 2px solid #ccd3db; border-radius: 10px; padding: 14px;
+    cursor: pointer; text-align: center; font-weight: bold; font-size: 0.9rem; transition: 0.15s;
   }
   .choix-carte:hover { border-color: var(--bleu-clair); }
-  .choix-carte.selectionne {
-    border-color: var(--bleu-clair);
-    background: #eaf2fb;
-    color: var(--bleu);
+  .choix-carte.selectionne { border-color: var(--bleu-clair); background: #eaf2fb; color: var(--bleu); }
+  .zone-upload {
+    border: 2px dashed #a9b6c4; border-radius: 12px; padding: 36px 20px;
+    text-align: center; background: #fff; cursor: pointer; transition: 0.15s; display: block;
   }
-  .boutons-navigation {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 24px;
+  .zone-upload:hover { border-color: var(--bleu-clair); background: #f6faff; }
+  .zone-upload.fichier-choisi { border-color: var(--vert); background: #f1faf2; }
+  .zone-upload .icone { font-size: 2rem; margin-bottom: 8px; }
+  .zone-upload input[type=file] { display: none; }
+  .btn-analyser {
+    margin-top: 16px; width: 100%; background: var(--bleu); color: #fff;
+    border: none; border-radius: 8px; padding: 14px; font-weight: bold;
+    font-size: 1rem; cursor: pointer;
   }
-  button {
-    font-family: inherit;
-    font-size: 0.95rem;
-    padding: 12px 22px;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
-    font-weight: bold;
+  .btn-analyser:disabled { background: #9db3c4; cursor: not-allowed; }
+  .btn-secondaire-lien {
+    display: block; text-align: center; margin-top: 14px; font-size: 0.85rem;
+    color: #888; text-decoration: underline; cursor: pointer; background: none; border: none;
   }
-  .btn-precedent {
-    background: #eee;
-    color: #333;
+  .spinner {
+    display: inline-block; width: 16px; height: 16px; border: 2px solid #fff;
+    border-top-color: transparent; border-radius: 50%; animation: tourner 0.7s linear infinite;
+    vertical-align: middle; margin-right: 8px;
   }
-  .btn-suivant, .btn-envoyer {
-    background: var(--bleu);
-    color: #fff;
-  }
+  @keyframes tourner { to { transform: rotate(360deg); } }
+  .boutons-navigation { display: flex; justify-content: space-between; margin-top: 24px; }
+  button { font-family: inherit; font-size: 0.95rem; padding: 12px 22px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
+  .btn-precedent { background: #eee; color: #333; }
+  .btn-suivant, .btn-envoyer { background: var(--bleu); color: #fff; }
   .btn-suivant:hover, .btn-envoyer:hover { background: var(--bleu-clair); }
-  .recap {
-    background: #fff;
-    border: 1px solid #dde3ea;
-    border-radius: 10px;
-    padding: 18px;
-    margin-bottom: 18px;
-  }
+  .recap { background: #fff; border: 1px solid #dde3ea; border-radius: 10px; padding: 18px; margin-bottom: 18px; }
   .recap h3 { margin-top: 0; color: var(--bleu); font-size: 1rem; }
   .recap ul { padding-left: 18px; margin: 8px 0; font-size: 0.88rem; color: #444; }
-  .recap .montant {
-    font-size: 1.4rem;
-    font-weight: bold;
-    color: var(--vert);
-    margin-top: 10px;
-  }
+  .recap .montant { font-size: 1.4rem; font-weight: bold; color: var(--vert); margin-top: 10px; }
   .recap .attente {
-    font-size: 0.95rem;
-    font-weight: bold;
-    color: #b26a00;
-    background: var(--jaune);
-    padding: 10px 12px;
-    border-radius: 8px;
-    margin-top: 10px;
+    font-size: 0.95rem; font-weight: bold; color: #b26a00; background: var(--jaune);
+    padding: 10px 12px; border-radius: 8px; margin-top: 10px;
   }
-  .note-validation {
-    font-size: 0.82rem;
-    color: #888;
-    margin-top: 6px;
-  }
-  .footer-legal {
-    margin-top: auto;
-    padding-top: 24px;
-    font-size: 0.72rem;
-    color: #999;
-    border-top: 1px solid #e3e7ec;
-  }
+  .note-validation { font-size: 0.82rem; color: #888; margin-top: 6px; }
+  .footer-legal { margin-top: auto; padding-top: 24px; font-size: 0.72rem; color: #999; border-top: 1px solid #e3e7ec; }
   @media (max-width: 900px) {
     .layout { flex-direction: column; }
     .panneau-video { height: auto; position: static; padding: 24px; }
@@ -211,17 +132,15 @@
 
 <div class="layout">
 
-  <!-- Panneau vidéo produit — même principe que estimation.html (résine) -->
   <div class="panneau-video">
     <video autoplay loop muted playsinline poster="anc-poster.jpg">
       <source src="anc-video.mp4" type="video/mp4">
     </video>
     <h1>Votre assainissement non collectif</h1>
-    <p>Fosse toutes eaux, filtre à sable, tranchées d'épandage, filière compacte
-       ou microstation — une estimation rapide, à valider avec un technicien.</p>
+    <p>Déposez votre étude de sol, on récupère automatiquement les informations
+       pour vous proposer une estimation — à valider avec un technicien.</p>
   </div>
 
-  <!-- Panneau formulaire -->
   <div class="panneau-formulaire">
 
     <div class="bandeau-confiance">
@@ -240,36 +159,39 @@
 
     <form id="formulaireANC">
 
-      <!-- Étape 1 : type de projet -->
+      <!-- Étape 1 : upload de l'étude de sol -->
       <div class="etape active" data-etape="1">
-        <h2>Votre projet</h2>
-        <p class="sous-titre">Quelques informations pour cadrer votre demande.</p>
-        <div class="champ">
-          <label>Type de projet</label>
-          <div class="choix-cartes" id="choixTypeProjet">
-            <div class="choix-carte" data-valeur="construction_neuve">Construction neuve</div>
-            <div class="choix-carte" data-valeur="rehabilitation">Réhabilitation / mise aux normes</div>
-          </div>
-        </div>
+        <h2>Votre étude de sol</h2>
+        <p class="sous-titre">Déposez le PDF de votre étude de filière d'assainissement — on en extrait automatiquement vos coordonnées et les données techniques (filière, EH, dimensions).</p>
+
+        <label class="zone-upload" id="zoneUpload" for="fichierEtude">
+          <div class="icone">📄</div>
+          <div id="texteZoneUpload"><strong>Cliquez pour choisir votre étude</strong><br>ou glissez-la ici (PDF)</div>
+          <input type="file" id="fichierEtude" name="fichierEtude" accept="application/pdf">
+        </label>
+
+        <button type="button" class="btn-analyser" id="btnAnalyser" disabled>Analyser mon étude</button>
+        <button type="button" class="btn-secondaire-lien" id="btnSansEtude">Je n'ai pas encore d'étude de sol — continuer sans</button>
       </div>
 
-      <!-- Étape 2 : coordonnées (téléphone collecté tôt, comme sur le formulaire résine) -->
+      <!-- Étape 2 : coordonnées (pré-remplies si extraites) -->
       <div class="etape" data-etape="2">
         <h2>Vos coordonnées</h2>
-        <p class="sous-titre">Pour vous recontacter et vous transmettre votre estimation.</p>
-        <div class="champ">
+        <p class="sous-titre">Vérifiez les informations récupérées depuis votre étude et complétez l'email.</p>
+        <div class="champ" id="champPrenomWrap">
           <label for="prenom">Prénom / Nom</label>
           <input type="text" id="prenom" name="prenom" required>
         </div>
-        <div class="champ">
+        <div class="champ" id="champTelWrap">
           <label for="telephone">Téléphone</label>
           <input type="tel" id="telephone" name="telephone" required>
         </div>
         <div class="champ">
           <label for="email">Email</label>
           <input type="email" id="email" name="email" required>
+          <small>Non présent dans l'étude — à renseigner pour recevoir votre estimation.</small>
         </div>
-        <div class="champ">
+        <div class="champ" id="champAdresseWrap">
           <label for="adresseProjet">Adresse du projet</label>
           <input type="text" id="adresseProjet" name="adresseProjet" required>
         </div>
@@ -278,48 +200,40 @@
       <!-- Étape 3 : logement -->
       <div class="etape" data-etape="3">
         <h2>Votre logement</h2>
-        <p class="sous-titre">1 pièce principale (chambre, séjour) = 1 EH (équivalent-habitant), selon le DTU 64.1.</p>
-        <div class="champ">
+        <p class="sous-titre">1 pièce principale = 1 EH (équivalent-habitant), selon le DTU 64.1.</p>
+        <div class="champ" id="champPiecesWrap">
           <label for="piecesPrincipales">Nombre de pièces principales</label>
           <input type="number" id="piecesPrincipales" name="piecesPrincipales" min="1" max="19" value="4" required>
           <small id="indicationEH">Soit environ 4 EH</small>
         </div>
-        <div class="champ">
-          <label for="etudeSol">Avez-vous déjà une étude de sol / de filière ?</label>
-          <select id="etudeSol" name="etudeSol">
-            <option value="non">Non, pas encore</option>
-            <option value="oui">Oui</option>
-          </select>
-        </div>
-        <div class="champ" id="champUploadEtude" style="display:none;">
-          <label for="fichierEtude">Joindre l'étude (PDF)</label>
-          <input type="file" id="fichierEtude" name="fichierEtude" accept="application/pdf">
-          <small>Optionnel — utile pour affiner l'estimation et gagner du temps.</small>
-        </div>
       </div>
 
-      <!-- Étape 4 : terrain -->
+      <!-- Étape 4 : filière & données techniques (pré-remplies si extraites) -->
       <div class="etape" data-etape="4">
-        <h2>Votre terrain</h2>
-        <p class="sous-titre">Ces éléments permettent d'affiner l'estimation (raccordements, contraintes).</p>
+        <h2>Filière préconisée</h2>
+        <p class="sous-titre">Vérifiez la filière identifiée dans votre étude, ou choisissez-la si elle n'a pas pu être détectée.</p>
+        <div class="champ" id="champFiliereWrap">
+          <label for="filiereSelect">Type de filière</label>
+          <select id="filiereSelect" name="filiereSelect">
+            <option value="filtreSableDraineEtanche">Filtre à sable vertical drainé (étanche)</option>
+            <option value="filtreSableDraineNonEtanche">Filtre à sable vertical drainé non étanche</option>
+            <option value="tranchesEpandage">Tranchées d'épandage</option>
+            <option value="filtreCompact" selected>Filière compacte</option>
+            <option value="microstation">Microstation</option>
+          </select>
+        </div>
         <div class="champ">
-          <label>Roche connue ou suspectée sur le terrain ?</label>
-          <div class="choix-cartes" id="choixRoche">
+          <label>Poste de relevage nécessaire ?</label>
+          <div class="choix-cartes" id="choixRelevage">
             <div class="choix-carte" data-valeur="non">Non</div>
             <div class="choix-carte" data-valeur="oui">Oui</div>
-            <div class="choix-carte" data-valeur="ne_sait_pas">Je ne sais pas</div>
           </div>
         </div>
         <div class="champ">
-          <label for="longueurRaccordement">Distance estimée maison → zone d'assainissement (mètres)</label>
-          <input type="number" id="longueurRaccordement" name="longueurRaccordement" min="0" value="10">
-          <small>Estimation à vue d'œil — sera vérifiée sur place.</small>
-        </div>
-        <div class="champ">
-          <label>Exutoire disponible</label>
-          <div class="choix-cartes" id="choixExutoire">
-            <div class="choix-carte" data-valeur="infiltration">Infiltration dans le sol</div>
-            <div class="choix-carte" data-valeur="fosse">Fossé / réseau pluvial</div>
+          <label>Roche signalée dans l'étude ?</label>
+          <div class="choix-cartes" id="choixRoche">
+            <div class="choix-carte" data-valeur="non">Non</div>
+            <div class="choix-carte" data-valeur="oui">Oui</div>
           </div>
         </div>
         <div class="champ">
@@ -328,6 +242,11 @@
             <div class="choix-carte" data-valeur="oui">Oui</div>
             <div class="choix-carte" data-valeur="non">Non, déjà existante</div>
           </div>
+        </div>
+        <div class="champ">
+          <label for="longueurRaccordement">Distance estimée maison → zone d'assainissement (mètres)</label>
+          <input type="number" id="longueurRaccordement" name="longueurRaccordement" min="0" value="10">
+          <small>Estimation à vue d'œil — sera vérifiée sur place.</small>
         </div>
       </div>
 
@@ -344,7 +263,7 @@
 
       <div class="boutons-navigation">
         <button type="button" class="btn-precedent" id="btnPrecedent" style="visibility:hidden;">← Précédent</button>
-        <button type="button" class="btn-suivant" id="btnSuivant">Suivant →</button>
+        <button type="button" class="btn-suivant" id="btnSuivant" style="display:none;">Suivant →</button>
         <button type="submit" class="btn-envoyer" id="btnEnvoyer" style="display:none;">Envoyer ma demande</button>
       </div>
 
@@ -368,17 +287,135 @@
   const options = PRICING_CONFIG_ANC.optionsComplementaires;
 
   const donnees = {
-    typeProjet: null,
     prenom: "", telephone: "", email: "", adresseProjet: "",
     piecesPrincipales: 4,
-    etudeSol: "non",
+    filiere: "filtreCompact",
+    posteRelevage: null,
     roche: null,
-    longueurRaccordement: 10,
-    exutoire: null,
     ventilation: null,
+    longueurRaccordement: 10,
+    etudePdfUrl: null,
+    extractionReussie: false,
   };
 
-  // --- Navigation entre étapes ---
+  // ---------- Étape 1 : upload + extraction ----------
+  const inputFichier = document.getElementById("fichierEtude");
+  const zoneUpload = document.getElementById("zoneUpload");
+  const texteZoneUpload = document.getElementById("texteZoneUpload");
+  const btnAnalyser = document.getElementById("btnAnalyser");
+  const btnSansEtude = document.getElementById("btnSansEtude");
+
+  inputFichier.addEventListener("change", () => {
+    if (inputFichier.files.length) {
+      zoneUpload.classList.add("fichier-choisi");
+      texteZoneUpload.innerHTML = "<strong>✓ " + inputFichier.files[0].name + "</strong><br>Cliquez pour changer de fichier";
+      btnAnalyser.disabled = false;
+    }
+  });
+
+  function fichierEnBase64(fichier) {
+    return new Promise((resolve, reject) => {
+      const lecteur = new FileReader();
+      lecteur.onload = () => resolve(lecteur.result.split(",")[1]);
+      lecteur.onerror = reject;
+      lecteur.readAsDataURL(fichier);
+    });
+  }
+
+  function marquerChampExtrait(idWrap) {
+    const wrap = document.getElementById(idWrap);
+    if (wrap && !wrap.querySelector(".badge-extrait")) {
+      wrap.classList.add("prerempli");
+      wrap.querySelector("label").insertAdjacentHTML("beforeend", '<span class="badge-extrait">extrait de l\'étude</span>');
+    }
+  }
+
+  function appliquerCarteChoisie(idConteneur, valeur) {
+    if (valeur === null || valeur === undefined) return;
+    const conteneur = document.getElementById(idConteneur);
+    conteneur.querySelectorAll(".choix-carte").forEach(c => {
+      c.classList.toggle("selectionne", c.dataset.valeur === (valeur ? "oui" : "non"));
+    });
+  }
+
+  btnAnalyser.addEventListener("click", async () => {
+    if (!inputFichier.files.length) return;
+    btnAnalyser.disabled = true;
+    btnAnalyser.innerHTML = '<span class="spinner"></span> Analyse en cours...';
+
+    try {
+      const base64 = await fichierEnBase64(inputFichier.files[0]);
+      const reponse = await fetch("/api/extraire-etude-anc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fichierBase64: base64, nomFichier: inputFichier.files[0].name }),
+      });
+      if (!reponse.ok) throw new Error("Échec extraction");
+      const resultat = await reponse.json();
+      const d = resultat.donneesExtraites || {};
+
+      donnees.etudePdfUrl = resultat.etudePdfUrl || null;
+      donnees.extractionReussie = true;
+
+      if (d.demandeur) {
+        if (d.demandeur.prenom || d.demandeur.nom) {
+          document.getElementById("prenom").value = [d.demandeur.prenom, d.demandeur.nom].filter(Boolean).join(" ");
+          donnees.prenom = document.getElementById("prenom").value;
+          marquerChampExtrait("champPrenomWrap");
+        }
+        if (d.demandeur.telephone) {
+          document.getElementById("telephone").value = d.demandeur.telephone;
+          donnees.telephone = d.demandeur.telephone;
+          marquerChampExtrait("champTelWrap");
+        }
+      }
+      if (d.adresseProjet) {
+        document.getElementById("adresseProjet").value = d.adresseProjet;
+        donnees.adresseProjet = d.adresseProjet;
+        marquerChampExtrait("champAdresseWrap");
+      }
+      if (d.piecesPrincipales) {
+        document.getElementById("piecesPrincipales").value = d.piecesPrincipales;
+        donnees.piecesPrincipales = d.piecesPrincipales;
+        marquerChampExtrait("champPiecesWrap");
+        champPieces.dispatchEvent(new Event("input"));
+      }
+      if (d.filiere) {
+        document.getElementById("filiereSelect").value = d.filiere;
+        donnees.filiere = d.filiere;
+        marquerChampExtrait("champFiliereWrap");
+      }
+      if (d.posteDeRelevage !== null && d.posteDeRelevage !== undefined) {
+        donnees.posteRelevage = d.posteDeRelevage;
+        appliquerCarteChoisie("choixRelevage", d.posteDeRelevage);
+      }
+      if (d.rocheSignalee !== null && d.rocheSignalee !== undefined) {
+        donnees.roche = d.rocheSignalee ? "oui" : "non";
+        appliquerCarteChoisie("choixRoche", d.rocheSignalee);
+      }
+      if (d.ventilationAPrevoir !== null && d.ventilationAPrevoir !== undefined) {
+        donnees.ventilation = d.ventilationAPrevoir ? "oui" : "non";
+        appliquerCarteChoisie("choixVentilation", d.ventilationAPrevoir);
+      }
+
+      etapeCourante = 2;
+      afficherEtape(etapeCourante);
+    } catch (err) {
+      alert("L'analyse de l'étude a échoué. Vous pouvez continuer et remplir les informations manuellement.");
+      etapeCourante = 2;
+      afficherEtape(etapeCourante);
+    } finally {
+      btnAnalyser.disabled = false;
+      btnAnalyser.textContent = "Analyser mon étude";
+    }
+  });
+
+  btnSansEtude.addEventListener("click", () => {
+    etapeCourante = 2;
+    afficherEtape(etapeCourante);
+  });
+
+  // ---------- Navigation étapes 2-5 ----------
   function afficherEtape(n) {
     document.querySelectorAll(".etape").forEach(e => {
       e.classList.toggle("active", Number(e.dataset.etape) === n);
@@ -386,26 +423,20 @@
     document.querySelectorAll(".progression .segment").forEach(s => {
       s.classList.toggle("actif", Number(s.dataset.segment) <= n);
     });
-    document.getElementById("btnPrecedent").style.visibility = n === 1 ? "hidden" : "visible";
-    document.getElementById("btnSuivant").style.display = n === NB_ETAPES ? "none" : "inline-block";
+    document.getElementById("btnPrecedent").style.visibility = n <= 1 ? "hidden" : "visible";
+    document.getElementById("btnSuivant").style.display = (n === NB_ETAPES || n === 1) ? "none" : "inline-block";
     document.getElementById("btnEnvoyer").style.display = n === NB_ETAPES ? "inline-block" : "none";
     if (n === NB_ETAPES) genererRecapitulatif();
   }
 
   document.getElementById("btnSuivant").addEventListener("click", () => {
-    if (etapeCourante < NB_ETAPES) {
-      etapeCourante++;
-      afficherEtape(etapeCourante);
-    }
+    if (etapeCourante < NB_ETAPES) { etapeCourante++; afficherEtape(etapeCourante); }
   });
   document.getElementById("btnPrecedent").addEventListener("click", () => {
-    if (etapeCourante > 1) {
-      etapeCourante--;
-      afficherEtape(etapeCourante);
-    }
+    if (etapeCourante > 2) { etapeCourante--; afficherEtape(etapeCourante); }
+    else if (etapeCourante === 2) { etapeCourante = 1; afficherEtape(1); }
   });
 
-  // --- Cartes à choix (type de projet, roche, exutoire, ventilation) ---
   function initChoixCartes(idConteneur, cleDonnee) {
     const conteneur = document.getElementById(idConteneur);
     conteneur.querySelectorAll(".choix-carte").forEach(carte => {
@@ -416,49 +447,42 @@
       });
     });
   }
-  initChoixCartes("choixTypeProjet", "typeProjet");
   initChoixCartes("choixRoche", "roche");
-  initChoixCartes("choixExutoire", "exutoire");
   initChoixCartes("choixVentilation", "ventilation");
 
-  // --- Champs simples ---
+  document.getElementById("choixRelevage").addEventListener("click", (e) => {
+    const carte = e.target.closest(".choix-carte");
+    if (carte) {
+      document.getElementById("choixRelevage").querySelectorAll(".choix-carte").forEach(c => c.classList.remove("selectionne"));
+      carte.classList.add("selectionne");
+      donnees.posteRelevage = carte.dataset.valeur === "oui";
+    }
+  });
+
   document.getElementById("prenom").addEventListener("input", e => donnees.prenom = e.target.value);
   document.getElementById("telephone").addEventListener("input", e => donnees.telephone = e.target.value);
   document.getElementById("email").addEventListener("input", e => donnees.email = e.target.value);
   document.getElementById("adresseProjet").addEventListener("input", e => donnees.adresseProjet = e.target.value);
   document.getElementById("longueurRaccordement").addEventListener("input", e => donnees.longueurRaccordement = Number(e.target.value));
+  document.getElementById("filiereSelect").addEventListener("change", e => donnees.filiere = e.target.value);
 
   const champPieces = document.getElementById("piecesPrincipales");
   const indicationEH = document.getElementById("indicationEH");
   champPieces.addEventListener("input", () => {
     let v = Math.min(19, Math.max(1, Number(champPieces.value) || 1));
     donnees.piecesPrincipales = v;
-    // 1 pièce principale = 1 EH (DTU 64.1) — bornée à la grille 4-19 EH
     const eh = Math.min(19, Math.max(4, v));
     indicationEH.textContent = "Soit environ " + eh + " EH";
   });
 
-  const selectEtude = document.getElementById("etudeSol");
-  const champUpload = document.getElementById("champUploadEtude");
-  selectEtude.addEventListener("change", () => {
-    donnees.etudeSol = selectEtude.value;
-    champUpload.style.display = selectEtude.value === "oui" ? "block" : "none";
-  });
-
-  // --- Calcul de l'estimation ---
+  // ---------- Calcul de l'estimation ----------
   function ehRetenu() {
     return Math.min(19, Math.max(4, donnees.piecesPrincipales || 4));
   }
 
-  // Filière par défaut proposée : à ce stade (sans étude de sol validée), on ne peut
-  // pas savoir avec certitude quelle filière conviendra (ça dépend de la perméabilité
-  // du sol). On affiche donc une fourchette indicative sur la filière la plus
-  // couramment posée (filtre compact) et on laisse le technicien confirmer.
-  const FILIERE_PAR_DEFAUT = "filtreCompact";
-
   function genererRecapitulatif() {
     const eh = ehRetenu();
-    const filiere = filieres[FILIERE_PAR_DEFAUT];
+    const filiere = filieres[donnees.filiere] || filieres.filtreCompact;
     const prixBase = filiere.prixParEH[eh];
 
     let coutOptions = 0;
@@ -476,12 +500,12 @@
       coutOptions += coutRaccordement;
       lignesOptions.push(`Terrassement de raccordement : ${donnees.longueurRaccordement} m × ${options.terrassementRaccordement.prixHT} € HT = ${coutRaccordement.toLocaleString("fr-FR")} € HT`);
     }
-    if (donnees.exutoire === "infiltration") {
-      lignesOptions.push(`Lit d'infiltration (si nécessaire) : ${options.litInfiltration.prixHT} € HT / m²`);
-    }
     lignesOptions.push(`Évacuation des déblais : à partir de ${options.evacuationDeblais.prixHT} € HT / tonne`);
 
-    let htmlRecap = `<h3>Logement de ${eh} EH — filière indicative : ${filiere.label}</h3>`;
+    let htmlRecap = `<h3>Logement de ${eh} EH — filière : ${filiere.label}</h3>`;
+    if (donnees.extractionReussie) {
+      htmlRecap += `<p style="font-size:0.85rem;color:#2e7d32;">✓ Données extraites automatiquement de votre étude de sol</p>`;
+    }
     htmlRecap += `<ul>${filiere.composantsInclus.map(c => `<li>${c}</li>`).join("")}</ul>`;
 
     if (lignesOptions.length) {
@@ -498,7 +522,7 @@
     document.getElementById("recapitulatif").innerHTML = htmlRecap;
   }
 
-  // --- Envoi du formulaire ---
+  // ---------- Envoi ----------
   document.getElementById("formulaireANC").addEventListener("submit", async function (e) {
     e.preventDefault();
     const btn = document.getElementById("btnEnvoyer");
@@ -506,27 +530,24 @@
     btn.textContent = "Envoi en cours...";
 
     const eh = ehRetenu();
-    const filiere = filieres[FILIERE_PAR_DEFAUT];
+    const filiere = filieres[donnees.filiere] || filieres.filtreCompact;
     const prixBase = filiere.prixParEH[eh];
 
     const payload = {
-      typeProjet: "anc",
-      sousType: donnees.typeProjet,
       prenom: donnees.prenom,
       telephone: donnees.telephone,
       email: donnees.email,
       adresseProjet: donnees.adresseProjet,
       piecesPrincipales: donnees.piecesPrincipales,
       eh: eh,
-      etudeSolFournie: donnees.etudeSol === "oui",
+      etudeSolFournie: donnees.extractionReussie,
+      etudePdfUrl: donnees.etudePdfUrl,
       roche: donnees.roche,
       longueurRaccordement: donnees.longueurRaccordement,
-      exutoire: donnees.exutoire,
       ventilation: donnees.ventilation,
-      filiereIndicative: FILIERE_PAR_DEFAUT,
+      posteRelevage: donnees.posteRelevage,
+      filiereIndicative: donnees.filiere,
       estimationIndicativeHT: typeof prixBase === "number" ? prixBase : null,
-      // Contrairement au formulaire résine, l'estimation ANC n'est PAS envoyée
-      // automatiquement au client : elle attend une validation technicien.
       estimationValidee: false,
     };
 
