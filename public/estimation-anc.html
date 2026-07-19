@@ -273,7 +273,8 @@
           <label>Poste de relevage nécessaire ?</label>
           <div class="choix-cartes" id="choixRelevage">
             <div class="choix-carte" data-valeur="non">Non</div>
-            <div class="choix-carte" data-valeur="oui">Oui</div>
+            <div class="choix-carte" data-valeur="amont">Oui — en amont de la fosse (1 550 € HT)</div>
+            <div class="choix-carte" data-valeur="aval">Oui — en aval de la fosse (2 300 € HT)</div>
           </div>
         </div>
         <div class="champ">
@@ -342,7 +343,7 @@
     prenom: "", telephone: "", email: "", adresseProjet: "",
     piecesPrincipales: 4,
     filiere: "filtreCompact",
-    posteRelevage: null,
+    posteRelevage: "non",
     roche: null,
     ventilation: null,
     longueurRaccordement: 10,
@@ -387,7 +388,7 @@
     if (valeur === null || valeur === undefined) return;
     const conteneur = document.getElementById(idConteneur);
     conteneur.querySelectorAll(".choix-carte").forEach(c => {
-      c.classList.toggle("selectionne", c.dataset.valeur === (valeur ? "oui" : "non"));
+      c.classList.toggle("selectionne", c.dataset.valeur === valeur);
     });
   }
 
@@ -441,16 +442,19 @@
         marquerChampExtrait("champFiliereWrap");
       }
       if (d.posteDeRelevage !== null && d.posteDeRelevage !== undefined) {
-        donnees.posteRelevage = d.posteDeRelevage;
-        appliquerCarteChoisie("choixRelevage", d.posteDeRelevage);
+        // L'étude de sol indique seulement si un poste de relevage est
+        // nécessaire, pas s'il est en amont ou en aval — on présélectionne
+        // "amont" par défaut (cas le plus courant), à ajuster si besoin.
+        donnees.posteRelevage = d.posteDeRelevage ? "amont" : "non";
+        appliquerCarteChoisie("choixRelevage", donnees.posteRelevage);
       }
       if (d.rocheSignalee !== null && d.rocheSignalee !== undefined) {
         donnees.roche = d.rocheSignalee ? "oui" : "non";
-        appliquerCarteChoisie("choixRoche", d.rocheSignalee);
+        appliquerCarteChoisie("choixRoche", donnees.roche);
       }
       if (d.ventilationAPrevoir !== null && d.ventilationAPrevoir !== undefined) {
         donnees.ventilation = d.ventilationAPrevoir ? "oui" : "non";
-        appliquerCarteChoisie("choixVentilation", d.ventilationAPrevoir);
+        appliquerCarteChoisie("choixVentilation", donnees.ventilation);
       }
 
       etapeCourante = 2;
@@ -510,7 +514,7 @@
     if (carte) {
       document.getElementById("choixRelevage").querySelectorAll(".choix-carte").forEach(c => c.classList.remove("selectionne"));
       carte.classList.add("selectionne");
-      donnees.posteRelevage = carte.dataset.valeur === "oui";
+      donnees.posteRelevage = carte.dataset.valeur;
     }
   });
 
@@ -567,6 +571,14 @@
       const coutTrancheeEvacuation = donnees.longueurTrancheeEvacuation * options.trancheeTechniqueEvacuation.prixHT;
       coutOptions += coutTrancheeEvacuation;
       lignesOptions.push(`Tranchée technique tuyaux d'évacuation : ${donnees.longueurTrancheeEvacuation} m × ${options.trancheeTechniqueEvacuation.prixHT} € HT = ${coutTrancheeEvacuation.toLocaleString("fr-FR")} € HT`);
+    }
+
+    if (donnees.posteRelevage === "amont") {
+      coutOptions += options.pompeRelevageAmont.prixHT;
+      lignesOptions.push(`Poste de relevage en amont (fourniture et pose) : ${options.pompeRelevageAmont.prixHT.toLocaleString("fr-FR")} € HT`);
+    } else if (donnees.posteRelevage === "aval") {
+      coutOptions += options.pompeRelevageAval.prixHT;
+      lignesOptions.push(`Poste de relevage en aval (fourniture et pose) : ${options.pompeRelevageAval.prixHT.toLocaleString("fr-FR")} € HT`);
     }
 
     lignesOptions.push(`Évacuation des terres excédentaires (en option) : à partir de ${options.evacuationDeblais.prixHT} € HT / tonne`);
