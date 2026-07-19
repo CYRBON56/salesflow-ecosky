@@ -107,6 +107,7 @@ export default async function handler(req, res) {
       etudePdfUrl,
       roche,
       longueurRaccordement,
+      longueurTrancheeEvacuation,
       ventilation,
       posteRelevage,
       filiereIndicative,
@@ -126,22 +127,34 @@ export default async function handler(req, res) {
     let complementsHT = 0;
     const detailComplements = [];
 
+    // Brise-roche et évacuation des terres excédentaires : options systématiquement
+    // listées sur chaque devis (informatif, non chiffré dans le total tant que le
+    // technicien ne confirme pas leur nécessité sur place).
+    detailComplements.push({ poste: "briseRocheHydraulique", prixIndicatifHT: options.briseRocheHydraulique.prixHT, note: "optionnel, si roche rencontrée" });
+
     if (ventilation === "oui") {
       complementsHT += options.ventilationToiture.prixHT;
       detailComplements.push({ poste: "ventilationToiture", montantHT: options.ventilationToiture.prixHT });
+    } else {
+      detailComplements.push({ poste: "ventilationToiture", prixIndicatifHT: options.ventilationToiture.prixHT, note: "en option" });
     }
+
     if (longueurRaccordement > 0) {
       const montant = Number(longueurRaccordement) * options.terrassementRaccordement.prixHT;
       complementsHT += montant;
       detailComplements.push({ poste: "terrassementRaccordement", metresLineaires: longueurRaccordement, montantHT: montant });
     }
-    if (roche === "oui") {
-      detailComplements.push({ poste: "briseRocheHydraulique", prixIndicatifHT: options.briseRocheHydraulique.prixHT, note: "optionnel, si roche rencontrée" });
+
+    if (longueurTrancheeEvacuation > 0) {
+      const montant = Number(longueurTrancheeEvacuation) * options.trancheeTechniqueEvacuation.prixHT;
+      complementsHT += montant;
+      detailComplements.push({ poste: "trancheeTechniqueEvacuation", metresLineaires: longueurTrancheeEvacuation, montantHT: montant });
     }
+
     if (posteRelevage === true) {
       detailComplements.push({ poste: "posteDeRelevage", note: "confirmé par l'étude de sol ou le client — à intégrer au devis technicien" });
     }
-    detailComplements.push({ poste: "evacuationDeblais", prixIndicatifHT: options.evacuationDeblais.prixHT });
+    detailComplements.push({ poste: "evacuationDeblais", prixIndicatifHT: options.evacuationDeblais.prixHT, note: "en option" });
 
     const estimationTotaleHT = typeof prixBaseHT === "number" ? prixBaseHT + complementsHT : null;
 
@@ -155,7 +168,7 @@ export default async function handler(req, res) {
       eh: ehRetenu,
       etude_sol_fournie: !!etudeSolFournie,
       etude_sol_pdf_url: etudePdfUrl || null,
-      contraintes_terrain: { roche, longueurRaccordement, ventilation, posteRelevage },
+      contraintes_terrain: { roche, longueurRaccordement, longueurTrancheeEvacuation, ventilation, posteRelevage },
       filiere_indicative: filiereIndicative,
       estimation_detail: {
         filiere: filiere.label,
