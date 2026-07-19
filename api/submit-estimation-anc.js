@@ -20,10 +20,15 @@
  * Reste en TODO (dépend de code existant non fourni ici, à ajouter au besoin) :
  *   - notification interne (SMS/email à OWNER) pour prévenir qu'une estimation
  *     ANC attend validation
+ *
+ * Note : la grille de prix est chargée depuis anc-pricing-config-server.js
+ * (et NON pricing-config-anc.js) — nom volontairement différent de la copie
+ * publique dans public/ pour éviter toute confusion lors des uploads GitHub
+ * (deux fichiers identiques portant le même nom dans deux dossiers différents).
  */
 
 const { createClient } = require("@supabase/supabase-js");
-const PRICING_CONFIG_ANC = require("./pricing-config-anc.js");
+const PRICING_CONFIG_ANC = require("./anc-pricing-config-server.js");
 
 const supabaseAnc = createClient(
   process.env.SUPABASE_ANC_URL,
@@ -38,7 +43,6 @@ module.exports = async function handler(req, res) {
 
   try {
     const {
-      sousType,
       prenom,
       telephone,
       email,
@@ -46,10 +50,11 @@ module.exports = async function handler(req, res) {
       piecesPrincipales,
       eh,
       etudeSolFournie,
+      etudePdfUrl,
       roche,
       longueurRaccordement,
-      exutoire,
       ventilation,
+      posteRelevage,
       filiereIndicative,
     } = req.body;
 
@@ -79,8 +84,8 @@ module.exports = async function handler(req, res) {
     if (roche === "oui") {
       detailComplements.push({ poste: "briseRocheHydraulique", prixIndicatifHT: options.briseRocheHydraulique.prixHT, note: "optionnel, si roche rencontrée" });
     }
-    if (exutoire === "infiltration") {
-      detailComplements.push({ poste: "litInfiltration", prixUnitaireHT: options.litInfiltration.prixHT, note: "surface à définir" });
+    if (posteRelevage === true) {
+      detailComplements.push({ poste: "posteDeRelevage", note: "confirmé par l'étude de sol ou le client — à intégrer au devis technicien" });
     }
     detailComplements.push({ poste: "evacuationDeblais", prixIndicatifHT: options.evacuationDeblais.prixHT });
 
@@ -88,7 +93,6 @@ module.exports = async function handler(req, res) {
 
     const enregistrementLead = {
       type_projet: "anc",
-      sous_type_projet: sousType || null,
       prenom,
       telephone,
       email,
@@ -96,7 +100,8 @@ module.exports = async function handler(req, res) {
       pieces_principales: piecesPrincipales || null,
       eh: ehRetenu,
       etude_sol_fournie: !!etudeSolFournie,
-      contraintes_terrain: { roche, longueurRaccordement, exutoire, ventilation },
+      etude_sol_pdf_url: etudePdfUrl || null,
+      contraintes_terrain: { roche, longueurRaccordement, ventilation, posteRelevage },
       filiere_indicative: filiereIndicative,
       estimation_detail: {
         filiere: filiere.label,
