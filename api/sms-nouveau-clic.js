@@ -3,8 +3,10 @@
 // du formulaire en venant d'une publicité Meta (présence de fbclid).
 // Ne remplace pas les autres SMS (devis complété, rappel demandé) — c'est
 // un signal précoce en plus, avant même que le visiteur remplisse quoi que ce soit.
-
-import twilio from 'twilio';
+//
+// N'utilise pas le package npm "twilio" (non installé sur ce projet) —
+// appelle directement l'API REST Twilio via fetch, comme les autres
+// endpoints SMS du projet.
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -19,15 +21,36 @@ export default async function handler(req, res) {
       return res.status(200).json({ skipped: true, reason: 'no fbclid' });
     }
 
-    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const fromNumber = process.env.TWILIO_FROM_NUMBER;
+    const toNumber = process.env.TWILIO_TO_NUMBER;
 
     const message = `🔔 Nouveau clic pub EcoSky !\nQuelqu'un vient d'ouvrir le formulaire devis via la pub Meta${utm_campaign ? ` (${utm_campaign})` : ''}.\nPage : ${page || 'estimation.html'}`;
 
-    await client.messages.create({
-      body: message,
-      from: process.env.TWILIO_FROM_NUMBER,
-      to: process.env.TWILIO_TO_NUMBER,
+    const body = new URLSearchParams({
+      To: toNumber,
+      From: fromNumber,
+      Body: message,
     });
+
+    const twilioRes = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
+        },
+        body: body.toString(),
+      }
+    );
+
+    if (!twilioRes.ok) {
+      const errText = await twilioRes.text();
+      console.error('Erreur Twilio (sms-nouveau-clic):', twilioRes.status, errText);
+      return res.status(200).json({ sent: false, error: errText });
+    }
 
     return res.status(200).json({ sent: true });
   } catch (err) {
