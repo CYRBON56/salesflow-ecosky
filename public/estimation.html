@@ -329,11 +329,14 @@
 
     // SMS immédiat dès l'arrivée sur la page via la pub — indépendant du
     // tracking ci-dessus, ne doit jamais bloquer ni casser le chargement.
+    // On envoie aussi le session_id (déjà généré ci-dessus) pour que le SMS
+    // puisse indiquer si ce visiteur semble déjà être venu via une pub avant.
     fetch(SMS_NOUVEAU_CLIC_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fbclid,
+        session_id: sessionId,
         utm_source: utmSource,
         utm_campaign: utmCampaign,
         page: window.location.pathname,
