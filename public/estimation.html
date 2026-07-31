@@ -243,6 +243,7 @@
   const APPOINTMENT_API_URL = "https://salesflow-ecosky.vercel.app/api/estimation-appointment";
   const CALLBACK_API_URL = "https://salesflow-ecosky.vercel.app/api/request-callback";
   const TRACK_CLICK_URL = "https://salesflow-ecosky.vercel.app/api/track-click";
+  const SMS_NOUVEAU_CLIC_URL = "https://salesflow-ecosky.vercel.app/api/sms-nouveau-clic";
 
   // ---------- Diaporama de fond (panneau formulaire) ----------
   const FORM_BG_IMAGES = [
@@ -278,11 +279,13 @@
     }, FORM_BG_INTERVAL_MS);
   })();
 
-  // ---------- Tracking des clics pub ----------
+  // ---------- Tracking des clics pub + SMS immédiat ----------
   // Cette page peut être la toute première page vue par un visiteur venant
   // d'une pub Facebook (destination directe du formulaire) — on capte donc le
   // clic ici aussi, avec la même logique que sur le site principal, pour que
-  // ça remonte bien dans "Clics pub" de SalesFlow System.
+  // ça remonte bien dans "Clics pub" de SalesFlow System. On envoie aussi un
+  // SMS immédiat à Cyrille dès cet instant, avant même que le visiteur
+  // remplisse quoi que ce soit dans le formulaire.
   (function trackAdClickIfNeeded() {
     const params = new URLSearchParams(window.location.search);
     const fbclid = params.get("fbclid");
@@ -307,6 +310,8 @@
       sessionId = "web_" + Date.now();
     }
 
+    const utmCampaign = params.get("utm_campaign");
+
     fetch(TRACK_CLICK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -315,10 +320,23 @@
         fbclid,
         ad_id: params.get("ad_id"),
         utm_source: utmSource,
-        utm_campaign: params.get("utm_campaign"),
+        utm_campaign: utmCampaign,
         utm_medium: params.get("utm_medium"),
         landing_page: window.location.href,
         referrer: document.referrer || null,
+      }),
+    }).catch(() => {});
+
+    // SMS immédiat dès l'arrivée sur la page via la pub — indépendant du
+    // tracking ci-dessus, ne doit jamais bloquer ni casser le chargement.
+    fetch(SMS_NOUVEAU_CLIC_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fbclid,
+        utm_source: utmSource,
+        utm_campaign: utmCampaign,
+        page: window.location.pathname,
       }),
     }).catch(() => {});
   })();
@@ -328,31 +346,31 @@
   // Palette complète DIECO — granulats/résine EPDM, avec les vraies
   // références RAL (voir PALETTE_COLORIS_DIECO_2026.pdf).
   const COLOR_SWATCHES = {
-    rouge_brique: "#AC4034",   // RAL 3016
-    rouge_vif: "#C1121C",      // RAL 3020
-    vert_fonce: "#316650",     // RAL 6028
-    vert_clair: "#468641",     // RAL 6017
-    orange: "#E75B12",         // RAL 2008
-    vert_reseda: "#5E8351",    // RAL 6011
-    jaune: "#F3DA0B",          // RAL 1018
-    bleu_fonce: "#154889",     // RAL 5005
-    gris_noir: "#2F3234",      // RAL 7021 (= "anthracite")
-    marron: "#4D3324",         // RAL 8028
-    beige: "#C6B286",          // RAL 1001
-    ocre: "#CB8F00",           // RAL 1005
-    gris_souris: "#7C7C7B",    // RAL 7037 (= "gris")
-    gris_clair: "#CFD0CF",     // RAL 7047
-    blanc_perle: "#E3D9C6",    // RAL 1013
-    blanc_casse: "#E6D2B5",    // RAL 1015
-    sable: "#AF8050",          // RAL 1011
-    bleu_petrole: "#234856",   // RAL 5001
-    bleu_moyen: "#2271B3",     // RAL 5015
-    bleu_clair: "#3481B8",     // RAL 5012
-    bleu_pastel: "#7FB0B7",    // RAL 5024
-    violet: "#4A203B",         // RAL 4007
-    lilas: "#6C4675",          // RAL 4005
-    rose: "#B24C8C",           // RAL 4010
-    beige_jaune: "#AF8050",    // RAL 1011 — utilisé uniquement pour l'option parking (inchangée)
+    rouge_brique: "#AC4034",
+    rouge_vif: "#C1121C",
+    vert_fonce: "#316650",
+    vert_clair: "#468641",
+    orange: "#E75B12",
+    vert_reseda: "#5E8351",
+    jaune: "#F3DA0B",
+    bleu_fonce: "#154889",
+    gris_noir: "#2F3234",
+    marron: "#4D3324",
+    beige: "#C6B286",
+    ocre: "#CB8F00",
+    gris_souris: "#7C7C7B",
+    gris_clair: "#CFD0CF",
+    blanc_perle: "#E3D9C6",
+    blanc_casse: "#E6D2B5",
+    sable: "#AF8050",
+    bleu_petrole: "#234856",
+    bleu_moyen: "#2271B3",
+    bleu_clair: "#3481B8",
+    bleu_pastel: "#7FB0B7",
+    violet: "#4A203B",
+    lilas: "#6C4675",
+    rose: "#B24C8C",
+    beige_jaune: "#AF8050",
   };
 
   const COLOR_LABELS = {
@@ -405,9 +423,6 @@
     email: "",
   };
 
-  // La liste des étapes dépend des réponses précédentes (support piéton vs
-  // carrossable, dalle vs carrelage vs pavé, bordure ou non...). On la
-  // recalcule à chaque fois plutôt que d'avoir une liste figée.
   function getSteps() {
     const s = [];
 
@@ -569,7 +584,7 @@
   function renderProgress() {
     const steps = getSteps();
     progressEl.innerHTML = "";
-    const total = steps.length + 1; // +1 pour l'écran de résultat
+    const total = steps.length + 1;
     for (let i = 0; i < total; i++) {
       const seg = document.createElement("div");
       seg.className = "progress-seg" + (i <= state.step ? " done" : "");
@@ -594,21 +609,17 @@
     return true;
   }
 
-  // Génère une texture de grains mouchetés (comme le rendu EPDM réel), pour
-  // remplacer le simple dégradé par un aperçu bien plus fidèle au produit.
   function generateSpeckleDataUrl(colors, size) {
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d");
 
-    // Fond neutre (liant résine) légèrement translucide sous les grains
     ctx.fillStyle = "#e9e6dd";
     ctx.fillRect(0, 0, size, size);
 
-    const grainCount = Math.round((size * size) / 9); // densité des grains
+    const grainCount = Math.round((size * size) / 9);
     for (let i = 0; i < grainCount; i++) {
-      // Répartition ~homogène entre les 1 ou 2 couleurs, avec un léger désordre
       const pick = colors.length === 1 ? colors[0] : colors[Math.random() < 0.5 ? 0 : 1];
       const x = Math.random() * size;
       const y = Math.random() * size;
@@ -649,8 +660,6 @@
 
   function renderStep() {
     const steps = getSteps();
-    // Si on a dépassé le nombre d'étapes suite à un changement de branche
-    // (ex: retour en arrière puis nouveau choix), on recadre proprement.
     if (state.step >= steps.length) state.step = steps.length - 1;
     const s = steps[state.step];
 
@@ -743,7 +752,6 @@
             } else if (current.length < (s.maxSelection || 2)) {
               current = [...current, val];
             } else {
-              // Déjà 2 couleurs choisies : la nouvelle remplace la première.
               current = [current[1], val];
             }
           }
@@ -811,8 +819,6 @@
   let partialLeadSaved = false;
 
   function savePartialLead() {
-    // On ne sauvegarde qu'une fois par visite, pas à chaque fois que le
-    // visiteur revient sur cette étape en arrière/avant.
     if (partialLeadSaved) return;
     partialLeadSaved = true;
     fetch(SAVE_PARTIAL_URL, {
@@ -899,7 +905,7 @@
 
   const CALLBACK_ALLOWED_DEPARTMENTS = ["56", "22", "29", "35", "44"];
   function isPostalCodeInZone(cp) {
-    if (!cp || cp.length < 2) return true; // pas de code postal donné, on ne bloque pas
+    if (!cp || cp.length < 2) return true;
     return CALLBACK_ALLOWED_DEPARTMENTS.includes(cp.trim().slice(0, 2));
   }
 
