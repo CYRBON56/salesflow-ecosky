@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     let visitorStatus = '🆕 Nouveau visiteur';
     try {
       const supabaseUrl = process.env.SUPABASE_URL;
-      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
       if (session_id && supabaseUrl && supabaseKey) {
         const checkRes = await fetch(
           `${supabaseUrl}/rest/v1/web_clicks?session_id=eq.${encodeURIComponent(session_id)}&fbclid=neq.${encodeURIComponent(fbclid)}&select=id&limit=1`,
