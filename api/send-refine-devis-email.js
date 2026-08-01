@@ -1,6 +1,6 @@
 // api/send-refine-devis-email.js
 // Envoie un email automatique à un lead capté via le formulaire instantané
-// Meta, avec un bouton "Affiner mon devis" qui renvoie vers le site avec
+// Meta, avec un bouton "Réaliser mon devis" qui renvoie vers le site avec
 // un lien personnalisé (contenant son lead_id) — le site pourra alors le
 // reconnaître automatiquement et pré-remplir ses coordonnées, sans qu'il
 // ait à retaper quoi que ce soit.
