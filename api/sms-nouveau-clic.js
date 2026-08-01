@@ -4,108 +4,92 @@
 // Ne remplace pas les autres SMS (devis complété, rappel demandé) — c'est
 // un signal précoce en plus, avant même que le visiteur remplisse quoi que ce soit.
 //
-// N'utilise pas le package npm "twilio" (non installé sur ce projet) —
-// appelle directement l'API REST Twilio via fetch.
-//
-// Indique aussi si le visiteur semble déjà être venu avant (via son
-// session_id stocké côté navigateur, comparé aux clics précédents dans
-// Supabase — table web_clicks) et sa localisation approximative (déduite
-// de son IP par Vercel, aucun service externe nécessaire).
-//
-// IMPORTANT : vérifier que les noms des variables d'environnement
-// SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY ci-dessous correspondent bien
-// à ceux déjà utilisés par les autres fichiers api/ de ce projet (submit-
-// estimation.js, etc.) — les adapter si les noms diffèrent sur Vercel.
+// Structure calquée sur api/request-callback.js (qui fonctionne) pour
+// éviter toute différence subtile dans l'appel Twilio.
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
+const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER;
+
+async function sendSms(to, body) {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !to) return false;
+  try {
+    const params = new URLSearchParams({ To: to, From: TWILIO_FROM_NUMBER, Body: body });
+    const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`, {
+      method: "POST",
+      headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+    if (!res.ok) console.error("Twilio SMS error (sms-nouveau-clic):", await res.text());
+    return res.ok;
+  } catch (err) {
+    console.error("sendSms (sms-nouveau-clic) error:", err.message);
+    return false;
+  }
+}
+
+async function checkVisitorAlreadySeen(sessionId, currentFbclid) {
+  if (!sessionId || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) return false;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/web_clicks?session_id=eq.${encodeURIComponent(sessionId)}&fbclid=neq.${encodeURIComponent(currentFbclid)}&select=id&limit=1`,
+      {
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+        },
+      }
+    );
+    if (!res.ok) return false;
+    const rows = await res.json();
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (err) {
+    console.error("checkVisitorAlreadySeen error:", err.message);
+    return false;
+  }
+}
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).send("Method not allowed");
 
   try {
     const { fbclid, utm_source, utm_campaign, page, session_id } = req.body || {};
 
-    // On n'envoie le SMS que si la visite vient bien d'une pub (fbclid présent)
     if (!fbclid) {
-      return res.status(200).json({ skipped: true, reason: 'no fbclid' });
+      return res.status(200).json({ skipped: true, reason: "no fbclid" });
     }
 
-    // ---------- Localisation approximative (headers Vercel) ----------
-    const city = req.headers['x-vercel-ip-city']
-      ? decodeURIComponent(req.headers['x-vercel-ip-city'])
+    const city = req.headers["x-vercel-ip-city"]
+      ? decodeURIComponent(req.headers["x-vercel-ip-city"])
       : null;
-    const region = req.headers['x-vercel-ip-country-region'] || null;
-    const country = req.headers['x-vercel-ip-country'] || null;
+    const region = req.headers["x-vercel-ip-country-region"] || null;
+    const country = req.headers["x-vercel-ip-country"] || null;
     const locationParts = [city, region, country].filter(Boolean);
-    const locationStr = locationParts.length > 0 ? locationParts.join(', ') : 'localisation inconnue';
+    const locationStr = locationParts.length > 0 ? locationParts.join(", ") : "localisation inconnue";
 
-    // ---------- Nouveau visiteur ou déjà venu ? ----------
-    let visitorStatus = '🆕 Nouveau visiteur';
-    try {
-      const supabaseUrl = process.env.SUPABASE_URL;
-      const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-      if (session_id && supabaseUrl && supabaseKey) {
-        const checkRes = await fetch(
-          `${supabaseUrl}/rest/v1/web_clicks?session_id=eq.${encodeURIComponent(session_id)}&fbclid=neq.${encodeURIComponent(fbclid)}&select=id&limit=1`,
-          {
-            headers: {
-              apikey: supabaseKey,
-              Authorization: `Bearer ${supabaseKey}`,
-            },
-          }
-        );
-        if (checkRes.ok) {
-          const rows = await checkRes.json();
-          if (Array.isArray(rows) && rows.length > 0) {
-            visitorStatus = '🔁 Déjà venu(e) via une pub précédemment';
-          }
-        }
-      }
-    } catch (checkErr) {
-      console.error('Erreur vérification visiteur déjà venu:', checkErr);
-      // On continue avec "Nouveau visiteur" par défaut plutôt que d'échouer
-    }
-
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-    const fromNumber = process.env.TWILIO_FROM_NUMBER;
-    const toNumber = process.env.TWILIO_TO_NUMBER;
+    const alreadySeen = await checkVisitorAlreadySeen(session_id, fbclid);
+    const visitorStatus = alreadySeen ? "🔁 Déjà venu(e) via une pub précédemment" : "🆕 Nouveau visiteur";
 
     const message =
       `🔔 Nouveau clic pub EcoSky !\n` +
       `${visitorStatus}\n` +
       `📍 ${locationStr}\n` +
-      `Pub${utm_campaign ? ` : ${utm_campaign}` : ''}\n` +
-      `Page : ${page || 'estimation.html'}`;
+      `Pub${utm_campaign ? ` : ${utm_campaign}` : ""}\n` +
+      `Page : ${page || "estimation.html"}`;
 
-    const body = new URLSearchParams({
-      To: toNumber,
-      From: fromNumber,
-      Body: message,
-    });
+    const sent = await sendSms(TWILIO_TO_NUMBER, message);
 
-    const twilioRes = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Authorization: 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
-        },
-        body: body.toString(),
-      }
-    );
-
-    if (!twilioRes.ok) {
-      const errText = await twilioRes.text();
-      console.error('Erreur Twilio (sms-nouveau-clic):', twilioRes.status, errText);
-      return res.status(200).json({ sent: false, error: errText });
-    }
-
-    return res.status(200).json({ sent: true });
+    return res.status(200).json({ sent });
   } catch (err) {
-    console.error('Erreur envoi SMS nouveau clic:', err);
-    // On ne fait jamais échouer le chargement de la page à cause d'une erreur SMS
+    console.error("sms-nouveau-clic error:", err.message);
     return res.status(200).json({ sent: false, error: err.message });
   }
 }
