@@ -1121,6 +1121,25 @@
     }
   }
 
+  // ---------- Pré-remplissage depuis le formulaire instantané Meta ----------
+  // Si le visiteur vient du bouton "Affiner mon devis" du formulaire Meta,
+  // l'URL contient ses coordonnées déjà données à Facebook (nom, email,
+  // téléphone) — on les récupère ici pour ne pas le faire retaper.
+  (function prefillFromMetaLeadForm() {
+    const params = new URLSearchParams(window.location.search);
+    const fullName = params.get("full_name") || params.get("nom_complet") || "";
+    const email = params.get("email") || "";
+    const phone = params.get("phone_number") || params.get("telephone") || "";
+
+    if (fullName) {
+      const parts = fullName.trim().split(/\s+/);
+      state.prenom = parts.shift() || "";
+      state.nom = parts.join(" ");
+    }
+    if (email) state.email = email;
+    if (phone) state.telephone = phone;
+  })();
+
   renderProgress();
   renderStep();
 })();
