@@ -794,6 +794,32 @@
         });
       });
       nom.focus();
+
+      // Recherche automatique : si ce numéro correspond à un lead déjà
+      // capté via le formulaire instantané Meta, on remplit nom/prénom/
+      // email tout seul, sans que la personne ait à les retaper.
+      let lookupTimer = null;
+      tel.addEventListener("input", () => {
+        clearTimeout(lookupTimer);
+        const digits = tel.value.replace(/\D/g, "");
+        if (digits.length < 9) return;
+        lookupTimer = setTimeout(async () => {
+          try {
+            const res = await fetch(
+              `https://salesflow-ecosky.vercel.app/api/lookup-lead-by-phone?telephone=${encodeURIComponent(tel.value)}`
+            );
+            const data = await res.json();
+            if (data.found) {
+              if (!nom.value && data.nom) { nom.value = data.nom; state.nom = data.nom; }
+              if (!prenom.value && data.prenom) { prenom.value = data.prenom; state.prenom = data.prenom; }
+              if (!email.value && data.email) { email.value = data.email; state.email = data.email; }
+              document.getElementById("btnNext").disabled = !canProceed(s);
+            }
+          } catch (e) {
+            // silencieux : la personne peut toujours remplir manuellement
+          }
+        }, 600);
+      });
     }
 
     document.getElementById("btnBack").addEventListener("click", () => {
