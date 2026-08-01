@@ -1,20 +1,11 @@
-// api/lookup-lead-by-phone.js
-// Recherche un lead existant par numéro de téléphone (E.164). Utilisé par
-// estimation.html pour pré-remplir automatiquement nom/prénom/email dès
-// qu'un visiteur retape son téléphone après être passé par le formulaire
-// instantané Meta — sans dépendre d'un mécanisme de transfert d'URL qui
-// n'existe pas côté Meta.
+// api/lookup-lead-by-id.js
+// Recherche un lead existant par son id Supabase. Utilisé par estimation.html
+// quand le visiteur arrive via le lien personnalisé envoyé par email
+// (send-refine-devis-email.js) — permet un pré-remplissage complet et fiable,
+// sans dépendre du visiteur qui retape son téléphone.
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-
-function toE164(phone) {
-  const digits = String(phone || "").replace(/\D/g, "");
-  if (!digits) return null;
-  if (digits.startsWith("33")) return "+" + digits;
-  if (digits.startsWith("0")) return "+33" + digits.slice(1);
-  return "+" + digits;
-}
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -24,13 +15,12 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).send("Method not allowed");
 
   try {
-    const phoneRaw = req.query.telephone;
-    const phoneE164 = toE164(phoneRaw);
-    if (!phoneE164 || phoneE164.length < 8) {
+    const leadId = req.query.lead_id;
+    if (!leadId) {
       return res.status(200).json({ found: false });
     }
 
-    const url = `${SUPABASE_URL}/rest/v1/leads?telephone=eq.${encodeURIComponent(phoneE164)}&select=nom,prenom,email&limit=1`;
+    const url = `${SUPABASE_URL}/rest/v1/leads?id=eq.${encodeURIComponent(leadId)}&select=nom,prenom,email,telephone&limit=1`;
     const r = await fetch(url, {
       headers: {
         apikey: SUPABASE_SERVICE_KEY,
@@ -50,9 +40,10 @@ export default async function handler(req, res) {
       nom: lead.nom || "",
       prenom: lead.prenom || "",
       email: lead.email || "",
+      telephone: lead.telephone || "",
     });
   } catch (err) {
-    console.error("lookup-lead-by-phone error:", err.message);
+    console.error("lookup-lead-by-id error:", err.message);
     return res.status(200).json({ found: false });
   }
 }
