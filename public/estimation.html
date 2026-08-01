@@ -1166,6 +1166,35 @@
     if (phone) state.telephone = phone;
   })();
 
+  // ---------- Pré-remplissage fiable via l'email automatique ----------
+  // Si le visiteur clique sur "Affiner mon devis" dans l'email envoyé après
+  // sa soumission du formulaire instantané Meta, le lien contient son
+  // lead_id — on va chercher ses coordonnées directement dans Supabase et
+  // on les affiche dès qu'il arrive, sans qu'il ait à retaper quoi que ce
+  // soit (contrairement au parcours depuis Meta, qui ne transmet rien).
+  (async function prefillFromLeadId() {
+    const params = new URLSearchParams(window.location.search);
+    const leadId = params.get("lead_id");
+    if (!leadId) return;
+    try {
+      const res = await fetch(
+        `https://salesflow-ecosky.vercel.app/api/lookup-lead-by-id?lead_id=${encodeURIComponent(leadId)}`
+      );
+      const data = await res.json();
+      if (data.found) {
+        if (data.nom) state.nom = data.nom;
+        if (data.prenom) state.prenom = data.prenom;
+        if (data.email) state.email = data.email;
+        if (data.telephone) state.telephone = data.telephone;
+        // Si on est déjà passé l'étape identité au moment où la réponse
+        // arrive, on réaffiche l'étape courante pour refléter les champs.
+        renderStep();
+      }
+    } catch (e) {
+      // silencieux : la personne peut toujours remplir manuellement
+    }
+  })();
+
   renderProgress();
   renderStep();
 })();
