@@ -2,7 +2,8 @@
 // Enregistre chaque arrivée sur le site depuis une pub Facebook (ou autre source
 // trackée), même si la personne ne finit jamais par discuter avec Skyeco.
 // Appelé automatiquement par le widget de chat au chargement de la page.
-// Envoie aussi un SMS à Cyrille dès qu'un visiteur arrive via une pub Meta (fbclid ou ad_id présent).
+// Envoie aussi un SMS à Cyrille dès qu'un visiteur arrive via une pub Meta (fbclid ou ad_id présent),
+// avec sa provenance géographique approximative (déduite de l'IP par Vercel).
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -31,16 +32,32 @@ async function supabaseRequest(path, options = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-async function sendClickAlertSms({ ad_id, utm_campaign, landing_page }) {
+// Vercel ajoute automatiquement ces en-têtes de géolocalisation approximative
+// (déduite de l'IP, pas du GPS) sur chaque requête entrante.
+function getGeoFromRequest(req) {
+  const h = req.headers || {};
+  return {
+    country: h["x-vercel-ip-country"] || null,
+    region: h["x-vercel-ip-region"] || null,
+    city: h["x-vercel-ip-city"] ? decodeURIComponent(h["x-vercel-ip-city"]) : null,
+    latitude: h["x-vercel-ip-latitude"] || null,
+    longitude: h["x-vercel-ip-longitude"] || null,
+  };
+}
+
+async function sendClickAlertSms({ ad_id, utm_campaign, landing_page, geo }) {
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !TWILIO_TO_NUMBER) {
     console.error("track-click SMS skipped: variables Twilio manquantes");
     return;
   }
 
+  const localisation = [geo.city, geo.region, geo.country].filter(Boolean).join(", ");
+
   const body =
     `Nouveau visiteur via pub Meta\n` +
     (utm_campaign ? `Campagne: ${utm_campaign}\n` : "") +
     (ad_id ? `Ad ID: ${ad_id}\n` : "") +
+    (localisation ? `Provenance: ${localisation}\n` : "") +
     (landing_page ? `Page: ${landing_page}` : "");
 
   const params = new URLSearchParams({
@@ -94,6 +111,8 @@ export default async function handler(req, res) {
       referrer,
     } = req.body || {};
 
+    const geo = getGeoFromRequest(req);
+
     await supabaseRequest("web_clicks", {
       method: "POST",
       body: JSON.stringify({
@@ -105,6 +124,11 @@ export default async function handler(req, res) {
         utm_medium: utm_medium || null,
         landing_page: landing_page || null,
         referrer: referrer || null,
+        geo_country: geo.country,
+        geo_region: geo.region,
+        geo_city: geo.city,
+        geo_latitude: geo.latitude,
+        geo_longitude: geo.longitude,
       }),
     });
 
@@ -113,7 +137,7 @@ export default async function handler(req, res) {
     const isMetaAdClick = Boolean(fbclid || ad_id);
     if (isMetaAdClick) {
       try {
-        await sendClickAlertSms({ ad_id, utm_campaign, landing_page });
+        await sendClickAlertSms({ ad_id, utm_campaign, landing_page, geo });
       } catch (smsErr) {
         console.error("track-click SMS error:", smsErr.message);
         // On ne bloque jamais le visiteur pour un souci d'envoi SMS
