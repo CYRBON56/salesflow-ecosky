@@ -226,6 +226,33 @@
     window.open('https://salesflow-ecosky.vercel.app/estimation.html?' + params.toString(), '_blank');
     closeModal();
   }
+
+  // Enregistre l'arrivée sur cette page (et envoie un SMS si ça vient d'une pub Meta)
+  (function trackLandingClick() {
+    try {
+      var qs = new URLSearchParams(window.location.search);
+      var sessionId = 'pub_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+
+      fetch('https://salesflow-ecosky.vercel.app/api/track-click', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          fbclid: qs.get('fbclid'),
+          ad_id: qs.get('ad_id'),
+          utm_source: qs.get('utm_source'),
+          utm_campaign: qs.get('utm_campaign'),
+          utm_medium: qs.get('utm_medium'),
+          landing_page: window.location.href,
+          referrer: document.referrer || null
+        })
+      }).catch(function (err) {
+        console.error('track-click error:', err);
+      });
+    } catch (err) {
+      console.error('trackLandingClick error:', err);
+    }
+  })();
 </script>
 
 </body>
