@@ -145,6 +145,7 @@
     <form id="prefill-form" onsubmit="goToEstimation(event)">
       <input type="text" id="prenom" placeholder="Prénom" required>
       <input type="text" id="nom" placeholder="Nom" required>
+      <input type="tel" id="telephone" placeholder="Téléphone" required>
       <input type="email" id="email" placeholder="Email" required>
       <button type="submit" class="btn btn-primary" style="margin-top:8px;">Continuer</button>
     </form>
@@ -218,9 +219,11 @@
     e.preventDefault();
     var prenom = document.getElementById('prenom').value.trim();
     var nom = document.getElementById('nom').value.trim();
+    var telephone = document.getElementById('telephone').value.trim();
     var email = document.getElementById('email').value.trim();
     var params = new URLSearchParams({
       full_name: prenom + ' ' + nom,
+      phone_number: telephone,
       email: email
     });
     window.open('https://salesflow-ecosky.vercel.app/estimation.html?' + params.toString(), '_blank');
