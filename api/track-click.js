@@ -2,9 +2,15 @@
 // Enregistre chaque arrivée sur le site depuis une pub Facebook (ou autre source
 // trackée), même si la personne ne finit jamais par discuter avec Skyeco.
 // Appelé automatiquement par le widget de chat au chargement de la page.
+// Envoie aussi un SMS à Cyrille dès qu'un visiteur arrive via une pub Meta (fbclid ou ad_id présent).
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
+const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER;
 
 async function supabaseRequest(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -23,6 +29,43 @@ async function supabaseRequest(path, options = {}) {
   }
   const text = await res.text();
   return text ? JSON.parse(text) : null;
+}
+
+async function sendClickAlertSms({ ad_id, utm_campaign, landing_page }) {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !TWILIO_TO_NUMBER) {
+    console.error("track-click SMS skipped: variables Twilio manquantes");
+    return;
+  }
+
+  const body =
+    `Nouveau visiteur via pub Meta\n` +
+    (utm_campaign ? `Campagne: ${utm_campaign}\n` : "") +
+    (ad_id ? `Ad ID: ${ad_id}\n` : "") +
+    (landing_page ? `Page: ${landing_page}` : "");
+
+  const params = new URLSearchParams({
+    To: TWILIO_TO_NUMBER,
+    From: TWILIO_FROM_NUMBER,
+    Body: body,
+  });
+
+  const res = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+    {
+      method: "POST",
+      headers: {
+        Authorization:
+          "Basic " + Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64"),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params,
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`Twilio error ${res.status}: ${text}`);
+  }
 }
 
 export default async function handler(req, res) {
@@ -64,6 +107,18 @@ export default async function handler(req, res) {
         referrer: referrer || null,
       }),
     });
+
+    // SMS uniquement pour une arrivée identifiée comme venant d'une pub Meta
+    // (présence d'un fbclid ou d'un ad_id) — pas pour chaque visite organique.
+    const isMetaAdClick = Boolean(fbclid || ad_id);
+    if (isMetaAdClick) {
+      try {
+        await sendClickAlertSms({ ad_id, utm_campaign, landing_page });
+      } catch (smsErr) {
+        console.error("track-click SMS error:", smsErr.message);
+        // On ne bloque jamais le visiteur pour un souci d'envoi SMS
+      }
+    }
 
     return res.status(200).json({ success: true });
   } catch (err) {
