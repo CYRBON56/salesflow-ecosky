@@ -18,7 +18,11 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "estimation@ecoskybyrms.fr";
 const OWNER_EMAIL = process.env.OWNER_EMAIL || "infos@ecosky.fr";
 
-const ALLOWED_DEPARTMENTS = ["56", "29", "22", "35"];
+// Zone cœur : départements couverts sans réserve.
+// Zone élargie : départements limitrophes acceptés, mais la plus-value de
+// déplacement et la faisabilité restent à valider par un technicien.
+const CORE_DEPARTMENTS = ["56", "29", "22", "35"];
+const EXTENDED_DEPARTMENTS = ["44"];
 
 const ENTREPRISE = {
   nom: "ECOSKY BY RMS",
@@ -282,9 +286,17 @@ function computeEstimation(answers) {
   };
 }
 
-function isDepartmentAllowed(codePostal) {
-  if (!codePostal) return true;
-  return ALLOWED_DEPARTMENTS.includes(String(codePostal).trim().slice(0, 2));
+// Détermine le statut de zone d'un code postal :
+// "core"     -> département couvert sans réserve (56, 29, 22, 35)
+// "extended" -> département limitrophe accepté, mais plus-value déplacement
+//               et faisabilité à valider par un technicien (44)
+// "out"      -> hors zone, refus automatique
+function getZoneStatus(codePostal) {
+  if (!codePostal) return "core";
+  const dept = String(codePostal).trim().slice(0, 2);
+  if (CORE_DEPARTMENTS.includes(dept)) return "core";
+  if (EXTENDED_DEPARTMENTS.includes(dept)) return "extended";
+  return "out";
 }
 
 // ---------- Numérotation séquentielle (E-2026-07-001, E-2026-07-002...) ----------
@@ -599,7 +611,9 @@ export default async function handler(req, res) {
 
     const phoneE164 = toE164(telephone);
     const estimation = computeEstimation(answers || {});
-    const inZone = isDepartmentAllowed(code_postal);
+    const zoneStatus = getZoneStatus(code_postal); // "core" | "extended" | "out"
+    const inZone = zoneStatus !== "out";
+    const isExtendedZone = zoneStatus === "extended";
 
     const numero = await nextEstimationNumber();
 
@@ -639,7 +653,9 @@ export default async function handler(req, res) {
       estimation_pdf_url: pdfUrl,
       source: "Formulaire estimation détaillée",
       formulaire_complete: true,
-      notes: "",
+      notes: isExtendedZone
+        ? "SECTEUR ÉLARGI (44) — vérifier distance, plus-value déplacement possible"
+        : "",
     };
 
     // Le téléphone est unique dans la table leads : si un dossier existe déjà
@@ -663,15 +679,20 @@ export default async function handler(req, res) {
       });
     }
 
-    // SMS au client avec son estimation (uniquement si dans la zone d'intervention)
+    // SMS au client avec son estimation (zone cœur = message normal, zone
+    // élargie = même message + précision sur la validation distance, hors
+    // zone = refus poli).
     if (phoneE164 && inZone) {
       const pdfLine = pdfUrl ? ` Votre estimateur détaillé (n°${numero}) : ${pdfUrl}` : "";
       const remiseLine = estimation.chiffrable
         ? ` 🎁 Remise de ${estimation.remisePourcent}% possible selon le volume (${estimation.montantApresRemise}€ TTC au lieu de ${estimation.montantTTC}€) — contactez un technicien pour voir si vous pouvez en bénéficier.`
         : "";
+      const zoneLine = isExtendedZone
+        ? " Votre secteur étant un peu excentré, une éventuelle plus-value de déplacement sera à valider par le technicien."
+        : "";
       const clientMessage =
         `Bonjour ${prenom || ""}, merci pour votre demande sur RMS ECOSKY ! ` +
-        `${estimation.texte} Cette estimation reste indicative et sera confirmée par l'un de nos techniciens lors d'un appel.${remiseLine}${pdfLine} À très vite !`;
+        `${estimation.texte} Cette estimation reste indicative et sera confirmée par l'un de nos techniciens lors d'un appel.${remiseLine}${zoneLine}${pdfLine} À très vite !`;
       await sendSms(phoneE164, clientMessage);
     } else if (phoneE164 && !inZone) {
       await sendSms(
@@ -681,9 +702,12 @@ export default async function handler(req, res) {
     }
 
     // SMS au propriétaire : nouveau lead qualifié avec toutes les réponses
+    const zoneNote = isExtendedZone
+      ? "\n⚠️ SECTEUR ÉLARGI (44) — vérifier distance, plus-value déplacement possible"
+      : "";
     const ownerMessage =
       `🔔 Nouvelle estimation détaillée ! (n°${numero})\n${prenom || ""} ${nom} — ${telephone}\n` +
-      `${type_projet || ""}${code_postal ? " — " + code_postal : ""}\n` +
+      `${type_projet || ""}${code_postal ? " — " + code_postal : ""}${zoneNote}\n` +
       `${estimation.texte}${pdfUrl ? "\nPDF : " + pdfUrl : ""}`;
     await sendSms(TWILIO_TO_NUMBER, ownerMessage);
 
@@ -717,7 +741,7 @@ export default async function handler(req, res) {
       subject: `🔔 Nouvelle estimation détaillée n°${numero} — ${prenom || ""} ${nom}`,
       html:
         `<p>${prenom || ""} ${nom} — ${telephone}</p>` +
-        `<p>${type_projet || ""}${code_postal ? " — " + code_postal : ""}</p>` +
+        `<p>${type_projet || ""}${code_postal ? " — " + code_postal : ""}${isExtendedZone ? " — ⚠️ secteur élargi (44)" : ""}</p>` +
         `<p>${estimation.texte}</p>` +
         (pdfUrl ? `<p>PDF : <a href="${pdfUrl}">${pdfUrl}</a></p>` : ""),
       pdfBytes,
@@ -733,7 +757,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
-
-
-
