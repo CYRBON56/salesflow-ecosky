@@ -116,9 +116,9 @@
 <main>
   <p class="intro">Que souhaitez-vous faire ?</p>
 
-  <a href="https://salesflow-ecosky.vercel.app/estimation.html" class="btn btn-primary" target="_blank" rel="noopener">
+  <button type="button" class="btn btn-primary" onclick="openModal()">
     <span class="btn-icon">📐</span> Recevoir mon estimation
-  </a>
+  </button>
 
   <a href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue.pdf" class="btn btn-secondary" target="_blank" rel="noopener">
     <span class="btn-icon">📄</span> Télécharger le catalogue
@@ -132,6 +132,97 @@
 <footer>
   RMS EcoSky — SASU au capital de 50 000€ — 23 Route de Corn Er Hoet, 56400 Brech — SIRET 939 997 870 00018
 </footer>
+
+<div id="modal-overlay" class="modal-overlay" onclick="if(event.target===this) closeModal()">
+  <div class="modal-box">
+    <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
+    <h2>Vos coordonnées</h2>
+    <p class="modal-sub">Pour préparer votre estimation, dites-nous qui vous êtes :</p>
+    <form id="prefill-form" onsubmit="goToEstimation(event)">
+      <input type="text" id="prenom" placeholder="Prénom" required>
+      <input type="text" id="nom" placeholder="Nom" required>
+      <input type="email" id="email" placeholder="Email" required>
+      <button type="submit" class="btn btn-primary" style="margin-top:8px;">Continuer</button>
+    </form>
+  </div>
+</div>
+
+<style>
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: white;
+    border-radius: 16px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 380px;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+  .modal-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: none;
+    border: none;
+    font-size: 1.6rem;
+    color: #999;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .modal-box h2 {
+    font-size: 1.2rem;
+    color: var(--blue-dark);
+    margin-bottom: 6px;
+  }
+  .modal-sub {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 18px;
+  }
+  #prefill-form input {
+    width: 100%;
+    padding: 13px 14px;
+    margin-bottom: 12px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    font-size: 1rem;
+  }
+  #prefill-form input:focus {
+    outline: none;
+    border-color: var(--blue);
+  }
+</style>
+
+<script>
+  function openModal() {
+    document.getElementById('modal-overlay').classList.add('open');
+  }
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+  function goToEstimation(e) {
+    e.preventDefault();
+    var prenom = document.getElementById('prenom').value.trim();
+    var nom = document.getElementById('nom').value.trim();
+    var email = document.getElementById('email').value.trim();
+    var params = new URLSearchParams({
+      full_name: prenom + ' ' + nom,
+      email: email
+    });
+    window.open('https://salesflow-ecosky.vercel.app/estimation.html?' + params.toString(), '_blank');
+    closeModal();
+  }
+</script>
 
 </body>
 </html>
