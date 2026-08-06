@@ -1,9 +1,9 @@
 // api/track-click.js
-// Enregistre chaque arrivée sur le site depuis une pub Facebook (ou autre source
-// trackée), même si la personne ne finit jamais par discuter avec Skyeco.
-// Appelé automatiquement par le widget de chat au chargement de la page.
-// Envoie aussi un SMS à Cyrille dès qu'un visiteur arrive via une pub Meta (fbclid ou ad_id présent),
-// avec sa provenance géographique approximative (déduite de l'IP par Vercel).
+// Enregistre chaque arrivée sur le site depuis une pub Facebook, Google Ads
+// (ou autre source trackée), même si la personne ne finit jamais par discuter
+// avec Skyeco. Appelé automatiquement par le widget de chat au chargement de la page.
+// Envoie aussi un SMS à Cyrille dès qu'un visiteur arrive via une pub Meta (fbclid ou ad_id)
+// ou une pub Google Ads (gclid), avec sa provenance géographique approximative (déduite de l'IP par Vercel).
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -45,7 +45,7 @@ function getGeoFromRequest(req) {
   };
 }
 
-async function sendClickAlertSms({ ad_id, utm_campaign, landing_page, geo }) {
+async function sendClickAlertSms({ source, ad_id, utm_campaign, landing_page, geo }) {
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !TWILIO_TO_NUMBER) {
     console.error("track-click SMS skipped: variables Twilio manquantes");
     return;
@@ -54,7 +54,7 @@ async function sendClickAlertSms({ ad_id, utm_campaign, landing_page, geo }) {
   const localisation = [geo.city, geo.region, geo.country].filter(Boolean).join(", ");
 
   const body =
-    `Nouveau visiteur via pub Meta\n` +
+    `Nouveau visiteur via pub ${source}\n` +
     (utm_campaign ? `Campagne: ${utm_campaign}\n` : "") +
     (ad_id ? `Ad ID: ${ad_id}\n` : "") +
     (localisation ? `Provenance: ${localisation}\n` : "") +
@@ -103,6 +103,7 @@ export default async function handler(req, res) {
     const {
       session_id,
       fbclid,
+      gclid,
       ad_id,
       utm_source,
       utm_campaign,
@@ -118,6 +119,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         session_id: session_id || null,
         fbclid: fbclid || null,
+        gclid: gclid || null,
         ad_id: ad_id || null,
         utm_source: utm_source || null,
         utm_campaign: utm_campaign || null,
@@ -132,12 +134,21 @@ export default async function handler(req, res) {
       }),
     });
 
-    // SMS uniquement pour une arrivée identifiée comme venant d'une pub Meta
-    // (présence d'un fbclid ou d'un ad_id) — pas pour chaque visite organique.
+    // SMS pour une arrivée identifiée comme venant d'une pub Meta
+    // (fbclid ou ad_id) OU d'une pub Google Ads (gclid) — pas pour
+    // chaque visite organique.
     const isMetaAdClick = Boolean(fbclid || ad_id);
-    if (isMetaAdClick) {
+    const isGoogleAdClick = Boolean(gclid);
+
+    if (isMetaAdClick || isGoogleAdClick) {
       try {
-        await sendClickAlertSms({ ad_id, utm_campaign, landing_page, geo });
+        await sendClickAlertSms({
+          source: isGoogleAdClick && !isMetaAdClick ? "Google Ads" : "Meta",
+          ad_id: ad_id || gclid,
+          utm_campaign,
+          landing_page,
+          geo,
+        });
       } catch (smsErr) {
         console.error("track-click SMS error:", smsErr.message);
         // On ne bloque jamais le visiteur pour un souci d'envoi SMS
