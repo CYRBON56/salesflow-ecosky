@@ -1,6 +1,6 @@
 // api/sms-nouveau-clic.js
 // Envoie un SMS immédiat à Cyrille dès qu'un visiteur arrive sur la page
-// du formulaire en venant d'une publicité Meta (présence de fbclid).
+// du formulaire en venant d'une publicité Meta (fbclid) ou Google Ads (gclid).
 // Ne remplace pas les autres SMS (devis complété, rappel demandé) — c'est
 // un signal précoce en plus, avant même que le visiteur remplisse quoi que ce soit.
 //
@@ -32,11 +32,14 @@ async function sendSms(to, body) {
   }
 }
 
-async function checkVisitorAlreadySeen(sessionId, currentFbclid) {
-  if (!sessionId || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) return false;
+// Détecte si ce visiteur (même session_id) était déjà venu via une pub
+// précédemment, en comparant sur fbclid OU gclid selon la source actuelle.
+async function checkVisitorAlreadySeen(sessionId, currentClickId) {
+  if (!sessionId || !currentClickId || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) return false;
   try {
+    const filter = `or=(fbclid.neq.${encodeURIComponent(currentClickId)},gclid.neq.${encodeURIComponent(currentClickId)})`;
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/web_clicks?session_id=eq.${encodeURIComponent(sessionId)}&fbclid=neq.${encodeURIComponent(currentFbclid)}&select=id&limit=1`,
+      `${SUPABASE_URL}/rest/v1/web_clicks?session_id=eq.${encodeURIComponent(sessionId)}&${filter}&select=id&limit=1`,
       {
         headers: {
           apikey: SUPABASE_SERVICE_KEY,
@@ -61,11 +64,14 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).send("Method not allowed");
 
   try {
-    const { fbclid, utm_source, utm_campaign, page, session_id } = req.body || {};
+    const { fbclid, gclid, utm_source, utm_campaign, page, session_id } = req.body || {};
 
-    if (!fbclid) {
-      return res.status(200).json({ skipped: true, reason: "no fbclid" });
+    if (!fbclid && !gclid) {
+      return res.status(200).json({ skipped: true, reason: "no fbclid or gclid" });
     }
+
+    const source = gclid && !fbclid ? "Google Ads" : "Meta";
+    const clickId = fbclid || gclid;
 
     const city = req.headers["x-vercel-ip-city"]
       ? decodeURIComponent(req.headers["x-vercel-ip-city"])
@@ -75,11 +81,11 @@ export default async function handler(req, res) {
     const locationParts = [city, region, country].filter(Boolean);
     const locationStr = locationParts.length > 0 ? locationParts.join(", ") : "localisation inconnue";
 
-    const alreadySeen = await checkVisitorAlreadySeen(session_id, fbclid);
+    const alreadySeen = await checkVisitorAlreadySeen(session_id, clickId);
     const visitorStatus = alreadySeen ? "🔁 Déjà venu(e) via une pub précédemment" : "🆕 Nouveau visiteur";
 
     const message =
-      `🔔 Nouveau clic pub EcoSky !\n` +
+      `🔔 Nouveau clic pub EcoSky (${source}) !\n` +
       `${visitorStatus}\n` +
       `📍 ${locationStr}\n` +
       `Pub${utm_campaign ? ` : ${utm_campaign}` : ""}\n` +
