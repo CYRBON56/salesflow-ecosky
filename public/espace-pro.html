@@ -12,8 +12,22 @@
     color: #14312a;
     background: #f7f9f7;
   }
+  .bg-slideshow {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background-size: cover;
+    background-position: center;
+    transition: background-image 1.2s ease-in-out;
+  }
+  .bg-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(180deg, rgba(247,249,247,0.88) 0%, rgba(247,249,247,0.96) 420px, #f7f9f7 620px);
+  }
   .hero {
-    background: linear-gradient(135deg, #14312a, #1f4a3d);
+    background: linear-gradient(135deg, rgba(20,49,42,0.92), rgba(31,74,61,0.92));
     color: #fff;
     padding: 48px 24px 56px;
     text-align: center;
@@ -104,6 +118,34 @@
     font-size: 13.5px;
     color: #14312a;
   }
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 56px;
+  }
+  @media (max-width: 720px) {
+    .gallery { grid-template-columns: repeat(2, 1fr); }
+  }
+  .gallery img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(20,49,42,0.12);
+  }
+  .gallery-cta {
+    text-align: center;
+    margin: -34px 0 56px;
+  }
+  .gallery-cta a {
+    color: #14312a;
+    font-size: 13.5px;
+    font-weight: 600;
+    text-decoration: none;
+    border-bottom: 1.5px solid #14312a;
+    padding-bottom: 2px;
+  }
   form {
     background: #fff;
     border-radius: 14px;
@@ -154,6 +196,9 @@
 </head>
 <body>
 
+  <div class="bg-slideshow" id="bgSlideshow"></div>
+  <div class="bg-overlay"></div>
+
   <div class="hero">
     <div class="eyebrow">RMS EcoSky — Espace Pro</div>
     <h1>Proposez la résine EPDM à vos clients, sans changer de métier</h1>
@@ -192,6 +237,21 @@
       <span class="fit-chip">🏗️ Maître d'œuvre / CMiste</span>
       <span class="fit-chip">🚧 Terrassement / VRD</span>
       <span class="fit-chip">🏢 Syndic / Bailleur</span>
+    </div>
+
+    <div class="section-title">Nos réalisations</div>
+    <div class="gallery">
+      <img src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/1.jpg" alt="Réalisation RMS EcoSky 1" loading="lazy" />
+      <img src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/2.jpg" alt="Réalisation RMS EcoSky 2" loading="lazy" />
+      <img src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/3.jpg" alt="Réalisation RMS EcoSky 3" loading="lazy" />
+      <img src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/terrasse.jpg" alt="Réalisation RMS EcoSky terrasse" loading="lazy" />
+      <img src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/4.jpg" alt="Réalisation RMS EcoSky 4" loading="lazy" />
+      <img src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/5.jpg" alt="Réalisation RMS EcoSky 5" loading="lazy" />
+      <img src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/6.jpg" alt="Réalisation RMS EcoSky 6" loading="lazy" />
+      <img src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/7.jpg" alt="Réalisation RMS EcoSky 7" loading="lazy" />
+    </div>
+    <div class="gallery-cta">
+      <a href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue.pdf" target="_blank" rel="noopener">📄 Voir le catalogue complet EcoSky'Gum</a>
     </div>
 
     <form id="proForm">
@@ -267,6 +327,27 @@
   </div>
 
 <script>
+  const BG_IMAGES = [
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/1.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/2.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/3.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/4.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/5.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/6.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/7.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/terrasse.jpg",
+  ];
+  (function bgSlideshow() {
+    const el = document.getElementById("bgSlideshow");
+    let i = 0;
+    function setBg() {
+      el.style.backgroundImage = `url(${BG_IMAGES[i]})`;
+      i = (i + 1) % BG_IMAGES.length;
+    }
+    setBg();
+    setInterval(setBg, 5000);
+  })();
+
   const API_URL = "https://salesflow-ecosky.vercel.app/api/submit-pro-contact";
   const form = document.getElementById("proForm");
   const submitBtn = document.getElementById("submitBtn");
