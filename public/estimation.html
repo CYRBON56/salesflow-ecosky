@@ -289,11 +289,12 @@
   (function trackAdClickIfNeeded() {
     const params = new URLSearchParams(window.location.search);
     const fbclid = params.get("fbclid");
+    const gclid = params.get("gclid");
     const utmSource = params.get("utm_source");
-    const isFromAd = !!fbclid || utmSource === "facebook";
+    const isFromAd = !!fbclid || !!gclid || utmSource === "facebook" || utmSource === "google";
     if (!isFromAd) return;
 
-    const dedupeKey = fbclid || "generic";
+    const dedupeKey = fbclid || gclid || "generic";
     let alreadyTracked = null;
     try { alreadyTracked = sessionStorage.getItem("ecosky_click_tracked_key"); } catch (e) {}
     if (alreadyTracked === dedupeKey) return;
@@ -318,6 +319,7 @@
       body: JSON.stringify({
         session_id: sessionId,
         fbclid,
+        gclid,
         ad_id: params.get("ad_id"),
         utm_source: utmSource,
         utm_campaign: utmCampaign,
@@ -336,6 +338,7 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fbclid,
+        gclid,
         session_id: sessionId,
         utm_source: utmSource,
         utm_campaign: utmCampaign,
