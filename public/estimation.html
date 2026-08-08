@@ -65,6 +65,32 @@
     .video-panel { flex: 0 0 220px; }
     .form-panel { padding: 28px 20px 60px; }
   }
+
+  /* Optimisations pour téléphones (petits écrans) */
+  @media (max-width: 480px) {
+    .video-panel { flex: 0 0 160px; }
+    .form-panel { padding: 20px 16px 48px; }
+    .header-block { padding: 12px 14px; margin-bottom: 16px; }
+    h1 { font-size: 19px; }
+    .sub { font-size: 13.5px; margin-bottom: 18px; }
+    .card { padding: 16px; }
+    .question { font-size: 15px; }
+    .option { padding: 12px 14px; font-size: 14px; }
+
+    /* Empêche le zoom automatique de Safari iOS sur les champs (nécessite 16px min) */
+    input[type="text"], input[type="tel"], input[type="email"], input[type="number"] {
+      font-size: 16px;
+      padding: 11px 12px;
+    }
+
+    .nav-row { flex-wrap: wrap; }
+    button.btn { font-size: 14px; padding: 12px 16px; }
+    .btn-primary { flex: 1 1 100%; order: 1; }
+    .btn-ghost { order: 2; padding: 8px 0; }
+
+    .trust-footer .trust-badges { gap: 10px; font-size: 11px; }
+    .trust-footer .legal-line { font-size: 10.5px; }
+  }
   .wrap { max-width: 480px; width: 100%; margin: 0; padding: 0; }
   .header-block {
     margin-bottom: 20px;
