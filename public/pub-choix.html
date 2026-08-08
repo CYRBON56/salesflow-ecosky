@@ -123,7 +123,7 @@
     <span class="btn-icon">📐</span> Recevoir mon estimation
   </button>
 
-  <a href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue.pdf" class="btn btn-secondary" target="_blank" rel="noopener">
+  <a href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf" class="btn btn-secondary" target="_blank" rel="noopener" onclick="notifyCatalogueDownload()">
     <span class="btn-icon">📄</span> Télécharger le catalogue
   </a>
 
@@ -209,6 +209,25 @@
 </style>
 
 <script>
+  function notifyCatalogueDownload() {
+    try {
+      var qs = new URLSearchParams(window.location.search);
+      var source = qs.get('fbclid') ? 'Meta' : (qs.get('gclid') ? 'Google Ads' : (qs.get('utm_source') || null));
+      fetch('https://salesflow-ecosky.vercel.app/api/sms-catalogue-download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: source,
+          utm_campaign: qs.get('utm_campaign')
+        })
+      }).catch(function (err) {
+        console.error('sms-catalogue-download error:', err);
+      });
+    } catch (err) {
+      console.error('notifyCatalogueDownload error:', err);
+    }
+  }
+
   function openModal() {
     document.getElementById('modal-overlay').classList.add('open');
   }
@@ -230,7 +249,7 @@
     closeModal();
   }
 
-  // Enregistre l'arrivée sur cette page (et envoie un SMS si ça vient d'une pub Meta)
+  // Enregistre l'arrivée sur cette page (et envoie un SMS si ça vient d'une pub Meta ou Google Ads)
   (function trackLandingClick() {
     try {
       var qs = new URLSearchParams(window.location.search);
@@ -242,6 +261,7 @@
         body: JSON.stringify({
           session_id: sessionId,
           fbclid: qs.get('fbclid'),
+          gclid: qs.get('gclid'),
           ad_id: qs.get('ad_id'),
           utm_source: qs.get('utm_source'),
           utm_campaign: qs.get('utm_campaign'),
