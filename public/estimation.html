@@ -239,7 +239,7 @@
 
       <a href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf"
          target="_blank" rel="noopener"
-         onclick="window.va && window.va('event', { name: 'catalogue_telecharge' })"
+         onclick="window.va && window.va('event', { name: 'catalogue_telecharge' }); notifyCatalogueDownloadEstimation();"
          style="display:inline-flex; align-items:center; gap:8px; margin-bottom:20px; padding:10px 16px; border:1px solid #14312a; border-radius:8px; color:#14312a; text-decoration:none; font-size:13.5px; font-weight:600; background:#fff;">
         📄 Pas encore prêt·e ? Téléchargez le catalogue EcoSky'Gum
       </a>
@@ -277,6 +277,22 @@
   const CALLBACK_API_URL = "https://salesflow-ecosky.vercel.app/api/request-callback";
   const TRACK_CLICK_URL = "https://salesflow-ecosky.vercel.app/api/track-click";
   const SMS_NOUVEAU_CLIC_URL = "https://salesflow-ecosky.vercel.app/api/sms-nouveau-clic";
+  const SMS_CATALOGUE_DOWNLOAD_URL = "https://salesflow-ecosky.vercel.app/api/sms-catalogue-download";
+
+  function notifyCatalogueDownloadEstimation() {
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      const source = qs.get("fbclid") ? "Meta" : (qs.get("gclid") ? "Google Ads" : (qs.get("utm_source") || "estimation.html"));
+      fetch(SMS_CATALOGUE_DOWNLOAD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source,
+          utm_campaign: qs.get("utm_campaign"),
+        }),
+      }).catch(() => {});
+    } catch (e) {}
+  }
 
   // ---------- Diaporama de fond (panneau formulaire) ----------
   const FORM_BG_IMAGES = [
