@@ -237,7 +237,7 @@
         <span>🔒 Données confidentielles</span>
       </div>
 
-      <a href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue.pdf"
+      <a href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf"
          target="_blank" rel="noopener"
          onclick="window.va && window.va('event', { name: 'catalogue_telecharge' })"
          style="display:inline-flex; align-items:center; gap:8px; margin-bottom:20px; padding:10px 16px; border:1px solid #14312a; border-radius:8px; color:#14312a; text-decoration:none; font-size:13.5px; font-weight:600; background:#fff;">
@@ -359,23 +359,6 @@
         utm_medium: params.get("utm_medium"),
         landing_page: window.location.href,
         referrer: document.referrer || null,
-      }),
-    }).catch(() => {});
-
-    // SMS immédiat dès l'arrivée sur la page via la pub — indépendant du
-    // tracking ci-dessus, ne doit jamais bloquer ni casser le chargement.
-    // On envoie aussi le session_id (déjà généré ci-dessus) pour que le SMS
-    // puisse indiquer si ce visiteur semble déjà être venu via une pub avant.
-    fetch(SMS_NOUVEAU_CLIC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fbclid,
-        gclid,
-        session_id: sessionId,
-        utm_source: utmSource,
-        utm_campaign: utmCampaign,
-        page: window.location.pathname,
       }),
     }).catch(() => {});
   })();
