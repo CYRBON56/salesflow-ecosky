@@ -15,20 +15,21 @@
     display: flex;
     min-height: 100vh;
   }
-  .video-panel {
+  .image-panel {
     flex: 1 1 45%;
     position: relative;
     overflow: hidden;
     background: #14312a;
   }
-  .video-panel video {
+  .image-panel img {
     position: absolute;
-    top: 50%; left: 50%;
-    min-width: 100%; min-height: 100%;
-    width: auto; height: auto;
-    transform: translate(-50%, -50%);
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     object-fit: cover;
+    opacity: 0;
+    transition: opacity 1.8s ease-in-out;
   }
+  .image-panel img.active { opacity: 1; }
   .form-panel {
     flex: 1 1 55%;
     position: relative;
@@ -39,21 +40,15 @@
     overflow-y: auto;
     overflow-x: hidden;
   }
-  .form-bg-slideshow {
+  .form-bg-video {
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    z-index: -2;
-    overflow: hidden;
-  }
-  .form-bg-slideshow img {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: 50%; left: 50%;
+    min-width: 100%; min-height: 100%;
+    width: auto; height: auto;
+    transform: translate(-50%, -50%);
     object-fit: cover;
-    opacity: 0;
-    transition: opacity 1.8s ease-in-out;
+    z-index: -2;
   }
-  .form-bg-slideshow img.active { opacity: 1; }
   .form-bg-overlay {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
@@ -62,13 +57,13 @@
   }
   @media (max-width: 800px) {
     .split-layout { flex-direction: column; }
-    .video-panel { flex: 0 0 220px; }
+    .image-panel { flex: 0 0 220px; }
     .form-panel { padding: 28px 20px 60px; }
   }
 
   /* Optimisations pour téléphones (petits écrans) */
   @media (max-width: 480px) {
-    .video-panel { flex: 0 0 160px; }
+    .image-panel { flex: 0 0 160px; }
     .form-panel { padding: 20px 16px 48px; }
     .header-block { padding: 12px 14px; margin-bottom: 16px; }
     h1 { font-size: 19px; }
@@ -217,13 +212,11 @@
 </head>
 <body>
 <div class="split-layout">
-  <div class="video-panel">
-    <video autoplay muted loop playsinline>
+  <div class="image-panel" id="heroImagePanel"></div>
+  <div class="form-panel">
+    <video class="form-bg-video" autoplay muted loop playsinline>
       <source src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/VIDEO-2026-07-13-22-59-06.mp4" type="video/mp4" />
     </video>
-  </div>
-  <div class="form-panel">
-    <div class="form-bg-slideshow" id="formBgSlideshow"></div>
     <div class="form-bg-overlay"></div>
     <div class="wrap">
       <div class="header-block">
@@ -295,7 +288,7 @@
   }
   window.notifyCatalogueDownloadEstimation = notifyCatalogueDownloadEstimation;
 
-  // ---------- Diaporama de fond (panneau formulaire) ----------
+  // ---------- Diaporama plein panneau (côté gauche) ----------
   const FORM_BG_IMAGES = [
     "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/1.jpg",
     "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/2.jpg",
@@ -311,7 +304,7 @@
   const FORM_BG_INTERVAL_MS = 4500;
 
   (function initFormBgSlideshow() {
-    const container = document.getElementById("formBgSlideshow");
+    const container = document.getElementById("heroImagePanel");
     if (!container || FORM_BG_IMAGES.length === 0) return;
     const imgs = FORM_BG_IMAGES.map((src, i) => {
       const img = document.createElement("img");
