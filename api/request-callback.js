@@ -4,6 +4,8 @@
 // juste à être rappelé rapidement — RMS ECOSKY reçoit immédiatement un SMS
 // et rappelle manuellement, pas d'automatisation d'appel.
 
+import { logSms } from "./_sms-log.js";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
@@ -113,6 +115,13 @@ export default async function handler(req, res) {
       (estimation_texte ? `${estimation_texte}` : "") +
       `\nÀ rappeler dès que possible.`;
     const sent = await sendSms(TWILIO_TO_NUMBER, ownerMessage);
+    await logSms({
+      sms_type: "demande_rappel",
+      destinataire: TWILIO_TO_NUMBER,
+      source: fullName,
+      message_body: ownerMessage,
+      twilio_success: sent,
+    });
 
     return res.status(200).json({ success: true, notified: sent });
   } catch (err) {
