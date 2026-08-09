@@ -30,6 +30,29 @@
     transition: opacity 0.8s ease-in-out;
   }
   .image-panel img.active { opacity: 1; }
+  .image-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(20,49,42,0.55) 0%, rgba(20,49,42,0.15) 35%, rgba(20,49,42,0.55) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+  .image-panel-title {
+    position: absolute;
+    top: 40px;
+    left: 32px;
+    right: 32px;
+    z-index: 2;
+    color: #fff;
+    font-size: clamp(1.6rem, 3vw, 2.4rem);
+    font-weight: 700;
+    line-height: 1.25;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.35);
+  }
+  @media (max-width: 800px) {
+    .image-panel-title { font-size: 1.3rem; top: 20px; left: 20px; right: 20px; }
+  }
   .form-panel {
     flex: 1 1 55%;
     position: relative;
@@ -212,7 +235,9 @@
 </head>
 <body>
 <div class="split-layout">
-  <div class="image-panel" id="heroImagePanel"></div>
+  <div class="image-panel" id="heroImagePanel">
+    <div class="image-panel-title">Le sol qui tient tête<br>aux hivers bretons.</div>
+  </div>
   <div class="form-panel">
     <video class="form-bg-video" autoplay muted loop playsinline>
       <source src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/VIDEO-2026-07-13-22-59-06.mp4" type="video/mp4" />
