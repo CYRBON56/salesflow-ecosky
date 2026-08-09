@@ -40,18 +40,20 @@
   }
   .image-panel-title {
     position: absolute;
-    top: 40px;
+    top: 50%;
     left: 32px;
     right: 32px;
+    transform: translateY(-50%);
     z-index: 2;
     color: #fff;
     font-size: clamp(1.6rem, 3vw, 2.4rem);
     font-weight: 700;
     line-height: 1.25;
+    text-align: center;
     text-shadow: 0 2px 12px rgba(0,0,0,0.35);
   }
   @media (max-width: 800px) {
-    .image-panel-title { font-size: 1.3rem; top: 20px; left: 20px; right: 20px; }
+    .image-panel-title { font-size: 1.3rem; left: 20px; right: 20px; }
   }
   .form-panel {
     flex: 1 1 55%;
