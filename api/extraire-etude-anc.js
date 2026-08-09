@@ -33,6 +33,41 @@ const supabaseAnc = createClient(
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
+const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER;
+
+async function envoyerSmsEtudeUploadee(donnees, etudePdfUrl) {
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !TWILIO_TO_NUMBER) {
+    console.error("SMS étude ANC ignoré : variables Twilio manquantes");
+    return false;
+  }
+  try {
+    const demandeur = donnees.demandeur || {};
+    const nomComplet = [demandeur.prenom, demandeur.nom].filter(Boolean).join(" ");
+    const message =
+      `📋 Une étude ANC vient d'être déposée !\n` +
+      (nomComplet ? `${nomComplet}\n` : "") +
+      (donnees.communeProjet ? `Commune: ${donnees.communeProjet}\n` : "") +
+      (donnees.filiereLibelle ? `Filière: ${donnees.filiereLibelle}\n` : "") +
+      `PDF: ${etudePdfUrl}`;
+
+    const params = new URLSearchParams({ To: TWILIO_TO_NUMBER, From: TWILIO_FROM_NUMBER, Body: message });
+    const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`, {
+      method: "POST",
+      headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    });
+    if (!res.ok) console.error("Twilio SMS error (extraire-etude-anc):", await res.text());
+    return res.ok;
+  } catch (err) {
+    console.error("envoyerSmsEtudeUploadee error:", err.message);
+    return false;
+  }
+}
+
 // Doit correspondre exactement aux clés de PRICING_CONFIG_ANC.filieres
 // (cf. anc-pricing-config-server.js)
 const FILIERES_CONNUES = [
@@ -135,6 +170,10 @@ export default async function handler(req, res) {
     if (donneesExtraites.filiere && !FILIERES_CONNUES.includes(donneesExtraites.filiere)) {
       donneesExtraites.filiere = null; // valeur inattendue -> laissé au choix manuel du client
     }
+
+    // SMS non bloquant : un souci Twilio ne doit jamais empêcher le client de
+    // recevoir le résultat de son analyse.
+    envoyerSmsEtudeUploadee(donneesExtraites, etudePdfUrl).catch(() => {});
 
     res.status(200).json({
       ok: true,
