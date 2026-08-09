@@ -25,6 +25,7 @@
 import { createClient } from "@supabase/supabase-js";
 import pdfParse from "pdf-parse";
 import Anthropic from "@anthropic-ai/sdk";
+import { logSms } from "./_sms-log.js";
 
 const supabaseAnc = createClient(
   process.env.SUPABASE_ANC_URL,
@@ -41,6 +42,7 @@ const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER;
 async function envoyerSmsEtudeUploadee(donnees, etudePdfUrl) {
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !TWILIO_TO_NUMBER) {
     console.error("SMS étude ANC ignoré : variables Twilio manquantes");
+    await logSms({ sms_type: "etude_anc_uploadee", destinataire: TWILIO_TO_NUMBER, twilio_success: false });
     return false;
   }
   try {
@@ -61,6 +63,14 @@ async function envoyerSmsEtudeUploadee(donnees, etudePdfUrl) {
       body: params.toString(),
     });
     if (!res.ok) console.error("Twilio SMS error (extraire-etude-anc):", await res.text());
+    await logSms({
+      sms_type: "etude_anc_uploadee",
+      destinataire: TWILIO_TO_NUMBER,
+      source: nomComplet || null,
+      utm_campaign: donnees.communeProjet || null,
+      message_body: message,
+      twilio_success: res.ok,
+    });
     return res.ok;
   } catch (err) {
     console.error("envoyerSmsEtudeUploadee error:", err.message);
