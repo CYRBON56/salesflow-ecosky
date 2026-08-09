@@ -124,6 +124,34 @@
     font-size: 0.78rem;
     color: #4a5a54;
   }
+  .checkbox-col { width: 30px; }
+  .btn-suppr {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+  .btn-suppr:hover { background: #fbe6e6; }
+  .barre-selection {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: #14312a;
+    color: white;
+    padding: 10px 16px;
+    border-radius: 10px;
+    margin-bottom: 14px;
+    font-size: 0.85rem;
+  }
+  .barre-selection.visible { display: flex; }
+  .barre-selection button {
+    background: #b3261e;
+    color: white;
+    border: none;
+    font-weight: 600;
+  }
   .vide { padding: 40px; text-align: center; color: #7a8983; }
   .chargement { padding: 40px; text-align: center; color: #7a8983; }
 </style>
@@ -147,6 +175,11 @@
 </div>
 
 <main>
+  <div class="barre-selection" id="barreSelection">
+    <span id="texteSelection">0 sélectionné(s)</span>
+    <button id="btnSupprimerSelection">🗑️ Supprimer la sélection</button>
+    <button id="btnAnnulerSelection" style="background:transparent; border:1px solid white;">Annuler</button>
+  </div>
   <div class="stats" id="stats"></div>
   <div id="conteneurTableau">
     <div class="chargement">Chargement…</div>
@@ -177,6 +210,7 @@
   let ongletActif = "sms";
   let toutesLignesSms = [];
   let toutesLignesLeads = [];
+  let selectionSms = new Set();
 
   function formatDate(iso) {
     if (!iso) return "—";
@@ -189,6 +223,31 @@
 
   function echapper(s) {
     return (s || "").toString().replace(/</g, "&lt;");
+  }
+
+  function majBarreSelection() {
+    const barre = document.getElementById("barreSelection");
+    const texte = document.getElementById("texteSelection");
+    if (ongletActif !== "sms" || selectionSms.size === 0) {
+      barre.classList.remove("visible");
+      return;
+    }
+    barre.classList.add("visible");
+    texte.textContent = `${selectionSms.size} sélectionné(s)`;
+  }
+
+  async function supprimerSms(ids) {
+    if (!ids.length) return;
+    if (!confirm(`Supprimer ${ids.length} SMS ? Cette action est définitive.`)) return;
+    try {
+      const res = await fetch(`${API_SMS}?ids=${ids.join(",")}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      selectionSms.clear();
+      await chargerSms();
+    } catch (err) {
+      alert("Erreur lors de la suppression : " + err.message);
+    }
   }
 
   // ---------- Onglet SMS ----------
@@ -212,6 +271,7 @@
     }
     const lignesHtml = lignes.map(l => `
       <tr>
+        <td class="checkbox-col"><input type="checkbox" class="case-sms" data-id="${l.id}" ${selectionSms.has(l.id) ? "checked" : ""}></td>
         <td>${formatDate(l.created_at)}</td>
         <td><span class="badge badge-type">${LIBELLES_TYPE_SMS[l.sms_type] || l.sms_type}</span></td>
         <td>${echapper(l.source) || "—"}</td>
@@ -219,12 +279,14 @@
         <td>${echapper([l.geo_city, l.geo_country].filter(Boolean).join(", ")) || "—"}</td>
         <td>${l.twilio_success === true ? '<span class="badge badge-ok">Envoyé</span>' : l.twilio_success === false ? '<span class="badge badge-ko">Échec</span>' : "—"}</td>
         <td class="msg-col">${echapper(l.message_body)}</td>
+        <td><button class="btn-suppr" data-id-suppr="${l.id}" title="Supprimer">🗑️</button></td>
       </tr>
     `).join("");
     conteneur.innerHTML = `
       <table>
         <thead>
           <tr>
+            <th class="checkbox-col"><input type="checkbox" id="caseToutSms"></th>
             <th>Date / heure</th>
             <th>Type</th>
             <th>Source / nom</th>
@@ -232,11 +294,37 @@
             <th>Localisation</th>
             <th>Statut</th>
             <th>Message</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>${lignesHtml}</tbody>
       </table>
     `;
+
+    document.querySelectorAll(".case-sms").forEach(cb => {
+      cb.addEventListener("change", () => {
+        const id = parseInt(cb.dataset.id, 10);
+        if (cb.checked) selectionSms.add(id); else selectionSms.delete(id);
+        majBarreSelection();
+      });
+    });
+    document.querySelectorAll(".btn-suppr").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = parseInt(btn.dataset.idSuppr, 10);
+        supprimerSms([id]);
+      });
+    });
+    const caseTout = document.getElementById("caseToutSms");
+    if (caseTout) {
+      caseTout.addEventListener("change", () => {
+        document.querySelectorAll(".case-sms").forEach(cb => {
+          cb.checked = caseTout.checked;
+          const id = parseInt(cb.dataset.id, 10);
+          if (caseTout.checked) selectionSms.add(id); else selectionSms.delete(id);
+        });
+        majBarreSelection();
+      });
+    }
   }
 
   function appliquerFiltreSms() {
@@ -244,6 +332,7 @@
     const lignes = type ? toutesLignesSms.filter(l => l.sms_type === type) : toutesLignesSms;
     renderStatsSms(lignes);
     renderTableSms(lignes);
+    majBarreSelection();
   }
 
   async function chargerSms() {
@@ -376,13 +465,24 @@
   }
 
   document.querySelectorAll(".onglet").forEach(el => {
-    el.addEventListener("click", () => activerOnglet(el.dataset.onglet));
+    el.addEventListener("click", () => {
+      selectionSms.clear();
+      activerOnglet(el.dataset.onglet);
+    });
   });
   document.getElementById("filtreType").addEventListener("change", () => {
+    selectionSms.clear();
     ongletActif === "sms" ? appliquerFiltreSms() : appliquerFiltreLeads();
   });
   document.getElementById("btnActualiser").addEventListener("click", () => {
     ongletActif === "sms" ? chargerSms() : chargerLeads();
+  });
+  document.getElementById("btnSupprimerSelection").addEventListener("click", () => {
+    supprimerSms(Array.from(selectionSms));
+  });
+  document.getElementById("btnAnnulerSelection").addEventListener("click", () => {
+    selectionSms.clear();
+    appliquerFiltreSms();
   });
 
   activerOnglet("sms");
