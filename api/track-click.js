@@ -5,6 +5,8 @@
 // Envoie aussi un SMS à Cyrille dès qu'un visiteur arrive via une pub Meta (fbclid ou ad_id)
 // ou une pub Google Ads (gclid), avec sa provenance géographique approximative (déduite de l'IP par Vercel).
 
+import { logSms } from "./_sms-log.js";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
@@ -48,6 +50,16 @@ function getGeoFromRequest(req) {
 async function sendClickAlertSms({ source, ad_id, utm_campaign, landing_page, geo }) {
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !TWILIO_TO_NUMBER) {
     console.error("track-click SMS skipped: variables Twilio manquantes");
+    await logSms({
+      sms_type: "arrivee_pub",
+      destinataire: TWILIO_TO_NUMBER,
+      source,
+      utm_campaign,
+      geo_city: geo.city,
+      geo_region: geo.region,
+      geo_country: geo.country,
+      twilio_success: false,
+    });
     return;
   }
 
@@ -83,6 +95,18 @@ async function sendClickAlertSms({ source, ad_id, utm_campaign, landing_page, ge
     const text = await res.text();
     console.error(`Twilio error ${res.status}: ${text}`);
   }
+
+  await logSms({
+    sms_type: "arrivee_pub",
+    destinataire: TWILIO_TO_NUMBER,
+    source,
+    utm_campaign,
+    geo_city: geo.city,
+    geo_region: geo.region,
+    geo_country: geo.country,
+    message_body: body,
+    twilio_success: res.ok,
+  });
 }
 
 export default async function handler(req, res) {
