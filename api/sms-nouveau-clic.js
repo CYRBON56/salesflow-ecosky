@@ -7,6 +7,8 @@
 // Structure calquée sur api/request-callback.js (qui fonctionne) pour
 // éviter toute différence subtile dans l'appel Twilio.
 
+import { logSms } from "./_sms-log.js";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
@@ -92,6 +94,17 @@ export default async function handler(req, res) {
       `Page : ${page || "estimation.html"}`;
 
     const sent = await sendSms(TWILIO_TO_NUMBER, message);
+    await logSms({
+      sms_type: "nouveau_clic",
+      destinataire: TWILIO_TO_NUMBER,
+      source,
+      utm_campaign,
+      geo_city: city,
+      geo_region: region,
+      geo_country: country,
+      message_body: message,
+      twilio_success: sent,
+    });
 
     return res.status(200).json({ sent });
   } catch (err) {
