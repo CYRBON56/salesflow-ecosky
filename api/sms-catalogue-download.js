@@ -3,6 +3,8 @@
 // catalogue" sur pub-choix.html — distinct du SMS "nouvel arrivant" envoyé
 // à l'ouverture de la page (celui-ci confirme une vraie action, plus qualifiante).
 
+import { logSms } from "./_sms-log.js";
+
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
@@ -54,6 +56,17 @@ export default async function handler(req, res) {
       (localisation ? `Provenance: ${localisation}` : "");
 
     const sent = await sendSms(TWILIO_TO_NUMBER, message);
+    await logSms({
+      sms_type: "catalogue_telecharge",
+      destinataire: TWILIO_TO_NUMBER,
+      source,
+      utm_campaign,
+      geo_city: geo.city,
+      geo_region: geo.region,
+      geo_country: geo.country,
+      message_body: message,
+      twilio_success: sent,
+    });
     return res.status(200).json({ sent });
   } catch (err) {
     console.error("sms-catalogue-download error:", err.message);
