@@ -2,20 +2,17 @@
 // Retourne l'historique des demandes d'estimation (table leads), pour la
 // page /sms-recus.html de SalesFlow System. Lecture seule, protégée par le
 // même middleware que le reste du dashboard.
-
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-
 export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).send("Method not allowed");
-
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 200, 500);
     const colonnes = [
       "id", "created_at", "nom", "prenom", "telephone", "email",
       "adresse_projet", "code_postal", "surface_m2", "type_projet",
       "delai_souhaite", "source", "statut", "formulaire_complete",
-      "callback_demande", "estimation_numero",
+      "callback_demande", "estimation_numero", "estimation_pdf_url",
     ].join(",");
     const url =
       `${SUPABASE_URL}/rest/v1/leads?select=${colonnes}&order=created_at.desc&limit=${limit}`;
