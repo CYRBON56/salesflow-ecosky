@@ -134,6 +134,12 @@
     border-radius: 6px;
   }
   .btn-suppr:hover, .btn-suppr-lead:hover { background: #fbe6e6; }
+  .lien-pdf {
+    color: var(--vert-clair);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .lien-pdf:hover { text-decoration: underline; }
   .barre-selection {
     display: none;
     align-items: center;
@@ -416,6 +422,7 @@
         <td>${badgeStatut(l.statut)}</td>
         <td>${l.formulaire_complete === true ? '<span class="badge badge-ok">Complet</span>' : '<span class="badge badge-ko">Incomplet</span>'}</td>
         <td>${l.callback_demande === true ? "📞 Oui" : "—"}</td>
+        <td>${l.estimation_pdf_url ? `<a href="${l.estimation_pdf_url}" target="_blank" rel="noopener" class="lien-pdf">📄 PDF</a>` : "—"}</td>
         <td><button class="btn-suppr-lead" data-id-suppr="${l.id}" title="Supprimer">🗑️</button></td>
       </tr>
     `;
@@ -435,6 +442,7 @@
             <th>Statut</th>
             <th>Formulaire</th>
             <th>Rappel</th>
+            <th>PDF</th>
             <th></th>
           </tr>
         </thead>
@@ -444,14 +452,14 @@
 
     document.querySelectorAll(".case-lead").forEach(cb => {
       cb.addEventListener("change", () => {
-        const id = parseInt(cb.dataset.id, 10);
+        const id = cb.dataset.id;
         if (cb.checked) selectionLeads.add(id); else selectionLeads.delete(id);
         majBarreSelection();
       });
     });
     document.querySelectorAll(".btn-suppr-lead").forEach(btn => {
       btn.addEventListener("click", () => {
-        const id = parseInt(btn.dataset.idSuppr, 10);
+        const id = btn.dataset.idSuppr;
         supprimerLeads([id]);
       });
     });
@@ -460,7 +468,7 @@
       caseToutLead.addEventListener("change", () => {
         document.querySelectorAll(".case-lead").forEach(cb => {
           cb.checked = caseToutLead.checked;
-          const id = parseInt(cb.dataset.id, 10);
+          const id = cb.dataset.id;
           if (caseToutLead.checked) selectionLeads.add(id); else selectionLeads.delete(id);
         });
         majBarreSelection();
