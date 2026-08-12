@@ -178,6 +178,16 @@
     margin-left: 4px;
   }
   .btn-lien:hover { background: #eef4f1; }
+  .btn-suppr-lead {
+    background: white;
+    border: 1px solid var(--bordure);
+    border-radius: 7px;
+    padding: 6px 9px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin-left: 4px;
+  }
+  .btn-suppr-lead:hover { background: #fdeaea; border-color: #e5a3a3; }
   .vide { padding: 40px; text-align: center; color: #7a8983; }
   .chargement { padding: 40px; text-align: center; color: #7a8983; }
 </style>
@@ -420,6 +430,7 @@
           ${peutRelancer ? `<button class="btn-relance" data-lead-id="${l.id}">📲 Renvoyer SMS</button>` : "—"}
           <a class="btn-lien" href="https://salesflow-ecosky.vercel.app/estimation.html?lead_id=${l.id}" target="_blank" rel="noopener">🔗 Reprise</a>
           <a class="btn-lien" href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf" target="_blank" rel="noopener">📄 Catalogue</a>
+          <button class="btn-suppr-lead" data-lead-id="${l.id}" title="Supprimer ce lead">🗑️</button>
         </td>
       </tr>
     `;
@@ -448,6 +459,24 @@
     document.querySelectorAll(".btn-relance").forEach(btn => {
       btn.addEventListener("click", () => relancerLead(btn));
     });
+    document.querySelectorAll(".btn-suppr-lead").forEach(btn => {
+      btn.addEventListener("click", () => supprimerLead(btn));
+    });
+  }
+
+  async function supprimerLead(btn) {
+    const leadId = btn.dataset.leadId;
+    if (!confirm("Supprimer définitivement ce lead ?")) return;
+    btn.disabled = true;
+    try {
+      const res = await fetch(`/api/leads-recus?id=${encodeURIComponent(leadId)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      chargerLeads();
+    } catch (err) {
+      alert("Erreur : " + err.message);
+      btn.disabled = false;
+    }
   }
 
   async function relancerLead(btn) {
