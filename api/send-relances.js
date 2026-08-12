@@ -6,6 +6,8 @@
 // Envoie AUSSI (par SMS) une relance aux visiteurs qui ont commencé le formulaire
 // d'estimation détaillée (donné leur téléphone) mais ne l'ont jamais terminé.
 
+import { logSms } from "./_sms-log.js";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
@@ -135,6 +137,53 @@ async function relancerFormulairesAbandonnes() {
   return results;
 }
 
+// Propose un rendez-vous téléphonique par SMS aux leads dont le formulaire
+// est complet depuis environ 24h (une seule fois, jamais renvoyé ensuite).
+async function proposerRdvFormulairesComplets() {
+  const results = [];
+  try {
+    const leads = await supabaseRequest(
+      "leads?formulaire_complete=eq.true&rdv_sms_envoye=eq.false&select=id,nom,telephone,code_postal,adresse_projet,created_at"
+    );
+
+    for (const lead of leads || []) {
+      if (!lead.telephone) continue;
+      const elapsed = hoursSince(lead.created_at);
+      if (elapsed < 20 || elapsed > 72) continue; // fenêtre ~24h (marge pour le cron quotidien)
+
+      const nom = lead.nom || "";
+      const lieu = [lead.adresse_projet, lead.code_postal].filter(Boolean).join(", ");
+      const lien = `https://salesflow-ecosky.vercel.app/estimation.html?lead_id=${lead.id}&rdv=1`;
+      const message =
+        `Bonjour Mme ou M. ${nom}, ici RMS EcoSky, spécialiste des sols souples en résine EPDM 👋 ` +
+        `Vous nous avez contactés pour une estimation de sol souple` +
+        (lieu ? ` (${lieu})` : ``) +
+        `, merci ! On aimerait vous appeler pour affiner ça ensemble et répondre à vos questions. ` +
+        `Choisissez le créneau qui vous arrange, ça prend 30 secondes : ${lien}`;
+
+      const sent = await sendSms(lead.telephone, message);
+      if (sent) {
+        await supabaseRequest(`leads?id=eq.${lead.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ rdv_sms_envoye: true }),
+          prefer: "return=minimal",
+        });
+      }
+      await logSms({
+        sms_type: "proposition_rdv",
+        destinataire: lead.telephone,
+        source: nom,
+        message_body: message,
+        twilio_success: sent,
+      });
+      results.push({ telephone: lead.telephone, success: sent });
+    }
+  } catch (err) {
+    console.error("proposerRdvFormulairesComplets error:", err.message);
+  }
+  return results;
+}
+
 export default async function handler(req, res) {
   // Sécurité simple : Vercel Cron envoie ce header automatiquement.
   if (CRON_SECRET) {
@@ -188,12 +237,15 @@ export default async function handler(req, res) {
     }
 
     const estimationResults = await relancerFormulairesAbandonnes();
+    const rdvResults = await proposerRdvFormulairesComplets();
 
     return res.status(200).json({
       processed: results.length,
       results,
       estimation_relances: estimationResults.length,
       estimation_results: estimationResults,
+      rdv_proposes: rdvResults.length,
+      rdv_results: rdvResults,
     });
   } catch (err) {
     console.error("send-relances error:", err);
