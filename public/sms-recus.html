@@ -125,7 +125,7 @@
     color: #4a5a54;
   }
   .checkbox-col { width: 30px; }
-  .btn-suppr, .btn-suppr-lead {
+  .btn-suppr {
     background: none;
     border: none;
     cursor: pointer;
@@ -133,13 +133,7 @@
     padding: 2px 6px;
     border-radius: 6px;
   }
-  .btn-suppr:hover, .btn-suppr-lead:hover { background: #fbe6e6; }
-  .lien-pdf {
-    color: var(--vert-clair);
-    font-weight: 600;
-    text-decoration: none;
-  }
-  .lien-pdf:hover { text-decoration: underline; }
+  .btn-suppr:hover { background: #fbe6e6; }
   .barre-selection {
     display: none;
     align-items: center;
@@ -158,6 +152,32 @@
     border: none;
     font-weight: 600;
   }
+  .btn-relance {
+    background: var(--vert-clair);
+    color: white;
+    border: none;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-relance:disabled { opacity: 0.6; cursor: default; }
+  .btn-lien {
+    display: inline-block;
+    background: white;
+    color: var(--vert);
+    border: 1px solid var(--bordure);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 7px;
+    text-decoration: none;
+    white-space: nowrap;
+    margin-left: 4px;
+  }
+  .btn-lien:hover { background: #eef4f1; }
   .vide { padding: 40px; text-align: center; color: #7a8983; }
   .chargement { padding: 40px; text-align: center; color: #7a8983; }
 </style>
@@ -195,7 +215,6 @@
 <script>
   const API_SMS = "/api/sms-recus";
   const API_LEADS = "/api/leads-recus";
-  const API_LEADS_ADMIN = "/api/leads-admin";
 
   const LIBELLES_TYPE_SMS = {
     arrivee_pub: "Arrivée pub",
@@ -204,6 +223,7 @@
     etude_anc_uploadee: "Étude ANC",
     demande_rappel: "Demande de rappel",
     nouveau_clic: "Nouveau clic",
+    relance_formulaire_incomplet: "Relance formulaire",
   };
 
   const LIBELLES_STATUT_LEAD = {
@@ -218,7 +238,6 @@
   let toutesLignesSms = [];
   let toutesLignesLeads = [];
   let selectionSms = new Set();
-  let selectionLeads = new Set();
 
   function formatDate(iso) {
     if (!iso) return "—";
@@ -233,20 +252,15 @@
     return (s || "").toString().replace(/</g, "&lt;");
   }
 
-  function selectionActive() {
-    return ongletActif === "sms" ? selectionSms : selectionLeads;
-  }
-
   function majBarreSelection() {
     const barre = document.getElementById("barreSelection");
     const texte = document.getElementById("texteSelection");
-    const selection = selectionActive();
-    if (selection.size === 0) {
+    if (ongletActif !== "sms" || selectionSms.size === 0) {
       barre.classList.remove("visible");
       return;
     }
     barre.classList.add("visible");
-    texte.textContent = `${selection.size} sélectionné(s)`;
+    texte.textContent = `${selectionSms.size} sélectionné(s)`;
   }
 
   async function supprimerSms(ids) {
@@ -258,26 +272,6 @@
       if (!data.ok) throw new Error(data.error || "Erreur inconnue");
       selectionSms.clear();
       await chargerSms();
-    } catch (err) {
-      alert("Erreur lors de la suppression : " + err.message);
-    }
-  }
-
-  async function supprimerLeads(ids) {
-    if (!ids.length) return;
-    if (!confirm(`Supprimer ${ids.length} demande(s) d'estimation ? Cette action est définitive.`)) return;
-    try {
-      for (const id of ids) {
-        const res = await fetch(API_LEADS_ADMIN, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "delete_lead", id }),
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || "Erreur inconnue");
-      }
-      selectionLeads.clear();
-      await chargerLeads();
     } catch (err) {
       alert("Erreur lors de la suppression : " + err.message);
     }
@@ -409,9 +403,9 @@
     }
     const lignesHtml = lignes.map(l => {
       const nomComplet = [l.prenom, l.nom].filter(Boolean).join(" ") || "—";
+      const peutRelancer = l.formulaire_complete !== true && l.telephone;
       return `
       <tr>
-        <td class="checkbox-col"><input type="checkbox" class="case-lead" data-id="${l.id}" ${selectionLeads.has(l.id) ? "checked" : ""}></td>
         <td>${formatDate(l.created_at)}</td>
         <td>${echapper(nomComplet)}</td>
         <td>${echapper(l.telephone) || "—"}</td>
@@ -422,8 +416,11 @@
         <td>${badgeStatut(l.statut)}</td>
         <td>${l.formulaire_complete === true ? '<span class="badge badge-ok">Complet</span>' : '<span class="badge badge-ko">Incomplet</span>'}</td>
         <td>${l.callback_demande === true ? "📞 Oui" : "—"}</td>
-        <td>${l.estimation_pdf_url ? `<a href="${l.estimation_pdf_url}" target="_blank" rel="noopener" class="lien-pdf">📄 PDF</a>` : "—"}</td>
-        <td><button class="btn-suppr-lead" data-id-suppr="${l.id}" title="Supprimer">🗑️</button></td>
+        <td>
+          ${peutRelancer ? `<button class="btn-relance" data-lead-id="${l.id}">📲 Renvoyer SMS</button>` : "—"}
+          <a class="btn-lien" href="https://salesflow-ecosky.vercel.app/estimation.html?lead_id=${l.id}" target="_blank" rel="noopener">🔗 Reprise</a>
+          <a class="btn-lien" href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf" target="_blank" rel="noopener">📄 Catalogue</a>
+        </td>
       </tr>
     `;
     }).join("");
@@ -431,7 +428,6 @@
       <table>
         <thead>
           <tr>
-            <th class="checkbox-col"><input type="checkbox" id="caseToutLead"></th>
             <th>Date / heure</th>
             <th>Nom</th>
             <th>Téléphone</th>
@@ -442,37 +438,36 @@
             <th>Statut</th>
             <th>Formulaire</th>
             <th>Rappel</th>
-            <th>PDF</th>
-            <th></th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>${lignesHtml}</tbody>
       </table>
     `;
 
-    document.querySelectorAll(".case-lead").forEach(cb => {
-      cb.addEventListener("change", () => {
-        const id = cb.dataset.id;
-        if (cb.checked) selectionLeads.add(id); else selectionLeads.delete(id);
-        majBarreSelection();
-      });
+    document.querySelectorAll(".btn-relance").forEach(btn => {
+      btn.addEventListener("click", () => relancerLead(btn));
     });
-    document.querySelectorAll(".btn-suppr-lead").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = btn.dataset.idSuppr;
-        supprimerLeads([id]);
+  }
+
+  async function relancerLead(btn) {
+    const leadId = btn.dataset.leadId;
+    if (!confirm("Envoyer un SMS de relance à ce lead ?")) return;
+    btn.disabled = true;
+    btn.textContent = "Envoi…";
+    try {
+      const res = await fetch("/api/renvoyer-sms-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead_id: leadId }),
       });
-    });
-    const caseToutLead = document.getElementById("caseToutLead");
-    if (caseToutLead) {
-      caseToutLead.addEventListener("change", () => {
-        document.querySelectorAll(".case-lead").forEach(cb => {
-          cb.checked = caseToutLead.checked;
-          const id = cb.dataset.id;
-          if (caseToutLead.checked) selectionLeads.add(id); else selectionLeads.delete(id);
-        });
-        majBarreSelection();
-      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      btn.textContent = data.sent ? "✅ Envoyé" : "⚠️ Échec Twilio";
+    } catch (err) {
+      btn.textContent = "❌ Erreur";
+      alert("Erreur : " + err.message);
+      btn.disabled = false;
     }
   }
 
@@ -481,7 +476,6 @@
     const lignes = statut ? toutesLignesLeads.filter(l => l.statut === statut) : toutesLignesLeads;
     renderStatsLeads(lignes);
     renderTableLeads(lignes);
-    majBarreSelection();
   }
 
   async function chargerLeads() {
@@ -532,37 +526,22 @@
   document.querySelectorAll(".onglet").forEach(el => {
     el.addEventListener("click", () => {
       selectionSms.clear();
-      selectionLeads.clear();
       activerOnglet(el.dataset.onglet);
     });
   });
   document.getElementById("filtreType").addEventListener("change", () => {
-    if (ongletActif === "sms") {
-      selectionSms.clear();
-      appliquerFiltreSms();
-    } else {
-      selectionLeads.clear();
-      appliquerFiltreLeads();
-    }
+    selectionSms.clear();
+    ongletActif === "sms" ? appliquerFiltreSms() : appliquerFiltreLeads();
   });
   document.getElementById("btnActualiser").addEventListener("click", () => {
     ongletActif === "sms" ? chargerSms() : chargerLeads();
   });
   document.getElementById("btnSupprimerSelection").addEventListener("click", () => {
-    if (ongletActif === "sms") {
-      supprimerSms(Array.from(selectionSms));
-    } else {
-      supprimerLeads(Array.from(selectionLeads));
-    }
+    supprimerSms(Array.from(selectionSms));
   });
   document.getElementById("btnAnnulerSelection").addEventListener("click", () => {
-    if (ongletActif === "sms") {
-      selectionSms.clear();
-      appliquerFiltreSms();
-    } else {
-      selectionLeads.clear();
-      appliquerFiltreLeads();
-    }
+    selectionSms.clear();
+    appliquerFiltreSms();
   });
 
   activerOnglet("sms");
