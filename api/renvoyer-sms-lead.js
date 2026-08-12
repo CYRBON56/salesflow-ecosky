@@ -87,7 +87,7 @@ export default async function handler(req, res) {
     await logSms({
       sms_type: "relance_formulaire_incomplet",
       destinataire: lead.telephone,
-      source: [prenom, lead.nom].filter(Boolean).join(" "),
+      source: [lead.prenom, lead.nom].filter(Boolean).join(" "),
       message_body: message,
       twilio_success: sent,
     });
