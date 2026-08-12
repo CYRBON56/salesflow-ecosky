@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     if (!lead_id) return res.status(400).json({ ok: false, error: "lead_id requis" });
 
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/leads?id=eq.${lead_id}&select=id,nom,telephone`,
+      `${SUPABASE_URL}/rest/v1/leads?id=eq.${lead_id}&select=id,nom,telephone,code_postal,adresse_projet`,
       {
         headers: {
           apikey: SUPABASE_SERVICE_KEY,
@@ -52,14 +52,30 @@ export default async function handler(req, res) {
     if (!lead.telephone) return res.status(400).json({ ok: false, error: "Ce lead n'a pas de téléphone" });
 
     const nom = lead.nom || "";
+    const lieu = [lead.adresse_projet, lead.code_postal].filter(Boolean).join(", ");
     const lien = `https://salesflow-ecosky.vercel.app/estimation.html?lead_id=${lead.id}&rdv=1`;
 
     const message =
-      `Bonjour Mme ou M. ${nom}, RMS EcoSky ici 👋 Merci pour votre demande d'estimation ! ` +
+      `Bonjour Mme ou M. ${nom}, ici RMS EcoSky, spécialiste des sols souples en résine EPDM 👋 ` +
+      `Vous nous avez contactés pour une estimation de sol souple` +
+      (lieu ? ` (${lieu})` : ``) +
+      `, merci ! ` +
       `On aimerait vous appeler pour affiner ça ensemble et répondre à vos questions. ` +
       `Choisissez le créneau qui vous arrange, ça prend 30 secondes : ${lien}`;
 
     const sent = await sendSms(lead.telephone, message);
+    if (sent) {
+      await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.${lead.id}`, {
+        method: "PATCH",
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({ rdv_sms_envoye: true }),
+      });
+    }
 
     await logSms({
       sms_type: "proposition_rdv",
