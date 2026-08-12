@@ -1242,6 +1242,17 @@
         if (data.prenom) state.prenom = data.prenom;
         if (data.email) state.email = data.email;
         if (data.telephone) state.telephone = data.telephone;
+        state.leadId = leadId;
+
+        // Lien direct "prendre rendez-vous" (SMS de relance post-formulaire
+        // complet) : on saute directement à l'écran de rendez-vous, sans
+        // repasser par tout le formulaire, puisque les infos sont déjà en
+        // base.
+        if (params.get("rdv") === "1") {
+          renderDirectRdv();
+          return;
+        }
+
         // Si on est déjà passé l'étape identité au moment où la réponse
         // arrive, on réaffiche l'étape courante pour refléter les champs.
         renderStep();
@@ -1250,6 +1261,29 @@
       // silencieux : la personne peut toujours remplir manuellement
     }
   })();
+
+  function renderDirectRdv() {
+    const cardEl = document.getElementById("card");
+    cardEl.innerHTML = `
+      <div class="success-icon">✅</div>
+      <div class="question" style="text-align:center;">Merci ${state.prenom || ""} !</div>
+      <p class="disclaimer">
+        Votre dossier est complet. Choisissez un créneau pour qu'un technicien vous appelle,
+        ou demandez à être rappelé rapidement.
+      </p>
+      <div id="appointmentSection">
+        <button class="btn btn-primary" id="btnWantAppointment" style="width:100%; margin-top:10px;">
+          📅 Prendre rendez-vous à un horaire précis
+        </button>
+        <button class="btn" id="btnWantCallback" style="width:100%; margin-top:8px; background:white; border:1.5px solid #1e6f4c; color:#14312a;">
+          📞 Être rappelé rapidement (sans rendez-vous précis)
+        </button>
+        <div id="callbackFeedback"></div>
+      </div>
+    `;
+    document.getElementById("btnWantAppointment").addEventListener("click", showSlots);
+    document.getElementById("btnWantCallback").addEventListener("click", requestCallback);
+  }
 
   renderProgress();
   renderStep();
