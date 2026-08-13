@@ -250,9 +250,17 @@
   }
 
   // Enregistre l'arrivée sur cette page (et envoie un SMS si ça vient d'une pub Meta ou Google Ads)
+  // Protégé par sessionStorage pour éviter un double envoi si la page se
+  // recharge ou est préchargée deux fois par le navigateur (ex: prerendering Chrome).
   (function trackLandingClick() {
     try {
       var qs = new URLSearchParams(window.location.search);
+      var dedupeKey = qs.get('fbclid') || qs.get('gclid') || qs.get('ad_id') || 'generic';
+      var alreadyTracked = null;
+      try { alreadyTracked = sessionStorage.getItem('ecosky_pub_click_tracked_key'); } catch (e) {}
+      if (alreadyTracked === dedupeKey) return;
+      try { sessionStorage.setItem('ecosky_pub_click_tracked_key', dedupeKey); } catch (e) {}
+
       var sessionId = 'pub_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
 
       fetch('https://salesflow-ecosky.vercel.app/api/track-click', {
