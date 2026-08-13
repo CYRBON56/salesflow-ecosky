@@ -4,7 +4,7 @@
 // non engageant), sauvegarde le lead dans Supabase, et envoie un SMS avec le
 // lien du PDF à la fois au client et au propriétaire de RMS ECOSKY.
 
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, PDFName, PDFString, PDFArray } from "pdf-lib";
 import { LOGO_ECOSKY_BASE64 } from "./_logo-ecosky-base64.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -362,7 +362,31 @@ function buildDesignationLines(answers) {
   return [];
 }
 
-async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_postal, telephone, email, answers, estimation }) {
+// pdf-lib n'a pas d'API haut niveau pour les liens cliquables : on pose
+// une annotation de lien manuellement par-dessus une zone dessinée (ici,
+// le bouton "Prendre rendez-vous").
+function addLinkAnnotation(page, doc, { x, y, width, height, url }) {
+  const linkAnnotation = doc.context.obj({
+    Type: "Annot",
+    Subtype: "Link",
+    Rect: [x, y, x + width, y + height],
+    Border: [0, 0, 0],
+    A: {
+      Type: "Action",
+      S: "URI",
+      URI: PDFString.of(url),
+    },
+  });
+  const linkRef = doc.context.register(linkAnnotation);
+  const existingAnnots = page.node.lookup(PDFName.of("Annots"), PDFArray);
+  if (existingAnnots) {
+    existingAnnots.push(linkRef);
+  } else {
+    page.node.set(PDFName.of("Annots"), doc.context.obj([linkRef]));
+  }
+}
+
+async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_postal, telephone, email, answers, estimation, leadId }) {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595.28, 841.89]); // A4
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -512,6 +536,20 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
     y -= 20;
   }
 
+  // Bouton "Prendre rendez-vous" — cliquable, renvoie vers l'écran de RDV
+  // (sans repasser par le formulaire, les infos étant déjà en base).
+  if (leadId) {
+    const btnWidth = 260;
+    const btnHeight = 26;
+    const btnX = marginX;
+    const btnY = y - btnHeight;
+    const rdvUrl = `https://salesflow-ecosky.vercel.app/estimation.html?lead_id=${leadId}&rdv=1`;
+    page.drawRectangle({ x: btnX, y: btnY, width: btnWidth, height: btnHeight, color: green });
+    text("📅  Prendre rendez-vous téléphonique", btnX + 14, btnY + 8, { bold: true, size: 10, color: rgb(1, 1, 1) });
+    addLinkAnnotation(page, doc, { x: btnX, y: btnY, width: btnWidth, height: btnHeight, url: rdvUrl });
+    y = btnY - 22;
+  }
+
   text(estimation.texte, marginX, y, { size: 8.5, color: grey });
   y -= 40;
 
@@ -617,28 +655,6 @@ export default async function handler(req, res) {
 
     const numero = await nextEstimationNumber();
 
-    let pdfUrl = null;
-    let pdfBytes = null;
-    try {
-      pdfBytes = await generateEstimatePdf({
-        numero,
-        nom,
-        prenom,
-        adresse_projet,
-        code_postal,
-        telephone,
-        email,
-        answers: answers || {},
-        estimation,
-      });
-      const filename = `${numero}.pdf`;
-      pdfUrl = await uploadPdfToSupabase(pdfBytes, filename);
-    } catch (pdfErr) {
-      // Un échec de génération/upload du PDF ne doit jamais empêcher
-      // l'enregistrement du lead ni l'envoi du SMS/email avec le texte seul.
-      console.error("PDF estimateur error:", pdfErr.message);
-    }
-
     const leadPayload = {
       nom,
       prenom: prenom || null,
@@ -650,7 +666,6 @@ export default async function handler(req, res) {
       reponses_estimation: answers || {},
       estimation_texte: estimation.texte,
       estimation_numero: numero,
-      estimation_pdf_url: pdfUrl,
       source: "Formulaire estimation détaillée",
       formulaire_complete: true,
       notes: isExtendedZone
@@ -662,6 +677,8 @@ export default async function handler(req, res) {
     // pour ce numéro (contact précédent par WhatsApp, chat, ou une estimation
     // antérieure), on le MET À JOUR avec cette nouvelle estimation plutôt que
     // d'essayer d'en créer un doublon, ce qui échouerait systématiquement.
+    // Fait AVANT la génération du PDF pour disposer de l'id du lead (utilisé
+    // pour le bouton "Prendre rendez-vous" cliquable dans le PDF).
     const existing = await supabaseRequest(
       `leads?telephone=eq.${encodeURIComponent(phoneE164 || telephone)}`
     );
@@ -677,6 +694,36 @@ export default async function handler(req, res) {
         method: "POST",
         body: JSON.stringify({ ...leadPayload, statut: "nouveau" }),
       });
+    }
+    const leadId = lead?.[0]?.id || null;
+
+    let pdfUrl = null;
+    let pdfBytes = null;
+    try {
+      pdfBytes = await generateEstimatePdf({
+        numero,
+        nom,
+        prenom,
+        adresse_projet,
+        code_postal,
+        telephone,
+        email,
+        answers: answers || {},
+        estimation,
+        leadId,
+      });
+      const filename = `${numero}.pdf`;
+      pdfUrl = await uploadPdfToSupabase(pdfBytes, filename);
+      if (leadId && pdfUrl) {
+        await supabaseRequest(`leads?id=eq.${leadId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ estimation_pdf_url: pdfUrl }),
+        });
+      }
+    } catch (pdfErr) {
+      // Un échec de génération/upload du PDF ne doit jamais empêcher
+      // l'enregistrement du lead ni l'envoi du SMS/email avec le texte seul.
+      console.error("PDF estimateur error:", pdfErr.message);
     }
 
     // SMS au client avec son estimation (zone cœur = message normal, zone
@@ -748,7 +795,7 @@ export default async function handler(req, res) {
       pdfFilename: `estimation-${numero}.pdf`,
     });
 
-    return res.status(200).json({ success: true, estimation, lead_id: lead?.[0]?.id, numero, pdf_url: pdfUrl });
+    return res.status(200).json({ success: true, estimation, lead_id: leadId, numero, pdf_url: pdfUrl });
   } catch (err) {
     console.error("submit-estimation error:", err.message);
     return res.status(200).json({
