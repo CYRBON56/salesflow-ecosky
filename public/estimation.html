@@ -55,6 +55,42 @@
   @media (max-width: 800px) {
     .image-panel-title { font-size: 1.3rem; left: 20px; right: 20px; }
   }
+  .catalogue-cta {
+    position: absolute;
+    left: 24px;
+    bottom: 24px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    background: rgba(255,255,255,0.96);
+    border-radius: 12px;
+    padding: 10px 16px 10px 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .catalogue-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
+  .catalogue-cta img {
+    position: static;
+    width: 46px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    opacity: 1;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  }
+  .catalogue-cta .catalogue-cta-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+  }
+  .catalogue-cta .catalogue-cta-text strong { color: #14312a; font-size: 13.5px; font-weight: 700; }
+  .catalogue-cta .catalogue-cta-text span { color: #4a5a54; font-size: 11.5px; }
+  @media (max-width: 800px) {
+    .catalogue-cta { left: 16px; bottom: 16px; padding: 8px 12px 8px 8px; }
+    .catalogue-cta img { width: 38px; height: 50px; }
+  }
   .form-panel {
     flex: 1 1 55%;
     position: relative;
@@ -239,6 +275,16 @@
 <div class="split-layout">
   <div class="image-panel" id="heroImagePanel">
     <div class="image-panel-title">Le sol qui tient tête<br>aux hivers bretons.<br><span style="display:block; margin-top:14px; font-size:0.45em; font-weight:600; opacity:0.9;">EcoSky — créé en 2007, fêtera bientôt ses 20 ans d'existence</span></div>
+    <a class="catalogue-cta"
+       href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf"
+       target="_blank" rel="noopener"
+       onclick="window.va && window.va('event', { name: 'catalogue_telecharge' }); notifyCatalogueDownloadEstimation();">
+      <img src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-cover.jpg" alt="Catalogue Réalisations EcoSky">
+      <span class="catalogue-cta-text">
+        <strong>📄 Voir le catalogue</strong>
+        <span>Nos réalisations en photos</span>
+      </span>
+    </a>
   </div>
   <div class="form-panel">
     <video class="form-bg-video" autoplay muted loop playsinline>
