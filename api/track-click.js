@@ -160,11 +160,18 @@ export default async function handler(req, res) {
 
     // SMS pour une arrivée identifiée comme venant d'une pub Meta
     // (fbclid ou ad_id) OU d'une pub Google Ads (gclid) — pas pour
-    // chaque visite organique.
+    // chaque visite organique. On filtre aussi les provenances hors
+    // France : ce sont presque toujours des clics automatisés (bots de
+    // vérification qualité/anti-fraude de Google, souvent localisés aux
+    // US) plutôt que de vrais visiteurs — le clic reste enregistré en
+    // base pour les stats, mais ne déclenche plus de SMS inutile. On
+    // laisse passer les provenances inconnues, pour ne jamais rater un
+    // vrai visiteur si Vercel n'a pas pu déterminer le pays.
     const isMetaAdClick = Boolean(fbclid || ad_id);
     const isGoogleAdClick = Boolean(gclid);
+    const isFrenchOrUnknown = !geo.country || geo.country === "FR";
 
-    if (isMetaAdClick || isGoogleAdClick) {
+    if ((isMetaAdClick || isGoogleAdClick) && isFrenchOrUnknown) {
       try {
         await sendClickAlertSms({
           source: isGoogleAdClick && !isMetaAdClick ? "Google Ads" : "Meta",
