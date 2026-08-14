@@ -545,7 +545,7 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
     const btnY = y - btnHeight;
     const rdvUrl = `https://salesflow-ecosky.vercel.app/estimation.html?lead_id=${leadId}&rdv=1`;
     page.drawRectangle({ x: btnX, y: btnY, width: btnWidth, height: btnHeight, color: green });
-    text("📅  Prendre rendez-vous téléphonique", btnX + 14, btnY + 8, { bold: true, size: 10, color: rgb(1, 1, 1) });
+    text("Prendre rendez-vous téléphonique", btnX + 14, btnY + 8, { bold: true, size: 10, color: rgb(1, 1, 1) });
     addLinkAnnotation(page, doc, { x: btnX, y: btnY, width: btnWidth, height: btnHeight, url: rdvUrl });
     y = btnY - 22;
   }
