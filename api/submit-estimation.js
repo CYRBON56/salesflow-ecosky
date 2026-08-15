@@ -331,32 +331,32 @@ const USAGE_LABELS = { pieton: "Usage piéton", carrossable: "Usage carrossable 
 function buildDesignationLines(answers) {
   if (answers.usage === "pieton") {
     return [
-      "PRESTATION COMPRISE (forfait de base) :",
-      "Ponçage / surfaçage de la surface au disque diamant, aspiration des",
-      "poussières, nettoyage complet du support, pose de la primaire",
-      "d'accrochage, application du revêtement résine EcoSky'Gum.",
-      "OPTIONS SELON L'ÉTAT DU SUPPORT (en supplément) :",
-      "- Remise à niveau / réparation de la dalle si détériorée",
-      "- Pose d'un filet de renfort (trame PVC) sur zones fragilisées",
-      "- Pose et collage des baguettes de finition (métrage variable)",
-      "Ces options ne peuvent être chiffrées qu'après déplacement d'un",
-      "technicien sur le chantier — l'estimation ci-dessus ne porte que sur",
-      "les éléments qui peuvent être déterminés à distance.",
+      { text: "PRESTATION COMPRISE (forfait de base) :" },
+      { text: "Ponçage / surfaçage de la surface au disque diamant, aspiration des" },
+      { text: "poussières, nettoyage complet du support, pose de la primaire" },
+      { text: "d'accrochage, application du revêtement résine EcoSky'Gum." },
+      { text: "OPTIONS SELON L'ÉTAT DU SUPPORT (en supplément) :", option: true },
+      { text: "- Remise à niveau / réparation de la dalle si détériorée", option: true },
+      { text: "- Pose d'un filet de renfort (trame PVC) sur zones fragilisées", option: true },
+      { text: "- Pose et collage des baguettes de finition (métrage variable)", option: true },
+      { text: "Ces options ne peuvent être chiffrées qu'après déplacement d'un" },
+      { text: "technicien sur le chantier — l'estimation ci-dessus ne porte que sur" },
+      { text: "les éléments qui peuvent être déterminés à distance." },
     ];
   }
   if (answers.usage === "carrossable" && answers.etat_terrain_carrossable === "terre_nue") {
     return [
-      "POSE POUR PARKING SUR TERRAIN NU :",
-      "Terrassement pour décaissement et évacuation du déblai, fourniture et",
-      "pose d'un concassé 0/31,5 sur 10cm, profilage et compactage, pose des",
-      "bordures si besoin, pose du revêtement quartz, granit ou marbre.",
+      { text: "POSE POUR PARKING SUR TERRAIN NU :" },
+      { text: "Terrassement pour décaissement et évacuation du déblai, fourniture et" },
+      { text: "pose d'un concassé 0/31,5 sur 10cm, profilage et compactage, pose des" },
+      { text: "bordures si besoin, pose du revêtement quartz, granit ou marbre." },
     ];
   }
   if (answers.usage === "carrossable" && answers.etat_terrain_carrossable === "deja_prepare") {
     return [
-      "POSE PARKING (terrain déjà préparé) :",
-      "Pose du revêtement quartz, granit ou marbre sur terrain déjà stabilisé,",
-      "pose des bordures si besoin.",
+      { text: "POSE PARKING (terrain déjà préparé) :" },
+      { text: "Pose du revêtement quartz, granit ou marbre sur terrain déjà stabilisé," },
+      { text: "pose des bordures si besoin." },
     ];
   }
   return [];
@@ -396,6 +396,7 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
   const dark = rgb(0.08, 0.09, 0.09);
   const grey = rgb(0.4, 0.42, 0.4);
   const lightBg = rgb(0.918, 0.957, 0.937);
+  const red = rgb(0.72, 0.15, 0.13); // #b82621 — section OPTIONS (suppléments potentiels)
 
   let y = 800;
   const marginX = 50;
@@ -502,8 +503,12 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
     const designationLines = buildDesignationLines(answers);
     if (designationLines.length > 0) {
       y -= 6;
-      designationLines.forEach((lineText, i) => {
-        text(lineText, marginX + 8, y, { size: 8, color: grey, bold: i === 0 });
+      designationLines.forEach((line, i) => {
+        text(line.text, marginX + 8, y, {
+          size: 8,
+          color: line.option ? red : grey,
+          bold: i === 0,
+        });
         y -= 11;
       });
     }
