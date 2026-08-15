@@ -3,9 +3,10 @@
 // passe (authentification HTTP Basic), pour que seuls toi et ton équipe
 // puissiez le consulter. Les formulaires d'estimation (estimation.html et
 // estimation-anc.html), pub-choix.html (page de choix affichée aux visiteurs
-// venant d'une pub) et la plupart des routes API (/api/*) restent librement
-// accessibles, car ce sont tes clients qui doivent pouvoir les utiliser sans
-// mot de passe.
+// venant d'une pub), details-projet.html (formulaire léger envoyé par SMS
+// après l'appel de RDV pour compléter nom/adresse/photos) et la plupart des
+// routes API (/api/*) restent librement accessibles, car ce sont tes
+// clients qui doivent pouvoir les utiliser sans mot de passe.
 // EXCEPTIONS protégées malgré tout (actions/données sensibles côté admin) :
 //   - /api/leads-admin : modifier/supprimer un lead, importer un CSV, réglages
 //   - /api/leads-anc-en-attente : liste les demandes ANC avec données clients
@@ -16,10 +17,10 @@
 export const config = {
   matcher: [
     // Protège tout SAUF : /api/* (hors les 3 routes listées ci-dessous),
-    // /estimation.html, /estimation-anc.html, /pub-choix.html, les fichiers
-    // statiques (images, css, js compilés par Vite), et les routes internes
-    // Next/Vercel.
-    "/((?!api/|estimation\\.html|estimation-anc\\.html|pub-choix\\.html|assets/|favicon|.*\\.(?:png|jpg|jpeg|svg|css|js|ico)$).*)",
+    // /estimation.html, /estimation-anc.html, /pub-choix.html,
+    // /details-projet.html, les fichiers statiques (images, css, js
+    // compilés par Vite), et les routes internes Next/Vercel.
+    "/((?!api/|estimation\\.html|estimation-anc\\.html|pub-choix\\.html|details-projet\\.html|assets/|favicon|.*\\.(?:png|jpg|jpeg|svg|css|js|ico)$).*)",
     // Protège spécifiquement ces routes admin, même si elles sont sous /api/.
     "/api/leads-admin",
     "/api/leads-anc-en-attente",
