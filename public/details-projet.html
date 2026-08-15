@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Compléter mon dossier — RMS EcoSky</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #14312a;
+    background: #f7f6f1;
+  }
+  .wrap { max-width: 540px; margin: 0 auto; padding: 28px 20px 60px; }
+  .logo-title { font-weight: 800; font-size: 1.15rem; color: #1e6f4c; margin-bottom: 4px; }
+  h1 { font-size: 1.4rem; margin: 4px 0 6px; }
+  .sub { color: #5b6b64; font-size: 0.95rem; line-height: 1.5; margin-bottom: 26px; }
+  label { display: block; font-weight: 600; font-size: 0.9rem; margin: 18px 0 6px; }
+  input[type="text"], textarea {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid #d8e3de;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-family: inherit;
+    background: white;
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  input:focus, textarea:focus { outline: none; border-color: #1e6f4c; }
+  .photo-zone {
+    margin-top: 10px;
+    border: 1.5px dashed #b7c7c0;
+    border-radius: 12px;
+    padding: 18px;
+    text-align: center;
+    background: white;
+    cursor: pointer;
+  }
+  .photo-zone input { display: none; }
+  .photo-hint { color: #5b6b64; font-size: 0.85rem; margin-top: 4px; }
+  .thumbs { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .thumb { position: relative; width: 84px; height: 84px; border-radius: 10px; overflow: hidden; border: 1px solid #d8e3de; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb .remove {
+    position: absolute; top: 2px; right: 2px;
+    background: rgba(0,0,0,0.6); color: white; border: none;
+    width: 20px; height: 20px; border-radius: 50%; font-size: 12px; cursor: pointer;
+    line-height: 1;
+  }
+  .btn-submit {
+    width: 100%;
+    background: #1e6f4c;
+    color: white;
+    border: none;
+    padding: 15px;
+    border-radius: 12px;
+    font-size: 1.02rem;
+    font-weight: 700;
+    margin-top: 30px;
+    cursor: pointer;
+  }
+  .btn-submit:disabled { opacity: 0.6; }
+  .disclaimer { color: #8a9490; font-size: 0.78rem; margin-top: 14px; line-height: 1.5; }
+  .error { color: #991b1b; font-size: 0.9rem; margin-top: 10px; }
+  .success-icon { font-size: 2.6rem; text-align: center; margin: 30px 0 10px; }
+  .success-title { text-align: center; font-size: 1.25rem; font-weight: 700; margin-bottom: 8px; }
+  .success-text { text-align: center; color: #5b6b64; font-size: 0.95rem; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="logo-title">RMS EcoSky</div>
+  <h1>On complète votre dossier</h1>
+  <p class="sub">
+    Suite à notre appel, merci de confirmer vos coordonnées et l'adresse exacte du projet.
+    Quelques photos du support (facultatif) nous aident aussi à mieux préparer votre intervention.
+  </p>
+
+  <label for="nom">Nom</label>
+  <input type="text" id="nom" placeholder="Votre nom" />
+
+  <label for="prenom">Prénom</label>
+  <input type="text" id="prenom" placeholder="Votre prénom" />
+
+  <label for="adresse">Adresse exacte du projet</label>
+  <textarea id="adresse" placeholder="Numéro, rue, code postal, ville"></textarea>
+
+  <label>Photos du projet (facultatif, jusqu'à 6)</label>
+  <div class="photo-zone" id="photoZone">
+    <div>📷 Ajouter des photos</div>
+    <div class="photo-hint">Depuis votre galerie ou l'appareil photo</div>
+    <input type="file" id="photoInput" accept="image/*" multiple />
+  </div>
+  <div class="thumbs" id="thumbs"></div>
+
+  <div id="errorBox"></div>
+
+  <button class="btn-submit" id="btnSubmit">Envoyer</button>
+
+  <p class="disclaimer">
+    Vos informations sont transmises uniquement à RMS EcoSky pour la préparation de votre projet.
+  </p>
+</div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const leadId = params.get("lead_id");
+  const API_URL = "https://salesflow-ecosky.vercel.app/api/submit-details-projet";
+  const LOOKUP_URL = "https://salesflow-ecosky.vercel.app/api/lookup-lead-by-id";
+  const MAX_PHOTOS = 6;
+  const MAX_DIMENSION = 1280;
+  const JPEG_QUALITY = 0.65;
+
+  let photos = []; // { dataUrl }
+
+  const nomEl = document.getElementById("nom");
+  const prenomEl = document.getElementById("prenom");
+  const adresseEl = document.getElementById("adresse");
+  const photoZone = document.getElementById("photoZone");
+  const photoInput = document.getElementById("photoInput");
+  const thumbsEl = document.getElementById("thumbs");
+  const errorBox = document.getElementById("errorBox");
+  const btnSubmit = document.getElementById("btnSubmit");
+
+  photoZone.addEventListener("click", () => photoInput.click());
+
+  photoInput.addEventListener("change", async (e) => {
+    const files = Array.from(e.target.files || []);
+    for (const file of files) {
+      if (photos.length >= MAX_PHOTOS) break;
+      try {
+        const dataUrl = await compressImage(file);
+        photos.push(dataUrl);
+        renderThumbs();
+      } catch (err) {
+        console.error("Erreur compression photo:", err);
+      }
+    }
+    photoInput.value = "";
+  });
+
+  function compressImage(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = (ev) => { img.src = ev.target.result; };
+      reader.onerror = reject;
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > MAX_DIMENSION) {
+          height = Math.round((height * MAX_DIMENSION) / width);
+          width = MAX_DIMENSION;
+        } else if (height > MAX_DIMENSION) {
+          width = Math.round((width * MAX_DIMENSION) / height);
+          height = MAX_DIMENSION;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", JPEG_QUALITY));
+      };
+      img.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderThumbs() {
+    thumbsEl.innerHTML = "";
+    photos.forEach((dataUrl, i) => {
+      const div = document.createElement("div");
+      div.className = "thumb";
+      div.innerHTML = `<img src="${dataUrl}"><button class="remove" data-i="${i}">×</button>`;
+      thumbsEl.appendChild(div);
+    });
+    thumbsEl.querySelectorAll(".remove").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        photos.splice(parseInt(btn.dataset.i, 10), 1);
+        renderThumbs();
+      });
+    });
+  }
+
+  // Préremplissage si les infos sont déjà connues
+  (async function prefill() {
+    if (!leadId) return;
+    try {
+      const res = await fetch(`${LOOKUP_URL}?lead_id=${encodeURIComponent(leadId)}`);
+      const data = await res.json();
+      if (data.found) {
+        if (data.nom) nomEl.value = data.nom;
+        if (data.prenom) prenomEl.value = data.prenom;
+      }
+    } catch (e) {
+      // silencieux
+    }
+  })();
+
+  btnSubmit.addEventListener("click", async () => {
+    errorBox.innerHTML = "";
+    if (!leadId) {
+      errorBox.innerHTML = '<div class="error">Lien invalide — merci de nous contacter directement.</div>';
+      return;
+    }
+    if (!nomEl.value.trim() || !adresseEl.value.trim()) {
+      errorBox.innerHTML = '<div class="error">Merci de renseigner au moins votre nom et l\'adresse du projet.</div>';
+      return;
+    }
+    btnSubmit.disabled = true;
+    btnSubmit.textContent = "Envoi en cours…";
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: leadId,
+          nom: nomEl.value.trim(),
+          prenom: prenomEl.value.trim(),
+          adresse: adresseEl.value.trim(),
+          photos,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Erreur inconnue");
+      document.getElementById("app").innerHTML = `
+        <div class="success-icon">✅</div>
+        <div class="success-title">Merci !</div>
+        <p class="success-text">Votre dossier est bien complété. On vous recontacte très vite pour la suite.</p>
+      `;
+    } catch (err) {
+      errorBox.innerHTML = `<div class="error">Erreur : ${err.message}. Merci de réessayer.</div>`;
+      btnSubmit.disabled = false;
+      btnSubmit.textContent = "Envoyer";
+    }
+  });
+</script>
+</body>
+</html>
