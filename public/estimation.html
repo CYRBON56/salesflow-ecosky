@@ -1,3 +1,28 @@
+@@ -4,6 +4,14 @@
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Estimation détaillée — RMS EcoSky</title>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-17738090056"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'AW-17738090056');
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+@@ -1240,6 +1248,9 @@ <h1>Votre estimation personnalisée</h1>
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (typeof gtag === "function") {
+          gtag("event", "conversion", { send_to: "AW-17738090056/vVjOCIDsgsIbEMiMl4pC" });
+        }
+        renderSuccess(data);
+      } else {
+        renderError(data.error || "Merci de réessayer dans quelques instants.");
 <!--
   INTÉGRATION dans public/estimation.html, à l'étape où le téléphone
   est saisi (step 2 d'après le formulaire actuel).
