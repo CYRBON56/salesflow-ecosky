@@ -178,20 +178,6 @@
     margin-left: 4px;
   }
   .btn-rdv:disabled { opacity: 0.6; cursor: default; }
-  .btn-details {
-    display: inline-block;
-    background: white;
-    color: #1e6f4c;
-    border: 1.5px solid #1e6f4c;
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 6px 10px;
-    border-radius: 7px;
-    cursor: pointer;
-    white-space: nowrap;
-    margin-left: 4px;
-  }
-  .btn-details:disabled { opacity: 0.6; cursor: default; }
   .btn-lien {
     display: inline-block;
     background: white;
@@ -206,6 +192,19 @@
     margin-left: 4px;
   }
   .btn-lien:hover { background: #eef4f1; }
+  .btn-lien-desactive {
+    display: inline-block;
+    background: #f5f5f3;
+    color: #b5bdb8;
+    border: 1px solid var(--bordure);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 7px;
+    white-space: nowrap;
+    margin-left: 4px;
+    cursor: default;
+  }
   .btn-suppr-lead {
     background: white;
     border: 1px solid var(--bordure);
@@ -458,8 +457,10 @@
         <td>
           ${peutRelancer ? `<button class="btn-relance" data-lead-id="${l.id}">📲 Renvoyer SMS</button>` : ""}
           ${peutProposerRdv ? `<button class="btn-rdv" data-lead-id="${l.id}">📅 Proposer RDV</button>` : ""}
-          ${l.telephone ? `<button class="btn-details" data-lead-id="${l.id}">📸 Détails projet</button>` : ""}
-          <a class="btn-lien" href="https://salesflow-ecosky.vercel.app/estimation.html?lead_id=${l.id}" target="_blank" rel="noopener">🔗 Reprise</a>
+          <a class="btn-lien" href="https://salesflow-ecosky.vercel.app/estimation.html?lead_id=${l.id}" target="_blank" rel="noopener">📋 Détails</a>
+          ${l.estimation_pdf_url
+            ? `<a class="btn-lien" href="${l.estimation_pdf_url}" target="_blank" rel="noopener">📄 Devis PDF</a>`
+            : `<span class="btn-lien-desactive" title="Pas encore de PDF généré pour ce lead">📄 Devis PDF</span>`}
           <a class="btn-lien" href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf" target="_blank" rel="noopener">📄 Catalogue</a>
           <button class="btn-suppr-lead" data-lead-id="${l.id}" title="Supprimer ce lead">🗑️</button>
         </td>
@@ -493,33 +494,9 @@
     document.querySelectorAll(".btn-rdv").forEach(btn => {
       btn.addEventListener("click", () => proposerRdv(btn));
     });
-    document.querySelectorAll(".btn-details").forEach(btn => {
-      btn.addEventListener("click", () => proposerDetails(btn));
-    });
     document.querySelectorAll(".btn-suppr-lead").forEach(btn => {
       btn.addEventListener("click", () => supprimerLead(btn));
     });
-  }
-
-  async function proposerDetails(btn) {
-    const leadId = btn.dataset.leadId;
-    if (!confirm("Envoyer un SMS pour demander nom, prénom, adresse exacte et photos du projet ?")) return;
-    btn.disabled = true;
-    btn.textContent = "Envoi…";
-    try {
-      const res = await fetch("/api/proposer-details-lead", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lead_id: leadId }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
-      btn.textContent = data.sent ? "✅ Envoyé" : "⚠️ Échec Twilio";
-    } catch (err) {
-      btn.textContent = "❌ Erreur";
-      alert("Erreur : " + err.message);
-      btn.disabled = false;
-    }
   }
 
   async function proposerRdv(btn) {
