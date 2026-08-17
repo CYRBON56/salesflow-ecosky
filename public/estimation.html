@@ -1,4 +1,6 @@
-@@ -4,6 +4,14 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Estimation détaillée — RMS EcoSky</title>
@@ -13,60 +15,270 @@
 <style>
   * { box-sizing: border-box; }
   body {
-@@ -1240,6 +1248,9 @@ <h1>Votre estimation personnalisée</h1>
-      });
-      const data = await res.json();
-      if (data.success) {
-        if (typeof gtag === "function") {
-          gtag("event", "conversion", { send_to: "AW-17738090056/vVjOCIDsgsIbEMiMl4pC" });
-        }
-        renderSuccess(data);
-      } else {
-        renderError(data.error || "Merci de réessayer dans quelques instants.");
-<!--
-  INTÉGRATION dans public/estimation.html, à l'étape où le téléphone
-  est saisi (step 2 d'après le formulaire actuel).
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #14312a;
+  }
+  .split-layout {
+    display: flex;
+    min-height: 100vh;
+  }
+  .image-panel {
+    flex: 1 1 45%;
+    position: relative;
+    overflow: hidden;
+    background: #14312a;
+  }
+  .image-panel img {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+  }
+  .image-panel img.active { opacity: 1; }
+  .image-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(20,49,42,0.55) 0%, rgba(20,49,42,0.15) 35%, rgba(20,49,42,0.55) 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+  .image-panel-title {
+    position: absolute;
+    top: 50%;
+    left: 32px;
+    right: 32px;
+    transform: translateY(-50%);
+    z-index: 2;
+    color: #fff;
+    font-size: clamp(1.6rem, 3vw, 2.4rem);
+    font-weight: 700;
+    line-height: 1.25;
+    text-align: center;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.35);
+  }
+  @media (max-width: 800px) {
+    .image-panel-title { font-size: 1.3rem; left: 20px; right: 20px; }
+  }
+  .catalogue-cta {
+    position: absolute;
+    left: 24px;
+    bottom: 24px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    background: rgba(255,255,255,0.96);
+    border-radius: 12px;
+    padding: 10px 16px 10px 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .catalogue-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,0,0,0.3); }
+  .catalogue-cta img {
+    position: static;
+    width: 46px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    opacity: 1;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  }
+  .catalogue-cta .catalogue-cta-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+  }
+  .catalogue-cta .catalogue-cta-text strong { color: #14312a; font-size: 13.5px; font-weight: 700; }
+  .catalogue-cta .catalogue-cta-text span { color: #4a5a54; font-size: 11.5px; }
+  @media (max-width: 800px) {
+    .catalogue-cta { left: 16px; bottom: 16px; padding: 8px 12px 8px 8px; }
+    .catalogue-cta img { width: 38px; height: 50px; }
+  }
+  .form-panel {
+    flex: 1 1 55%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .form-bg-video {
+    position: absolute;
+    top: 50%; left: 50%;
+    min-width: 100%; min-height: 100%;
+    width: auto; height: auto;
+    transform: translate(-50%, -50%);
+    object-fit: cover;
+    z-index: -2;
+  }
+  .form-bg-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: -1;
+    background: rgba(246,244,239,0.55);
+  }
+  @media (max-width: 800px) {
+    .split-layout { flex-direction: column; }
+    .image-panel { flex: 0 0 220px; }
+    .form-panel { padding: 28px 20px 60px; }
+  }
 
-  1) Suppose qu'il existe déjà un <input id="telephone" ...>
-     juste après ce champ, ajouter le bloc HTML ci-dessous.
-  2) Ajouter le bloc <style> dans le <head> ou la feuille de style existante.
-  3) Ajouter le bloc <script> avant la fermeture de </body>, ou dans le
-     script principal existant.
-  4) Le bouton final "Suivant" / "Continuer" de l'étape 2 doit être
-     désactivé tant que window.telephoneVerifie !== true — voir la
-     fonction exposée verifierAvantEtapeSuivante() en bas.
--->
+  /* Optimisations pour téléphones (petits écrans) */
+  @media (max-width: 480px) {
+    .image-panel { flex: 0 0 160px; }
+    .form-panel { padding: 20px 16px 48px; }
+    .header-block { padding: 12px 14px; margin-bottom: 16px; }
+    h1 { font-size: 19px; }
+    .sub { font-size: 13.5px; margin-bottom: 18px; }
+    .card { padding: 16px; }
+    .question { font-size: 15px; }
+    .option { padding: 12px 14px; font-size: 14px; }
 
-<!-- ================= HTML à insérer sous le champ téléphone ================= -->
-<div id="smsVerifBlock" style="margin-top:10px;">
-  <p style="font-size:0.82rem; color:#5b6b64; margin-bottom:10px; line-height:1.4;">
-    Cette vérification nous permet de nous assurer qu'un vrai numéro est associé à votre demande,
-    pour éviter les robots et vous garantir une réponse de notre part.
-  </p>
-  <button type="button" id="btnEnvoyerCode" class="btn-secondaire-sms">
-    Vérifier mon numéro par SMS
-  </button>
+    /* Empêche le zoom automatique de Safari iOS sur les champs (nécessite 16px min) */
+    input[type="text"], input[type="tel"], input[type="email"], input[type="number"] {
+      font-size: 16px;
+      padding: 11px 12px;
+    }
 
-  <div id="smsCodeZone" style="display:none; margin-top:12px;">
-    <label for="smsCode" style="display:block; font-weight:600; font-size:0.88rem; margin-bottom:6px;">
-      Code reçu par SMS
-    </label>
-    <div style="display:flex; gap:8px;">
-      <input type="text" id="smsCode" inputmode="numeric" maxlength="6" placeholder="123456"
-             style="flex:1; padding:12px 14px; border:1.5px solid #d8e3de; border-radius:10px; font-size:1.1rem; letter-spacing:0.2em; text-align:center;">
-      <button type="button" id="btnVerifierCode" class="btn-secondaire-sms">Valider</button>
-    </div>
-    <div id="smsRenvoyer" style="margin-top:8px; font-size:0.82rem; color:#5b6b64;">
-      <span id="smsCountdown"></span>
-      <a href="#" id="lienRenvoyerCode" style="display:none; color:#1e6f4c;">Renvoyer le code</a>
-    </div>
-  </div>
+    .nav-row { flex-wrap: wrap; }
+    button.btn { font-size: 14px; padding: 12px 16px; }
+    .btn-primary { flex: 1 1 100%; order: 1; }
+    .btn-ghost { order: 2; padding: 8px 0; }
 
-  <div id="smsStatus" style="margin-top:8px; font-size:0.85rem;"></div>
-</div>
+    .trust-footer .trust-badges { gap: 10px; font-size: 11px; }
+    .trust-footer .legal-line { font-size: 10.5px; }
+  }
+  .wrap { max-width: 480px; width: 100%; margin: 0; padding: 0; }
+  .header-block {
+    margin-bottom: 20px;
+    background: rgba(255,255,255,0.7);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+  .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 1px; color: #1e6f4c; text-transform: uppercase; }
+  h1 { font-size: 22px; margin: 6px 0 8px; }
+  .sub { font-size: 14px; color: #5b6b64; margin: 0 0 24px; line-height: 1.5; }
 
-<!-- ================= CSS ================= -->
-<style>
+  .progress { display: flex; gap: 4px; margin-bottom: 26px; }
+  .progress-seg { flex: 1; height: 4px; border-radius: 2px; background: #e0ddd2; }
+  .progress-seg.done { background: #1e6f4c; }
+
+  .card { background: white; border: 1px solid #e2e0d5; border-radius: 14px; padding: 22px; box-shadow: 0 4px 18px rgba(20,49,42,0.06); }
+  .step-label { font-size: 12px; color: #8a9490; margin-bottom: 6px; }
+  .question { font-size: 16px; font-weight: 600; margin: 0 0 16px; line-height: 1.4; }
+
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .option {
+    border: 1.5px solid #d8e3de;
+    border-radius: 10px;
+    padding: 13px 16px;
+    font-size: 14.5px;
+    cursor: pointer;
+    background: white;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .option:hover { border-color: #1e6f4c; }
+  .option.selected { border-color: #1e6f4c; background: #eaf4ef; font-weight: 600; }
+  .color-swatch {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    margin-right: 10px;
+    vertical-align: middle;
+    border: 1.5px solid rgba(0,0,0,0.12);
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.5);
+  }
+  .color-preview {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: white;
+    border: 1.5px solid #d8e3de;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+  .color-preview-swatch {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    border: 1.5px solid rgba(0,0,0,0.12);
+    background-size: cover;
+    background-position: center;
+  }
+  .color-preview-text { font-size: 13px; color: #4a5a54; }
+  .color-limit-note { font-size: 12px; color: #8a9490; margin-top: 8px; }
+
+  input[type="text"], input[type="tel"], input[type="email"], input[type="number"] {
+    width: 100%;
+    border: 1.5px solid #d8e3de;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 15px;
+    margin-bottom: 12px;
+    font-family: inherit;
+  }
+  input:focus { outline: none; border-color: #1e6f4c; }
+  label.field-label { display: block; font-size: 12.5px; color: #5b6b64; margin-bottom: 4px; font-weight: 600; }
+
+  .nav-row { display: flex; justify-content: space-between; margin-top: 22px; gap: 10px; }
+  button.btn {
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 14.5px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-primary { background: #1e6f4c; color: white; flex: 1; }
+  .btn-primary:disabled { opacity: 0.45; cursor: default; }
+  .btn-ghost { background: transparent; color: #5b6b64; }
+
+  .result-box {
+    background: #eaf4ef;
+    border: 1.5px solid #1e6f4c;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 10px;
+  }
+  .result-price { font-size: 26px; font-weight: 800; color: #14312a; margin: 6px 0; }
+  .result-note { font-size: 13px; color: #4a5a54; line-height: 1.5; }
+  .disclaimer { font-size: 12px; color: #8a9490; margin-top: 14px; line-height: 1.5; }
+
+  .success-icon { font-size: 40px; text-align: center; margin-bottom: 8px; }
+
+  .trust-footer {
+    margin-top: 28px;
+    padding-top: 18px;
+    border-top: 1px solid #e2e0d5;
+    font-size: 11.5px;
+    color: #8a9490;
+    line-height: 1.6;
+    text-align: center;
+  }
+  .trust-footer .trust-badges {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #4a5a54;
+    font-weight: 600;
+  }
+  .trust-footer .trust-badges span { display: inline-flex; align-items: center; gap: 5px; }
+  .trust-footer .legal-line { color: #14312a; }
+
+  /* ---- Vérification SMS du téléphone (étape identité) ---- */
   .btn-secondaire-sms {
     background: #eef4f0;
     color: #1e6f4c;
@@ -83,126 +295,1194 @@
   .sms-status-error { color: #991b1b; }
   .sms-status-loading { color: #5b6b64; }
 </style>
+</head>
+<body>
+<div class="split-layout">
+  <div class="image-panel" id="heroImagePanel">
+    <div class="image-panel-title">Le sol qui tient tête<br>aux hivers bretons.<br><span style="display:block; margin-top:14px; font-size:0.45em; font-weight:600; opacity:0.9;">EcoSky — créé en 2007, fêtera bientôt ses 20 ans d'existence</span></div>
+    <a class="catalogue-cta"
+       href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf"
+       target="_blank" rel="noopener"
+       onclick="window.va && window.va('event', { name: 'catalogue_telecharge' }); notifyCatalogueDownloadEstimation();">
+      <img src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-cover.jpg" alt="Catalogue Réalisations EcoSky">
+      <span class="catalogue-cta-text">
+        <strong>📄 Voir le catalogue</strong>
+        <span>Nos réalisations en photos</span>
+      </span>
+    </a>
+  </div>
+  <div class="form-panel">
+    <video class="form-bg-video" autoplay muted loop playsinline>
+      <source src="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/VIDEO-2026-07-13-22-59-06.mp4" type="video/mp4" />
+    </video>
+    <div class="form-bg-overlay"></div>
+    <div class="wrap">
+      <div class="header-block">
+        <div class="eyebrow">RMS EcoSky — Estimation détaillée</div>
+        <h1>Votre estimation personnalisée</h1>
+        <p class="sub" style="margin-bottom:0;">Répondez à quelques questions sur votre projet pour recevoir une estimation la plus précise possible, envoyée directement par mail.</p>
+      </div>
+      <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px; font-size:12.5px; color:#4a5a54;">
+        <span>✅ Sans engagement</span>
+        <span>⏱️ Réponse sous 24h</span>
+        <span>🔒 Données confidentielles</span>
+      </div>
 
-<!-- ================= JS ================= -->
+      <a href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf"
+         target="_blank" rel="noopener"
+         onclick="window.va && window.va('event', { name: 'catalogue_telecharge' }); notifyCatalogueDownloadEstimation();"
+         style="display:inline-flex; align-items:center; gap:8px; margin-bottom:20px; padding:10px 16px; border:1px solid #14312a; border-radius:8px; color:#14312a; text-decoration:none; font-size:13.5px; font-weight:600; background:#fff;">
+        📄 Pas encore prêt·e ? Téléchargez le catalogue EcoSky'Gum
+      </a>
+
+      <div class="progress" id="progress"></div>
+      <div class="card" id="card"></div>
+
+      <div class="trust-footer">
+        <div class="trust-badges">
+          <span>🛡️ Assurance décennale ERGO France</span>
+          <span>🏛️ RCS Lorient 939 997 870</span>
+        </div>
+        <div class="legal-line">
+          RMS EcoSky — RESINE MARBRE SOL, SASU au capital de 50&nbsp;000&nbsp;€<br/>
+          23 Route de Corn Er Hoet, 56400 Brech — SIRET 939 997 870 00018<br/>
+          Assurance responsabilité civile décennale n° SV75020721/11590 — ERGO France<br/>
+          <a href="https://www.ecosky.fr" target="_blank" rel="noopener noreferrer" style="color:#1e6f4c;">www.ecosky.fr</a>
+          &nbsp;—&nbsp;
+          <a href="mailto:infos@ecosky.fr" style="color:#1e6f4c;">infos@ecosky.fr</a>
+        </div>
+        <div id="footerCallback" style="margin-top:14px;">
+          <button class="btn" id="btnFooterCallback" style="background:white; border:1.5px solid #1e6f4c; color:#14312a; padding:10px 18px; font-size:13px; font-weight:700; border-radius:10px; cursor:pointer;">
+            📞 Être rappelé
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
-  window.telephoneVerifie = false; // exposé globalement pour bloquer la suite du formulaire
+  const API_URL = "https://salesflow-ecosky.vercel.app/api/submit-estimation";
+  const APPOINTMENT_API_URL = "https://salesflow-ecosky.vercel.app/api/estimation-appointment";
+  const CALLBACK_API_URL = "https://salesflow-ecosky.vercel.app/api/request-callback";
+  const TRACK_CLICK_URL = "https://salesflow-ecosky.vercel.app/api/track-click";
+  const SMS_NOUVEAU_CLIC_URL = "https://salesflow-ecosky.vercel.app/api/sms-nouveau-clic";
+  const SMS_CATALOGUE_DOWNLOAD_URL = "https://salesflow-ecosky.vercel.app/api/sms-catalogue-download";
 
-  const btnEnvoyer = document.getElementById("btnEnvoyerCode");
-  const btnVerifier = document.getElementById("btnVerifierCode");
-  const codeZone = document.getElementById("smsCodeZone");
-  const codeInput = document.getElementById("smsCode");
-  const statusBox = document.getElementById("smsStatus");
-  const countdownEl = document.getElementById("smsCountdown");
-  const lienRenvoyer = document.getElementById("lienRenvoyerCode");
-  const telephoneInput = document.getElementById("telephone"); // adapter l'id si différent
-
-  let countdownTimer = null;
-
-  function setStatus(msg, type) {
-    statusBox.textContent = msg;
-    statusBox.className = type ? `sms-status-${type}` : "";
+  function notifyCatalogueDownloadEstimation() {
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      const source = qs.get("fbclid") ? "Meta" : (qs.get("gclid") ? "Google Ads" : (qs.get("utm_source") || "estimation.html"));
+      fetch(SMS_CATALOGUE_DOWNLOAD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source,
+          utm_campaign: qs.get("utm_campaign"),
+        }),
+      }).catch(() => {});
+    } catch (e) {}
   }
+  window.notifyCatalogueDownloadEstimation = notifyCatalogueDownloadEstimation;
 
-  function startCountdown(seconds) {
-    let remaining = seconds;
-    lienRenvoyer.style.display = "none";
-    countdownEl.textContent = `Renvoi possible dans ${remaining}s`;
-    clearInterval(countdownTimer);
-    countdownTimer = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(countdownTimer);
-        countdownEl.textContent = "";
-        lienRenvoyer.style.display = "inline";
-      } else {
-        countdownEl.textContent = `Renvoi possible dans ${remaining}s`;
+  // ---------- Diaporama plein panneau (côté gauche) ----------
+  const FORM_BG_IMAGES = [
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/1.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/2.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/3.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/4.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/5.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/6.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/7.jpg",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/8.JPG",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/9.JPG",
+    "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/terrasse.jpg",
+  ];
+  const FORM_BG_INTERVAL_MS = 2000;
+
+  (function initFormBgSlideshow() {
+    const container = document.getElementById("heroImagePanel");
+    if (!container || FORM_BG_IMAGES.length === 0) return;
+    const imgs = FORM_BG_IMAGES.map((src, i) => {
+      const img = document.createElement("img");
+      img.src = src;
+      if (i === 0) img.className = "active";
+      container.appendChild(img);
+      return img;
+    });
+    if (imgs.length <= 1) return;
+    let index = 0;
+    setInterval(() => {
+      imgs[index].classList.remove("active");
+      index = (index + 1) % imgs.length;
+      imgs[index].classList.add("active");
+    }, FORM_BG_INTERVAL_MS);
+  })();
+
+  // ---------- Tracking des clics pub + SMS immédiat ----------
+  (function trackAdClickIfNeeded() {
+    const params = new URLSearchParams(window.location.search);
+    const fbclid = params.get("fbclid");
+    const gclid = params.get("gclid");
+    const utmSource = params.get("utm_source");
+    const isFromAd = !!fbclid || !!gclid || utmSource === "facebook" || utmSource === "google";
+    if (!isFromAd) return;
+
+    const dedupeKey = fbclid || gclid || "generic";
+    let alreadyTracked = null;
+    try { alreadyTracked = sessionStorage.getItem("ecosky_click_tracked_key"); } catch (e) {}
+    if (alreadyTracked === dedupeKey) return;
+    try { sessionStorage.setItem("ecosky_click_tracked_key", dedupeKey); } catch (e) {}
+
+    let sessionId = null;
+    try {
+      sessionId = localStorage.getItem("ecosky_chat_session");
+      if (!sessionId) {
+        sessionId = "web_" + crypto.randomUUID();
+        localStorage.setItem("ecosky_chat_session", sessionId);
       }
-    }, 1000);
-  }
-
-  async function envoyerCode() {
-    const telephone = telephoneInput ? telephoneInput.value.trim() : "";
-    if (!telephone) {
-      setStatus("Merci de saisir votre numéro de téléphone d'abord.", "error");
-      return;
+    } catch (e) {
+      sessionId = "web_" + Date.now();
     }
-    btnEnvoyer.disabled = true;
-    setStatus("Envoi du code en cours…", "loading");
-    try {
-      const res = await fetch("/api/verify-send-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telephone }),
+
+    const utmCampaign = params.get("utm_campaign");
+
+    fetch(TRACK_CLICK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionId,
+        fbclid,
+        gclid,
+        ad_id: params.get("ad_id"),
+        utm_source: utmSource,
+        utm_campaign: utmCampaign,
+        utm_medium: params.get("utm_medium"),
+        landing_page: window.location.href,
+        referrer: document.referrer || null,
+      }),
+    }).catch(() => {});
+  })();
+
+  const COLOR_SWATCHES = {
+    rouge_brique: "#AC4034",
+    rouge_vif: "#C1121C",
+    vert_fonce: "#316650",
+    vert_clair: "#468641",
+    orange: "#E75B12",
+    vert_reseda: "#5E8351",
+    jaune: "#F3DA0B",
+    bleu_fonce: "#154889",
+    gris_noir: "#2F3234",
+    marron: "#4D3324",
+    beige: "#C6B286",
+    ocre: "#CB8F00",
+    gris_souris: "#7C7C7B",
+    gris_clair: "#CFD0CF",
+    blanc_perle: "#E3D9C6",
+    blanc_casse: "#E6D2B5",
+    sable: "#AF8050",
+    bleu_petrole: "#234856",
+    bleu_moyen: "#2271B3",
+    bleu_clair: "#3481B8",
+    bleu_pastel: "#7FB0B7",
+    violet: "#4A203B",
+    lilas: "#6C4675",
+    rose: "#B24C8C",
+    beige_jaune: "#AF8050",
+  };
+
+  const COLOR_LABELS = {
+    rouge_brique: "Rouge brique — RAL 3016",
+    rouge_vif: "Rouge vif — RAL 3020",
+    vert_fonce: "Vert foncé — RAL 6028",
+    vert_clair: "Vert clair — RAL 6017",
+    orange: "Orange — RAL 2008",
+    vert_reseda: "Vert réséda — RAL 6011",
+    jaune: "Jaune — RAL 1018",
+    bleu_fonce: "Bleu foncé — RAL 5005",
+    gris_noir: "Anthracite (Gris noir) — RAL 7021",
+    marron: "Marron — RAL 8028",
+    beige: "Beige — RAL 1001",
+    ocre: "Ocre — RAL 1005",
+    gris_souris: "Gris souris — RAL 7037",
+    gris_clair: "Gris clair — RAL 7047",
+    blanc_perle: "Blanc perle — RAL 1013",
+    blanc_casse: "Blanc cassé — RAL 1015",
+    sable: "Sable — RAL 1011",
+    bleu_petrole: "Bleu pétrole — RAL 5001",
+    bleu_moyen: "Bleu moyen — RAL 5015",
+    bleu_clair: "Bleu clair — RAL 5012",
+    bleu_pastel: "Bleu pastel — RAL 5024",
+    violet: "Violet — RAL 4007",
+    lilas: "Lilas — RAL 4005",
+    rose: "Rose — RAL 4010",
+  };
+
+  const state = {
+    step: 0,
+    leadId: null,
+    usage: null,
+    support_pieton: null,
+    etat_dalle: null,
+    enlevement_carrelage: null,
+    etat_terrain_carrossable: null,
+    bordure: null,
+    bordure_metres: "",
+    couleur_granulat: null,
+    surface: "",
+    age_batiment: null,
+    delai: null,
+    coloris: [],
+    ville: "",
+    code_postal: "",
+    nom: "",
+    prenom: "",
+    telephone: "",
+    email: "",
+    telephoneVerifie: false,
+    telephoneVerifieNumero: null,
+    _smsCountdownTimer: null,
+  };
+
+  function getSteps() {
+    const s = [];
+
+    s.push({
+      key: "usage",
+      question: "Quel est le type de projet ?",
+      type: "choice",
+      options: [
+        ["pieton", "Terrasse, tour de piscine ou allée piétonne"],
+        ["carrossable", "Parking ou allée pour véhicule (carrossable)"],
+      ],
+    });
+
+    s.push({ key: "identite", question: "Vos coordonnées", type: "identity" });
+
+    if (state.usage === "pieton") {
+      s.push({
+        key: "support_pieton",
+        question: "Quel est le support actuel ?",
+        type: "choice",
+        options: [
+          ["dalle_beton", "Dalle béton existante"],
+          ["carrelage", "Carrelage existant"],
+          ["pave", "Pavé autobloquant existant"],
+          ["terrain_nu", "Terrain nu, rien n'existe"],
+        ],
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "Erreur lors de l'envoi du code.");
-      codeZone.style.display = "block";
-      setStatus("Code envoyé par SMS. Il peut prendre quelques secondes à arriver.", "ok");
-      startCountdown(30);
-    } catch (err) {
-      setStatus(err.message, "error");
-    } finally {
-      btnEnvoyer.disabled = false;
-    }
-  }
 
-  async function verifierCode() {
-    const telephone = telephoneInput ? telephoneInput.value.trim() : "";
-    const code = codeInput.value.trim();
-    if (!code) {
-      setStatus("Merci de saisir le code reçu.", "error");
-      return;
+      if (state.support_pieton === "dalle_beton") {
+        s.push({
+          key: "etat_dalle",
+          question: "Dans quel état est la dalle ?",
+          type: "choice",
+          options: [
+            ["bon_etat", "Bon état"],
+            ["a_reprendre", "Fissurée / nécessite réparation"],
+          ],
+        });
+      }
+      if (state.support_pieton === "carrelage") {
+        s.push({
+          key: "enlevement_carrelage",
+          question: "Qui retire les carreaux existants avant notre intervention ?",
+          type: "choice",
+          options: [
+            ["client", "Je m'en charge moi-même"],
+            ["rms", "RMS ECOSKY s'en charge"],
+          ],
+        });
+      }
     }
-    btnVerifier.disabled = true;
-    setStatus("Vérification en cours…", "loading");
-    try {
-      const res = await fetch("/api/verify-check-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telephone, code }),
+
+    if (state.usage === "carrossable") {
+      s.push({
+        key: "etat_terrain_carrossable",
+        question: "Dans quel état est le terrain actuellement ?",
+        type: "choice",
+        options: [
+          ["terre_nue", "Terre nue, rien n'est fait"],
+          ["deja_prepare", "Terrain déjà préparé / stabilisé"],
+        ],
       });
-      const data = await res.json();
-      if (!data.success || !data.verified) throw new Error(data.error || "Code invalide.");
-      window.telephoneVerifie = true;
-      setStatus("✓ Numéro vérifié.", "ok");
-      btnEnvoyer.style.display = "none";
-      codeZone.style.display = "none";
-    } catch (err) {
-      window.telephoneVerifie = false;
-      setStatus(err.message, "error");
-    } finally {
-      btnVerifier.disabled = false;
+      s.push({
+        key: "bordure",
+        question: "Souhaitez-vous une bordure autour de la zone ?",
+        type: "choice",
+        options: [
+          ["oui", "Oui"],
+          ["non", "Non"],
+        ],
+      });
+      if (state.bordure === "oui") {
+        s.push({
+          key: "bordure_metres",
+          question: "Longueur de bordure souhaitée, en mètres linéaires ?",
+          type: "number",
+          placeholder: "Ex : 12",
+        });
+      }
+      s.push({
+        key: "couleur_granulat",
+        question: "Quelle couleur de granulat souhaitez-vous ?",
+        type: "choice",
+        options: [
+          ["beige_jaune", "Beige / Sable — RAL 1011 (inclus dans le prix de base)"],
+          ["autre", "Une autre couleur (+50€ HT/m²)"],
+        ],
+      });
+    }
+
+    s.push({
+      key: "surface",
+      question: "Quelle surface représente le projet, en m² environ ?",
+      type: "number",
+      placeholder: "Ex : 25",
+    });
+    s.push({
+      key: "age_batiment",
+      question: "Le bâtiment concerné a-t-il plus de 2 ans ?",
+      type: "choice",
+      options: [
+        ["plus_2_ans", "Oui, plus de 2 ans (TVA 10%)"],
+        ["moins_2_ans", "Non, moins de 2 ans (TVA 20%)"],
+      ],
+    });
+    s.push({
+      key: "delai",
+      question: "Sous quel délai souhaitez-vous réaliser ce projet ?",
+      type: "choice",
+      options: [
+        ["urgent", "Le plus vite possible"],
+        ["1_3_mois", "Dans 1 à 3 mois"],
+        ["plus_tard", "Plus tard / pas encore défini"],
+      ],
+    });
+    if (state.usage === "pieton") {
+      s.push({
+        key: "coloris",
+        question: "Quel coloris EcoSky'Gum vous fait envie ?",
+        type: "multi-color",
+        maxSelection: 2,
+        options: [
+          ["gris_souris", COLOR_LABELS.gris_souris],
+          ["gris_noir", COLOR_LABELS.gris_noir],
+          ["gris_clair", COLOR_LABELS.gris_clair],
+          ["beige", COLOR_LABELS.beige],
+          ["sable", COLOR_LABELS.sable],
+          ["ocre", COLOR_LABELS.ocre],
+          ["blanc_perle", COLOR_LABELS.blanc_perle],
+          ["blanc_casse", COLOR_LABELS.blanc_casse],
+          ["marron", COLOR_LABELS.marron],
+          ["jaune", COLOR_LABELS.jaune],
+          ["orange", COLOR_LABELS.orange],
+          ["rouge_brique", COLOR_LABELS.rouge_brique],
+          ["rouge_vif", COLOR_LABELS.rouge_vif],
+          ["rose", COLOR_LABELS.rose],
+          ["violet", COLOR_LABELS.violet],
+          ["lilas", COLOR_LABELS.lilas],
+          ["bleu_fonce", COLOR_LABELS.bleu_fonce],
+          ["bleu_petrole", COLOR_LABELS.bleu_petrole],
+          ["bleu_moyen", COLOR_LABELS.bleu_moyen],
+          ["bleu_clair", COLOR_LABELS.bleu_clair],
+          ["bleu_pastel", COLOR_LABELS.bleu_pastel],
+          ["vert_fonce", COLOR_LABELS.vert_fonce],
+          ["vert_clair", COLOR_LABELS.vert_clair],
+          ["vert_reseda", COLOR_LABELS.vert_reseda],
+          ["pas_encore", "Pas encore décidé"],
+        ],
+      });
+    }
+    s.push({ key: "localisation", question: "Où se situe le projet ?", type: "location" });
+
+    return s;
+  }
+
+  const cardEl = document.getElementById("card");
+  const progressEl = document.getElementById("progress");
+
+  function renderProgress() {
+    const steps = getSteps();
+    progressEl.innerHTML = "";
+    const total = steps.length + 1;
+    for (let i = 0; i < total; i++) {
+      const seg = document.createElement("div");
+      seg.className = "progress-seg" + (i <= state.step ? " done" : "");
+      progressEl.appendChild(seg);
     }
   }
 
-  btnEnvoyer.addEventListener("click", envoyerCode);
-  btnVerifier.addEventListener("click", verifierCode);
-  lienRenvoyer.addEventListener("click", (e) => {
-    e.preventDefault();
-    envoyerCode();
-  });
+  function canProceed(s) {
+    if (!s) return true;
+    if (s.type === "choice") return !!state[s.key];
+    if (s.type === "multi-color") return Array.isArray(state[s.key]) && state[s.key].length > 0;
+    if (s.type === "number") return state[s.key] && parseFloat(state[s.key]) > 0;
+    if (s.type === "location") return state.code_postal && state.code_postal.length === 5;
+    if (s.type === "identity")
+      return (
+        state.nom &&
+        state.telephone &&
+        state.telephone.length >= 8 &&
+        state.email &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email) &&
+        state.telephoneVerifie === true
+      );
+    return true;
+  }
 
-  // Si le client modifie le numéro après vérification, on invalide la vérification
-  if (telephoneInput) {
-    telephoneInput.addEventListener("input", () => {
-      if (window.telephoneVerifie) {
-        window.telephoneVerifie = false;
-        btnEnvoyer.style.display = "inline-block";
-        setStatus("Numéro modifié — merci de le revérifier.", "error");
+  function generateSpeckleDataUrl(colors, size) {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#e9e6dd";
+    ctx.fillRect(0, 0, size, size);
+
+    const grainCount = Math.round((size * size) / 9);
+    for (let i = 0; i < grainCount; i++) {
+      const pick = colors.length === 1 ? colors[0] : colors[Math.random() < 0.5 ? 0 : 1];
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const r = 1.2 + Math.random() * 2.3;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r, r * (0.75 + Math.random() * 0.4), Math.random() * Math.PI, 0, Math.PI * 2);
+      ctx.fillStyle = pick;
+      ctx.globalAlpha = 0.65 + Math.random() * 0.35;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    return canvas.toDataURL();
+  }
+
+  function buildColorPreview(selected) {
+    if (!Array.isArray(selected) || selected.length === 0) return "";
+    const real = selected.filter((v) => v !== "pas_encore" && COLOR_SWATCHES[v]);
+    if (real.length === 0) return "";
+
+    if (real.length === 1) {
+      const dataUrl = generateSpeckleDataUrl([COLOR_SWATCHES[real[0]]], 110);
+      return `
+        <div class="color-preview">
+          <div class="color-preview-swatch" style="background-image:url(${dataUrl});"></div>
+          <div class="color-preview-text">${COLOR_LABELS[real[0]] || real[0]}</div>
+        </div>
+      `;
+    }
+
+    const dataUrl = generateSpeckleDataUrl([COLOR_SWATCHES[real[0]], COLOR_SWATCHES[real[1]]], 110);
+    return `
+      <div class="color-preview">
+        <div class="color-preview-swatch" style="background-image:url(${dataUrl});"></div>
+        <div class="color-preview-text">Mélange 50/50 : ${COLOR_LABELS[real[0]] || real[0]} + ${COLOR_LABELS[real[1]] || real[1]}</div>
+      </div>
+    `;
+  }
+
+  function renderStep() {
+    const steps = getSteps();
+    if (state.step >= steps.length) state.step = steps.length - 1;
+    const s = steps[state.step];
+
+    let html = `<div class="step-label">Étape ${state.step + 1} sur ${steps.length}</div>`;
+    html += `<div class="question">${s.question}</div>`;
+
+    if (s.type === "choice") {
+      html += '<div class="options">';
+      s.options.forEach(([val, label]) => {
+        const sel = state[s.key] === val ? " selected" : "";
+        const swatch = COLOR_SWATCHES[val]
+          ? `<span class="color-swatch" style="background:${COLOR_SWATCHES[val]};"></span>`
+          : "";
+        html += `<div class="option${sel}" data-val="${val}">${swatch}${label}</div>`;
+      });
+      html += "</div>";
+    } else if (s.type === "multi-color") {
+      html += `<p style="font-size:13px; color:#5b6b64; margin:-8px 0 16px; line-height:1.5;">
+        Choisissez <strong>une seule couleur</strong> pour un rendu uni, ou <strong>deux couleurs</strong>
+        pour un mélange 50/50 — ce qu'on appelle un <strong>moucheté</strong> chez EcoSky'Gum. Cliquez sur
+        une couleur pour la sélectionner, puis sur une deuxième si vous voulez un mélange.
+      </p>`;
+      html += buildColorPreview(state[s.key]);
+      html += '<div class="options">';
+      s.options.forEach(([val, label]) => {
+        const chosen = Array.isArray(state[s.key]) && state[s.key].includes(val);
+        const sel = chosen ? " selected" : "";
+        const swatch = COLOR_SWATCHES[val]
+          ? `<span class="color-swatch" style="background:${COLOR_SWATCHES[val]};"></span>`
+          : "";
+        html += `<div class="option${sel}" data-val="${val}">${swatch}${label}${chosen ? " ✓" : ""}</div>`;
+      });
+      html += "</div>";
+      html += `<div class="color-limit-note">Sélectionnez 1 ou 2 couleurs maximum. Avec 2 couleurs, le mélange se fait à 50/50.</div>`;
+    } else if (s.type === "number") {
+      html += `<input type="number" id="inputNum" placeholder="${s.placeholder}" value="${state[s.key]}" min="1" />`;
+    } else if (s.type === "location") {
+      html += `
+        <label class="field-label">Ville</label>
+        <input type="text" id="inputVille" placeholder="Ex : Brech" value="${state.ville}" />
+        <label class="field-label">Code postal</label>
+        <input type="text" id="inputCP" placeholder="Ex : 56400" value="${state.code_postal}" maxlength="5" />
+      `;
+    } else if (s.type === "identity") {
+      html += `
+        <label class="field-label">Nom</label>
+        <input type="text" id="inputNom" value="${state.nom}" />
+        <label class="field-label">Prénom</label>
+        <input type="text" id="inputPrenom" value="${state.prenom}" />
+        <label class="field-label">Téléphone (pour être recontacté par un technicien)</label>
+        <input type="tel" id="inputTel" value="${state.telephone}" placeholder="06 XX XX XX XX" />
+
+        <div id="smsVerifBlock" style="margin: -2px 0 16px;">
+          <p style="font-size:0.8rem; color:#5b6b64; margin-bottom:10px; line-height:1.4;">
+            Cette vérification nous permet de nous assurer qu'un vrai numéro est associé à votre demande,
+            pour éviter les robots et vous garantir une réponse de notre part.
+          </p>
+          <button type="button" id="btnEnvoyerCode" class="btn-secondaire-sms">
+            Vérifier mon numéro par SMS
+          </button>
+          <div id="smsCodeZone" style="display:none; margin-top:12px;">
+            <label for="smsCode" style="display:block; font-weight:600; font-size:0.85rem; margin-bottom:6px;">
+              Code reçu par SMS
+            </label>
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="smsCode" inputmode="numeric" maxlength="6" placeholder="123456"
+                     style="flex:1; margin-bottom:0; letter-spacing:0.2em; text-align:center;">
+              <button type="button" id="btnVerifierCode" class="btn-secondaire-sms">Valider</button>
+            </div>
+            <div id="smsRenvoyer" style="margin-top:8px; font-size:0.8rem; color:#5b6b64;">
+              <span id="smsCountdown"></span>
+              <a href="#" id="lienRenvoyerCode" style="display:none; color:#1e6f4c;">Renvoyer le code</a>
+            </div>
+          </div>
+          <div id="smsStatus" style="margin-top:8px; font-size:0.83rem;"></div>
+        </div>
+
+        <label class="field-label">Email (pour recevoir l'estimation)</label>
+        <input type="email" id="inputEmail" value="${state.email}" />
+      `;
+    }
+
+    html += `
+      <div class="nav-row">
+        <button class="btn btn-ghost" id="btnBack" ${state.step === 0 ? "style='visibility:hidden'" : ""}>← Retour</button>
+        <button class="btn btn-primary" id="btnNext" disabled>Continuer</button>
+      </div>
+    `;
+
+    cardEl.innerHTML = html;
+    wireStepEvents(s, steps);
+    document.getElementById("btnNext").disabled = !canProceed(s);
+  }
+
+  function wireStepEvents(s, steps) {
+    if (s.type === "choice") {
+      cardEl.querySelectorAll(".option").forEach((el) => {
+        el.addEventListener("click", () => {
+          state[s.key] = el.dataset.val;
+          renderProgress();
+          renderStep();
+        });
+      });
+    } else if (s.type === "multi-color") {
+      if (!Array.isArray(state[s.key])) state[s.key] = [];
+      cardEl.querySelectorAll(".option").forEach((el) => {
+        el.addEventListener("click", () => {
+          const val = el.dataset.val;
+          let current = state[s.key];
+          if (val === "pas_encore") {
+            current = current.includes("pas_encore") ? [] : ["pas_encore"];
+          } else {
+            current = current.filter((v) => v !== "pas_encore");
+            if (current.includes(val)) {
+              current = current.filter((v) => v !== val);
+            } else if (current.length < (s.maxSelection || 2)) {
+              current = [...current, val];
+            } else {
+              current = [current[1], val];
+            }
+          }
+          state[s.key] = current;
+          renderProgress();
+          renderStep();
+        });
+      });
+    } else if (s.type === "number") {
+      const input = document.getElementById("inputNum");
+      input.addEventListener("input", () => {
+        state[s.key] = input.value;
+        document.getElementById("btnNext").disabled = !canProceed(s);
+      });
+      input.focus();
+    } else if (s.type === "location") {
+      const ville = document.getElementById("inputVille");
+      const cp = document.getElementById("inputCP");
+      ville.addEventListener("input", () => { state.ville = ville.value; });
+      cp.addEventListener("input", () => {
+        state.code_postal = cp.value;
+        document.getElementById("btnNext").disabled = !canProceed(s);
+      });
+      ville.focus();
+    } else if (s.type === "identity") {
+      const nom = document.getElementById("inputNom");
+      const prenom = document.getElementById("inputPrenom");
+      const tel = document.getElementById("inputTel");
+      const email = document.getElementById("inputEmail");
+
+      const btnEnvoyerCode = document.getElementById("btnEnvoyerCode");
+      const btnVerifierCode = document.getElementById("btnVerifierCode");
+      const smsCodeZone = document.getElementById("smsCodeZone");
+      const smsCodeInput = document.getElementById("smsCode");
+      const smsStatusBox = document.getElementById("smsStatus");
+      const smsCountdownEl = document.getElementById("smsCountdown");
+      const smsLienRenvoyer = document.getElementById("lienRenvoyerCode");
+
+      function smsSetStatus(msg, type) {
+        smsStatusBox.textContent = msg;
+        smsStatusBox.className = type ? `sms-status-${type}` : "";
+      }
+
+      function smsStartCountdown(seconds) {
+        let remaining = seconds;
+        smsLienRenvoyer.style.display = "none";
+        smsCountdownEl.textContent = `Renvoi possible dans ${remaining}s`;
+        clearInterval(state._smsCountdownTimer);
+        state._smsCountdownTimer = setInterval(() => {
+          remaining -= 1;
+          if (remaining <= 0) {
+            clearInterval(state._smsCountdownTimer);
+            smsCountdownEl.textContent = "";
+            smsLienRenvoyer.style.display = "inline";
+          } else {
+            smsCountdownEl.textContent = `Renvoi possible dans ${remaining}s`;
+          }
+        }, 1000);
+      }
+
+      function smsShowVerifiedUI() {
+        btnEnvoyerCode.style.display = "none";
+        smsCodeZone.style.display = "none";
+        smsSetStatus("✓ Numéro vérifié.", "ok");
+      }
+
+      async function smsEnvoyerCode() {
+        const telephoneVal = tel.value.trim();
+        if (!telephoneVal || telephoneVal.length < 8) {
+          smsSetStatus("Merci de saisir un numéro de téléphone valide d'abord.", "error");
+          return;
+        }
+        btnEnvoyerCode.disabled = true;
+        smsSetStatus("Envoi du code en cours…", "loading");
+        try {
+          const res = await fetch("/api/verify-send-code", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ telephone: telephoneVal }),
+          });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || "Erreur lors de l'envoi du code.");
+          smsCodeZone.style.display = "block";
+          smsSetStatus("Code envoyé par SMS. Il peut prendre quelques secondes à arriver.", "ok");
+          smsStartCountdown(30);
+        } catch (err) {
+          smsSetStatus(err.message, "error");
+        } finally {
+          btnEnvoyerCode.disabled = false;
+        }
+      }
+
+      async function smsVerifierCode() {
+        const telephoneVal = tel.value.trim();
+        const code = smsCodeInput.value.trim();
+        if (!code) {
+          smsSetStatus("Merci de saisir le code reçu.", "error");
+          return;
+        }
+        btnVerifierCode.disabled = true;
+        smsSetStatus("Vérification en cours…", "loading");
+        try {
+          const res = await fetch("/api/verify-check-code", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ telephone: telephoneVal, code }),
+          });
+          const data = await res.json();
+          if (!data.success || !data.verified) throw new Error(data.error || "Code invalide.");
+          state.telephoneVerifie = true;
+          state.telephoneVerifieNumero = telephoneVal;
+          smsShowVerifiedUI();
+          document.getElementById("btnNext").disabled = !canProceed(s);
+        } catch (err) {
+          state.telephoneVerifie = false;
+          smsSetStatus(err.message, "error");
+        } finally {
+          btnVerifierCode.disabled = false;
+        }
+      }
+
+      btnEnvoyerCode.addEventListener("click", smsEnvoyerCode);
+      btnVerifierCode.addEventListener("click", smsVerifierCode);
+      smsLienRenvoyer.addEventListener("click", (e) => {
+        e.preventDefault();
+        smsEnvoyerCode();
+      });
+
+      // Si déjà vérifié pour ce même numéro (retour arrière puis suivant), on l'affiche directement
+      if (state.telephoneVerifie && state.telephoneVerifieNumero === tel.value.trim()) {
+        smsShowVerifiedUI();
+      }
+
+      [nom, prenom, tel, email].forEach((el) => {
+        el.addEventListener("input", () => {
+          state.nom = nom.value;
+          state.prenom = prenom.value;
+          state.telephone = tel.value;
+          state.email = email.value;
+          if (state.telephoneVerifie && state.telephoneVerifieNumero !== tel.value.trim()) {
+            state.telephoneVerifie = false;
+            btnEnvoyerCode.style.display = "inline-block";
+            smsCodeZone.style.display = "none";
+            smsSetStatus("Numéro modifié — merci de le revérifier.", "error");
+          }
+          document.getElementById("btnNext").disabled = !canProceed(s);
+        });
+      });
+      nom.focus();
+
+      // Recherche automatique : si ce numéro correspond à un lead déjà
+      // capté via le formulaire instantané Meta, on remplit nom/prénom/
+      // email tout seul, sans que la personne ait à les retaper.
+      let lookupTimer = null;
+      tel.addEventListener("input", () => {
+        clearTimeout(lookupTimer);
+        const digits = tel.value.replace(/\D/g, "");
+        if (digits.length < 9) return;
+        lookupTimer = setTimeout(async () => {
+          try {
+            const res = await fetch(
+              `https://salesflow-ecosky.vercel.app/api/lookup-lead-by-phone?telephone=${encodeURIComponent(tel.value)}`
+            );
+            const data = await res.json();
+            if (data.found) {
+              if (!nom.value && data.nom) { nom.value = data.nom; state.nom = data.nom; }
+              if (!prenom.value && data.prenom) { prenom.value = data.prenom; state.prenom = data.prenom; }
+              if (!email.value && data.email) { email.value = data.email; state.email = data.email; }
+              document.getElementById("btnNext").disabled = !canProceed(s);
+            }
+          } catch (e) {
+            // silencieux : la personne peut toujours remplir manuellement
+          }
+        }, 600);
+      });
+    }
+
+    document.getElementById("btnBack").addEventListener("click", () => {
+      if (state.step > 0) {
+        state.step -= 1;
+        renderProgress();
+        renderStep();
+      }
+    });
+    document.getElementById("btnNext").addEventListener("click", () => {
+      if (!canProceed(s)) return;
+      if (s.type === "identity") {
+        savePartialLead();
+      }
+      if (state.step < steps.length - 1) {
+        state.step += 1;
+        renderProgress();
+        renderStep();
+      } else {
+        submitForm();
       }
     });
   }
 
-  // À appeler avant de laisser passer à l'étape suivante du formulaire
-  window.verifierAvantEtapeSuivante = function () {
-    if (!window.telephoneVerifie) {
-      setStatus("Merci de vérifier votre numéro par SMS avant de continuer.", "error");
-      codeZone.scrollIntoView({ behavior: "smooth", block: "center" });
-      return false;
+  const SAVE_PARTIAL_URL = "https://salesflow-ecosky.vercel.app/api/save-partial-lead";
+  let partialLeadSaved = false;
+
+  function savePartialLead() {
+    if (partialLeadSaved) return;
+    partialLeadSaved = true;
+    fetch(SAVE_PARTIAL_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nom: state.nom,
+        prenom: state.prenom,
+        telephone: state.telephone,
+        type_projet: state.usage,
+      }),
+    }).catch(() => {});
+  }
+
+  function renderLoading() {
+    cardEl.innerHTML = `<div style="text-align:center; padding: 30px 0; color:#5b6b64;">Calcul de votre estimation en cours...</div>`;
+  }
+
+  function renderError(message) {
+    cardEl.innerHTML = `
+      <div style="text-align:center; padding: 10px 0;">
+        <div class="question">Un souci est survenu</div>
+        <p class="sub">${message}</p>
+        <button class="btn btn-primary" id="btnRetry">Réessayer</button>
+      </div>
+    `;
+    document.getElementById("btnRetry").addEventListener("click", submitForm);
+  }
+
+  function renderSuccess(data) {
+    const est = data.estimation || {};
+    state.leadId = data.lead_id || null;
+    state.lastEstimationTexte = est.texte || "";
+
+    let priceBlock = "";
+    if (est.chiffrable) {
+      priceBlock = `
+        <div class="result-box">
+          <div class="result-note">Estimation indicative</div>
+          <div class="result-price">${est.montantTTC} € TTC</div>
+          <div class="result-note">${est.texte}</div>
+        </div>
+      `;
+    } else {
+      priceBlock = `
+        <div class="result-box">
+          <div class="result-note">${est.texte || "Votre projet nécessite une évaluation personnalisée."}</div>
+        </div>
+      `;
     }
-    return true;
-  };
+    const remiseBlock = est.chiffrable
+      ? `
+        <div style="background:#eaf4ef; border:1.5px solid #1e6f4c; border-radius:10px; padding:12px 14px; margin-top:10px; font-size:13px; color:#14312a; text-align:center;">
+          🎁 <strong>Remise de ${est.remisePourcent}% possible selon le volume</strong><br/>
+          Soit <strong>${est.montantApresRemise} €</strong> au lieu de ${est.montantTTC} € — contactez un
+          technicien pour voir si vous pouvez en bénéficier.
+        </div>
+      `
+      : "";
+
+    cardEl.innerHTML = `
+      <div class="success-icon">✅</div>
+      <div class="question" style="text-align:center;">Merci ${state.prenom || ""} !</div>
+      ${priceBlock}
+      <p class="disclaimer">
+        Cette estimation reste indicative et devra être confirmée par l'un de nos techniciens lors
+        d'un appel téléphonique. Vous recevrez ce récapitulatif par mail dans quelques instants.
+      </p>
+      <div id="appointmentSection">
+        ${remiseBlock}
+        <button class="btn btn-primary" id="btnWantAppointment" style="width:100%; margin-top:10px;">
+          📅 Prendre rendez-vous à un horaire précis — pour connaître précisément ce qui est réellement
+          inclus et voir si vous pouvez bénéficier de la remise
+        </button>
+        <button class="btn" id="btnWantCallback" style="width:100%; margin-top:8px; background:white; border:1.5px solid #1e6f4c; color:#14312a;">
+          📞 Être rappelé rapidement (sans rendez-vous précis)
+        </button>
+        <div id="callbackFeedback"></div>
+      </div>
+    `;
+    document.getElementById("btnWantAppointment").addEventListener("click", showSlots);
+    document.getElementById("btnWantCallback").addEventListener("click", requestCallback);
+  }
+
+  const CALLBACK_ALLOWED_DEPARTMENTS = ["56", "22", "29", "35", "44"];
+  function isPostalCodeInZone(cp) {
+    if (!cp || cp.length < 2) return true;
+    return CALLBACK_ALLOWED_DEPARTMENTS.includes(cp.trim().slice(0, 2));
+  }
+
+  document.getElementById("btnFooterCallback").addEventListener("click", handleFooterCallbackClick);
+
+  function handleFooterCallbackClick() {
+    if (state.nom && state.telephone) {
+      if (!isPostalCodeInZone(state.code_postal)) {
+        showOutOfZoneMessage();
+        return;
+      }
+      sendFooterCallback(state.nom, state.prenom, state.telephone, state.code_postal || "");
+      return;
+    }
+    const container = document.getElementById("footerCallback");
+    container.innerHTML = `
+      <div style="max-width:320px; margin:0 auto; text-align:left;">
+        <input type="text" id="footerNom" placeholder="Votre nom" style="width:100%; border:1.5px solid #d8e3de; border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:8px;" />
+        <input type="tel" id="footerTel" placeholder="Votre téléphone" style="width:100%; border:1.5px solid #d8e3de; border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:8px;" />
+        <input type="text" id="footerCP" placeholder="Code postal" maxlength="5" style="width:100%; border:1.5px solid #d8e3de; border-radius:10px; padding:10px 12px; font-size:14px; margin-bottom:10px;" />
+        <button class="btn btn-primary" id="btnFooterCallbackConfirm" style="width:100%; padding:10px;">Confirmer</button>
+      </div>
+    `;
+    document.getElementById("btnFooterCallbackConfirm").addEventListener("click", () => {
+      const nom = document.getElementById("footerNom").value.trim();
+      const tel = document.getElementById("footerTel").value.trim();
+      const cp = document.getElementById("footerCP").value.trim();
+      if (!nom || tel.length < 8) return;
+      if (!isPostalCodeInZone(cp)) {
+        showOutOfZoneMessage();
+        return;
+      }
+      sendFooterCallback(nom, "", tel, cp);
+    });
+  }
+
+  function showOutOfZoneMessage() {
+    const container = document.getElementById("footerCallback");
+    container.innerHTML = `<div style="font-size:17px; font-weight:600; color:#991b1b; max-width:320px; margin:0 auto;">Désolé, nous n'intervenons pas dans votre secteur / département.</div>`;
+  }
+
+  async function sendFooterCallback(nom, prenom, telephone, code_postal) {
+    const container = document.getElementById("footerCallback");
+    container.innerHTML = `<div style="font-size:13px; color:#5b6b64;">Envoi en cours...</div>`;
+    try {
+      const res = await fetch(CALLBACK_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: state.leadId,
+          nom,
+          prenom,
+          telephone,
+          code_postal: code_postal || "",
+          estimation_texte: state.lastEstimationTexte || "",
+        }),
+      });
+      const data = await res.json();
+      container.innerHTML = data.success
+        ? `<div style="font-size:13px; color:#1e6f4c; font-weight:600;">✅ Demande envoyée, on vous rappelle très vite !</div>`
+        : `<div style="font-size:13px; color:#991b1b;">${data.error || "Réessayez dans un instant."}</div>`;
+    } catch (err) {
+      container.innerHTML = `<div style="font-size:13px; color:#991b1b;">Impossible d'envoyer la demande. Réessayez.</div>`;
+    }
+  }
+
+
+  async function requestCallback() {
+    const btn = document.getElementById("btnWantCallback");
+    const feedback = document.getElementById("callbackFeedback");
+    btn.disabled = true;
+    btn.textContent = "Envoi en cours...";
+    try {
+      const res = await fetch(CALLBACK_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: state.leadId,
+          nom: state.nom,
+          prenom: state.prenom,
+          telephone: state.telephone,
+          estimation_texte: state.lastEstimationTexte || "",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        btn.style.display = "none";
+        feedback.innerHTML = `<div class="result-box" style="margin-top:10px;"><div class="result-note">✅ Demande envoyée ! Un conseiller RMS ECOSKY va vous rappeler très rapidement.</div></div>`;
+      } else {
+        btn.disabled = false;
+        btn.textContent = "📞 Être rappelé rapidement (sans rendez-vous précis)";
+        feedback.innerHTML = `<div style="text-align:center; padding:8px 0; color:#991b1b; font-size:13px;">${data.error || "Réessayez dans un instant."}</div>`;
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "📞 Être rappelé rapidement (sans rendez-vous précis)";
+      feedback.innerHTML = `<div style="text-align:center; padding:8px 0; color:#991b1b; font-size:13px;">Impossible d'envoyer la demande. Réessayez.</div>`;
+    }
+  }
+
+  async function showSlots() {
+    const section = document.getElementById("appointmentSection");
+    section.innerHTML = `<div style="text-align:center; padding: 14px 0; color:#5b6b64; font-size:13.5px;">Recherche des créneaux disponibles...</div>`;
+    try {
+      const res = await fetch(APPOINTMENT_API_URL, { method: "GET" });
+      const data = await res.json();
+      if (!data.success || !data.slots || data.slots.length === 0) {
+        section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#5b6b64; font-size:13.5px;">Aucun créneau disponible pour le moment. Un conseiller RMS ECOSKY vous recontactera directement.</div>`;
+        return;
+      }
+      renderSlotChoices(data.slots);
+    } catch (err) {
+      section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#991b1b; font-size:13.5px;">Impossible de récupérer les créneaux. Réessayez dans un instant.</div>`;
+    }
+  }
+
+  function renderSlotChoices(slots) {
+    const section = document.getElementById("appointmentSection");
+    const optionsHtml = slots
+      .map((iso) => {
+        const label = new Intl.DateTimeFormat("fr-FR", {
+          weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+          timeZone: "Europe/Paris",
+        }).format(new Date(iso));
+        return `<div class="option" data-iso="${iso}">${label}</div>`;
+      })
+      .join("");
+    section.innerHTML = `
+      <div class="step-label" style="margin-top:12px;">Choisissez un créneau d'appel avec un technicien</div>
+      <div class="options" id="slotOptions">${optionsHtml}</div>
+    `;
+    section.querySelectorAll(".option").forEach((el) => {
+      el.addEventListener("click", () => bookSlot(el.dataset.iso));
+    });
+  }
+
+  async function bookSlot(iso) {
+    const section = document.getElementById("appointmentSection");
+    section.innerHTML = `<div style="text-align:center; padding: 14px 0; color:#5b6b64; font-size:13.5px;">Confirmation du rendez-vous...</div>`;
+    try {
+      const res = await fetch(APPOINTMENT_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: state.leadId,
+          start_time_iso: iso,
+          nom: state.nom,
+          prenom: state.prenom,
+          email: state.email,
+          telephone: state.telephone,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        section.innerHTML = `
+          <div class="result-box" style="margin-top:12px;">
+            <div class="result-note">✅ Rendez-vous confirmé</div>
+            <div class="result-price" style="font-size:18px;">${data.formatted_date}</div>
+            <div class="result-note">Un technicien RMS ECOSKY vous appellera à ce créneau pour détailler votre devis, les contraintes éventuelles et les remises possibles.</div>
+          </div>
+        `;
+      } else {
+        section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#991b1b; font-size:13.5px;">${data.error || "La réservation a échoué, réessayez."}</div>`;
+      }
+    } catch (err) {
+      section.innerHTML = `<div style="text-align:center; padding: 10px 0; color:#991b1b; font-size:13.5px;">Impossible de confirmer le rendez-vous. Réessayez dans un instant.</div>`;
+    }
+  }
+
+  async function submitForm() {
+    renderLoading();
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nom: state.nom,
+          prenom: state.prenom,
+          telephone: state.telephone,
+          email: state.email || null,
+          adresse_projet: state.ville,
+          code_postal: state.code_postal,
+          type_projet: state.usage,
+          answers: {
+            usage: state.usage,
+            support_pieton: state.support_pieton,
+            etat_dalle: state.etat_dalle,
+            enlevement_carrelage: state.enlevement_carrelage,
+            etat_terrain_carrossable: state.etat_terrain_carrossable,
+            bordure: state.bordure,
+            bordure_metres: state.bordure_metres,
+            couleur_granulat: state.couleur_granulat,
+            surface: state.surface,
+            age_batiment: state.age_batiment,
+            delai: state.delai,
+            coloris: state.coloris,
+            ville: state.ville,
+            code_postal: state.code_postal,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (typeof gtag === "function") {
+          gtag("event", "conversion", { send_to: "AW-17738090056/vVjOCIDsgsIbEMiMl4pC" });
+        }
+        renderSuccess(data);
+      } else {
+        renderError(data.error || "Merci de réessayer dans quelques instants.");
+      }
+    } catch (err) {
+      renderError("Impossible de contacter le serveur pour le moment. Merci de réessayer.");
+    }
+  }
+
+  // ---------- Pré-remplissage depuis le formulaire instantané Meta ----------
+  (function prefillFromMetaLeadForm() {
+    const params = new URLSearchParams(window.location.search);
+    const fullName = params.get("full_name") || params.get("nom_complet") || "";
+    const email = params.get("email") || "";
+    const phone = params.get("phone_number") || params.get("telephone") || "";
+
+    if (fullName) {
+      const parts = fullName.trim().split(/\s+/);
+      state.prenom = parts.shift() || "";
+      state.nom = parts.join(" ");
+    }
+    if (email) state.email = email;
+    if (phone) state.telephone = phone;
+  })();
+
+  // ---------- Pré-remplissage fiable via l'email automatique ----------
+  (async function prefillFromLeadId() {
+    const params = new URLSearchParams(window.location.search);
+    const leadId = params.get("lead_id");
+    if (!leadId) return;
+    try {
+      const res = await fetch(
+        `https://salesflow-ecosky.vercel.app/api/lookup-lead-by-id?lead_id=${encodeURIComponent(leadId)}`
+      );
+      const data = await res.json();
+      if (data.found) {
+        if (data.nom) state.nom = data.nom;
+        if (data.prenom) state.prenom = data.prenom;
+        if (data.email) state.email = data.email;
+        if (data.telephone) state.telephone = data.telephone;
+        state.leadId = leadId;
+
+        if (params.get("rdv") === "1") {
+          renderDirectRdv();
+          return;
+        }
+
+        renderStep();
+      }
+    } catch (e) {
+      // silencieux : la personne peut toujours remplir manuellement
+    }
+  })();
+
+  function renderDirectRdv() {
+    const cardEl = document.getElementById("card");
+    cardEl.innerHTML = `
+      <div class="success-icon">✅</div>
+      <div class="question" style="text-align:center;">Merci ${state.prenom || ""} !</div>
+      <p class="disclaimer">
+        Votre dossier est complet. Choisissez un créneau pour qu'un technicien vous appelle,
+        ou demandez à être rappelé rapidement.
+      </p>
+      <div id="appointmentSection">
+        <button class="btn btn-primary" id="btnWantAppointment" style="width:100%; margin-top:10px;">
+          📅 Prendre rendez-vous à un horaire précis
+        </button>
+        <button class="btn" id="btnWantCallback" style="width:100%; margin-top:8px; background:white; border:1.5px solid #1e6f4c; color:#14312a;">
+          📞 Être rappelé rapidement (sans rendez-vous précis)
+        </button>
+        <div id="callbackFeedback"></div>
+      </div>
+    `;
+    document.getElementById("btnWantAppointment").addEventListener("click", showSlots);
+    document.getElementById("btnWantCallback").addEventListener("click", requestCallback);
+  }
+
+  renderProgress();
+  renderStep();
 })();
 </script>
+
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>
