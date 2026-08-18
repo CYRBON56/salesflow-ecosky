@@ -2,13 +2,12 @@
 // Reçoit les réponses du formulaire d'estimation détaillée (10 questions),
 // calcule une estimation indicative, génère un PDF "ESTIMATEUR" (numéroté,
 // non engageant), sauvegarde le lead dans Supabase, et envoie par EMAIL le
-// lien/PDF à la fois au client et au propriétaire de RMS ECOSKY. Un SEUL
-// SMS Twilio subsiste : après l'envoi, on demande au client par SMS
-// l'adresse exacte du chantier et un lien pour envoyer des photos.
+// lien/PDF à la fois au client et au propriétaire de RMS ECOSKY. Le SMS de
+// demande d'adresse/photos n'est PAS automatique : il se déclenche
+// manuellement depuis le tableau de bord (bouton "Adresse & photos").
 
 import { PDFDocument, StandardFonts, rgb, PDFName, PDFString, PDFArray } from "pdf-lib";
 import { LOGO_ECOSKY_BASE64 } from "./_logo-ecosky-base64.js";
-import { sendSms } from "./_sms.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -693,18 +692,6 @@ export default async function handler(req, res) {
       pdfBytes,
       pdfFilename: `estimation-${numero}.pdf`,
     });
-
-    // SMS au client (conservé volontairement, seul SMS restant du parcours) :
-    // demande de l'adresse exacte du chantier et invitation à envoyer des
-    // photos via une petite page dédiée, pour affiner l'estimation.
-    if (phoneE164 && inZone && leadId) {
-      const photosUrl = `https://salesflow-ecosky.vercel.app/photos.html?lead_id=${leadId}`;
-      const smsBody =
-        `Merci pour votre demande sur RMS ECOSKY ! Pour affiner votre estimation, ` +
-        `pouvez-vous nous indiquer l'adresse exacte du chantier et nous envoyer quelques photos ? ` +
-        `Ça prend 2 minutes, c'est ici : ${photosUrl}`;
-      await sendSms(phoneE164, smsBody);
-    }
 
     return res.status(200).json({ success: true, estimation, lead_id: leadId, numero, pdf_url: pdfUrl });
   } catch (err) {
