@@ -2,12 +2,12 @@
 // Reçoit les réponses du formulaire d'estimation détaillée (10 questions),
 // calcule une estimation indicative, génère un PDF "ESTIMATEUR" (numéroté,
 // non engageant), sauvegarde le lead dans Supabase, et envoie par EMAIL le
-// lien/PDF à la fois au client et au propriétaire de RMS ECOSKY (canal
-// unique — les notifications SMS Twilio ont été retirées).
+// lien/PDF à la fois au client et au propriétaire de RMS ECOSKY. Un SEUL
+// SMS Twilio subsiste : après l'envoi, on demande au client par SMS
+// l'adresse exacte du chantier et un lien pour envoyer des photos.
 
 import { PDFDocument, StandardFonts, rgb, PDFName, PDFString, PDFArray } from "pdf-lib";
 import { LOGO_ECOSKY_BASE64 } from "./_logo-ecosky-base64.js";
-import { sendEmail as sendEmailBase } from "./_email.js";
 import { sendSms } from "./_sms.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
