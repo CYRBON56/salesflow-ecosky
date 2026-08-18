@@ -1,18 +1,17 @@
 // api/submit-estimation.js
 // Reçoit les réponses du formulaire d'estimation détaillée (10 questions),
 // calcule une estimation indicative, génère un PDF "ESTIMATEUR" (numéroté,
-// non engageant), sauvegarde le lead dans Supabase, et envoie un SMS avec le
-// lien du PDF à la fois au client et au propriétaire de RMS ECOSKY.
+// non engageant), sauvegarde le lead dans Supabase, et envoie par EMAIL le
+// lien/PDF à la fois au client et au propriétaire de RMS ECOSKY (canal
+// unique — les notifications SMS Twilio ont été retirées).
 
 import { PDFDocument, StandardFonts, rgb, PDFName, PDFString, PDFArray } from "pdf-lib";
 import { LOGO_ECOSKY_BASE64 } from "./_logo-ecosky-base64.js";
+import { sendEmail as sendEmailBase } from "./_email.js";
+import { sendSms } from "./_sms.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
-const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER; // numéro du propriétaire RMS ECOSKY
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 // Adresse d'envoi : doit appartenir à un domaine vérifié dans Resend (ex. estimation@ecoskybyrms.fr)
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "estimation@ecoskybyrms.fr";
@@ -31,7 +30,6 @@ const ENTREPRISE = {
   ville: "56400 BRECH",
   siret: "SIRET : 939 997 870 00018 — APE 4399D",
   rcs: "RCS Lorient 939 997 870",
-  // RCS : ville du greffe à confirmer avant activation (ex. "RCS Lorient 939 997 870")
   assurance: "Assurance RC décennale n° SV75020721/11590 (ERGO France)",
   contact: "infos@ecosky.fr / c.bon@ecosky.fr",
 };
@@ -63,41 +61,10 @@ function toE164(phone) {
   return "+" + digits;
 }
 
-async function sendSms(to, body) {
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER || !to) {
-    console.error("Twilio: configuration manquante ou numéro absent, SMS non envoyé.");
-    return false;
-  }
-  try {
-    const params = new URLSearchParams({ To: to, From: TWILIO_FROM_NUMBER, Body: body });
-    const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString("base64");
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${auth}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: params.toString(),
-      }
-    );
-    if (!res.ok) {
-      console.error("Twilio SMS error:", await res.text());
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error("sendSms error:", err.message);
-    return false;
-  }
-}
-
-// Envoi d'email via l'API Resend (https://resend.com). Contrairement au SMS
-// Twilio (bloqué en mode trial pour tout numéro non vérifié), l'email n'a
-// pas cette limitation — c'est pourquoi il sert de canal de secours/parallèle
-// tant que le compte Twilio n'est pas passé en payant. PDF joint en base64
-// quand disponible ; sinon, le mail part quand même avec le texte seul.
+// Envoi d'email via l'API Resend, avec gestion des pièces jointes (PDF +
+// logo intégré) — version étendue de sendEmail pour ce fichier, qui a
+// besoin des pièces jointes (les autres fichiers utilisent la version de
+// base dans _email.js).
 async function sendEmail({ to, subject, html, pdfBytes, pdfFilename, includeLogo }) {
   if (!RESEND_API_KEY || !to) {
     console.error("Resend: configuration manquante ou destinataire absent, email non envoyé.");
@@ -141,8 +108,7 @@ async function sendEmail({ to, subject, html, pdfBytes, pdfFilename, includeLogo
 
 // Template HTML professionnel pour l'email client : en-tête avec logo,
 // message clair (transmission + rappel que le technicien doit affiner),
-// bloc estimation, et pied de page avec les mentions légales — cohérent
-// avec le PDF joint et le bandeau de confiance du formulaire.
+// bloc estimation, et pied de page avec les mentions légales.
 function buildClientEmailHtml({ prenom, estimation, numero, remiseHtml }) {
   return `
   <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; color: #14312a;">
@@ -178,11 +144,6 @@ function buildClientEmailHtml({ prenom, estimation, numero, remiseHtml }) {
 }
 
 // ---------- Calcul de l'estimation ----------
-// Reprend exactement les mêmes règles de prix que Skyeco (chat), pour rester
-// cohérent partout : 115€ HT/m² sur dalle existante, à partir de 150€ HT/m²
-// pour un parking carrossable. Les autres cas (terrain nu, etc.) ne sont pas
-// chiffrables en ligne de façon fiable — on l'indique clairement plutôt que
-// d'inventer un prix.
 function computeEstimation(answers) {
   const surface = parseFloat(answers.surface);
   const usage = answers.usage; // "pieton" | "carrossable"
@@ -215,7 +176,6 @@ function computeEstimation(answers) {
         prixM2 = 115;
         note = "prix applicable une fois les carreaux existants retirés par vos soins";
       } else {
-        // RMS ECOSKY doit retirer les carreaux : pas de prix fixe en ligne
         chiffrable = false;
       }
     } else if (support === "pave") {
@@ -223,7 +183,6 @@ function computeEstimation(answers) {
       note =
         "prix de départ : le tarif définitif dépend de l'état des pavés existants et sera validé par un technicien";
     } else {
-      // terrain nu, usage piéton : pas de tarif en ligne
       chiffrable = false;
     }
   } else if (usage === "carrossable") {
@@ -263,10 +222,6 @@ function computeEstimation(answers) {
   const totalHT = montantHT + bordureHT;
   const montantTTC = Math.round(totalHT * (1 + tauxTVA));
 
-  // Remise selon le volume (montant TTC de l'estimation) : 5% en dessous de
-  // 5 000€, 10% entre 5 000€ et 10 000€, 15% à partir de 10 000€. Cette
-  // remise n'est PAS automatiquement appliquée au prix final : elle est
-  // affichée à titre indicatif, à confirmer avec un technicien.
   let remisePourcent = 5;
   if (montantTTC >= 10000) remisePourcent = 15;
   else if (montantTTC >= 5000) remisePourcent = 10;
@@ -286,11 +241,6 @@ function computeEstimation(answers) {
   };
 }
 
-// Détermine le statut de zone d'un code postal :
-// "core"     -> département couvert sans réserve (56, 29, 22, 35)
-// "extended" -> département limitrophe accepté, mais plus-value déplacement
-//               et faisabilité à valider par un technicien (44)
-// "out"      -> hors zone, refus automatique
 function getZoneStatus(codePostal) {
   if (!codePostal) return "core";
   const dept = String(codePostal).trim().slice(0, 2);
@@ -299,7 +249,6 @@ function getZoneStatus(codePostal) {
   return "out";
 }
 
-// ---------- Numérotation séquentielle (E-2026-07-001, E-2026-07-002...) ----------
 async function nextEstimationNumber() {
   const now = new Date();
   const prefix = `E-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-`;
@@ -310,13 +259,10 @@ async function nextEstimationNumber() {
     const count = (rows || []).length;
     return prefix + String(count + 1).padStart(3, "0");
   } catch (err) {
-    // En cas d'échec de la numérotation, on retombe sur un identifiant basé sur
-    // l'horodatage plutôt que de bloquer tout le processus.
     return prefix + String(Date.now()).slice(-4);
   }
 }
 
-// ---------- Génération du PDF "ESTIMATEUR" ----------
 const SUPPORT_LABELS = {
   dalle_beton: "Dalle béton existante",
   carrelage: "Carrelage existant",
@@ -325,9 +271,6 @@ const SUPPORT_LABELS = {
 };
 const USAGE_LABELS = { pieton: "Usage piéton", carrossable: "Usage carrossable (véhicule)" };
 
-// Désignation technique détaillée des travaux, selon le type de pose choisi
-// par le client dans le formulaire. Utilisée dans le PDF pour lister
-// précisément ce que comprend l'intervention.
 function buildDesignationLines(answers) {
   if (answers.usage === "pieton") {
     return [
@@ -362,9 +305,6 @@ function buildDesignationLines(answers) {
   return [];
 }
 
-// pdf-lib n'a pas d'API haut niveau pour les liens cliquables : on pose
-// une annotation de lien manuellement par-dessus une zone dessinée (ici,
-// le bouton "Prendre rendez-vous").
 function addLinkAnnotation(page, doc, { x, y, width, height, url }) {
   const linkAnnotation = doc.context.obj({
     Type: "Annot",
@@ -392,11 +332,11 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
 
-  const green = rgb(0.118, 0.435, 0.298); // #1e6f4c
+  const green = rgb(0.118, 0.435, 0.298);
   const dark = rgb(0.08, 0.09, 0.09);
   const grey = rgb(0.4, 0.42, 0.4);
   const lightBg = rgb(0.918, 0.957, 0.937);
-  const red = rgb(0.72, 0.15, 0.13); // #b82621 — section OPTIONS (suppléments potentiels)
+  const red = rgb(0.72, 0.15, 0.13);
 
   let y = 800;
   const marginX = 50;
@@ -415,7 +355,6 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
     page.drawLine({ start: { x: marginX, y: yy }, end: { x: pageWidth - marginX, y: yy }, thickness: 1, color });
   }
 
-  // Logo en haut à gauche
   let headerTextX = marginX;
   try {
     const logoBytes = Uint8Array.from(Buffer.from(LOGO_ECOSKY_BASE64, "base64"));
@@ -425,11 +364,9 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
     page.drawImage(logoImage, { x: marginX, y: 800 - logoHeight + 8, width: logoWidth, height: logoHeight });
     headerTextX = marginX + logoWidth + 12;
   } catch (logoErr) {
-    // Un échec d'intégration du logo ne doit jamais bloquer la génération du PDF.
     console.error("Logo PDF embed error:", logoErr.message);
   }
 
-  // En-tête entreprise (gauche)
   text(ENTREPRISE.nom, headerTextX, y, { bold: true, size: 15, color: green });
   y -= 16;
   text(ENTREPRISE.adresse, headerTextX, y, { size: 9, color: grey });
@@ -440,7 +377,6 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
   y -= 12;
   text(ENTREPRISE.contact, headerTextX, y, { size: 9, color: grey });
 
-  // Titre ESTIMATEUR (droite)
   text("ESTIMATEUR", pageWidth - marginX - 150, 800, { bold: true, size: 22, color: dark });
   text("Document non contractuel", pageWidth - marginX - 150, 782, { size: 9, color: grey });
   text(`N° ${numero}`, pageWidth - marginX - 150, 764, { bold: true, size: 10 });
@@ -451,7 +387,6 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
   line(y);
   y -= 26;
 
-  // Bloc client / chantier
   text("CLIENT", marginX, y, { bold: true, size: 10, color: green });
   text("ADRESSE DU PROJET", marginX + 280, y, { bold: true, size: 10, color: green });
   y -= 14;
@@ -476,7 +411,6 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
 
   y -= 26;
 
-  // Tableau estimation
   const tableTop = y;
   page.drawRectangle({ x: marginX, y: tableTop - 20, width: pageWidth - marginX * 2, height: 20, color: lightBg });
   text("Désignation", marginX + 8, tableTop - 14, { bold: true, size: 9.5 });
@@ -499,7 +433,6 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
       tableRow(`Bordure — ${answers.bordure_metres} m linéaires × 45€ HT/m`, null);
     }
 
-    // Désignation technique détaillée des travaux compris dans le prix
     const designationLines = buildDesignationLines(answers);
     if (designationLines.length > 0) {
       y -= 6;
@@ -541,8 +474,6 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
     y -= 20;
   }
 
-  // Bouton "Prendre rendez-vous" — cliquable, renvoie vers l'écran de RDV
-  // (sans repasser par le formulaire, les infos étant déjà en base).
   if (leadId) {
     const btnWidth = 260;
     const btnHeight = 26;
@@ -558,7 +489,6 @@ async function generateEstimatePdf({ numero, nom, prenom, adresse_projet, code_p
   text(estimation.texte, marginX, y, { size: 8.5, color: grey });
   y -= 40;
 
-  // Conditions — protège explicitement RMS ECOSKY
   text("CONDITIONS DE CET ESTIMATEUR", marginX, y, { bold: true, size: 10.5, color: green });
   y -= 18;
 
@@ -645,7 +575,7 @@ export default async function handler(req, res) {
       adresse_projet,
       code_postal,
       type_projet,
-      answers, // objet avec toutes les réponses détaillées (état, usage, surface, âge bâtiment, délai, coloris...)
+      answers,
     } = body;
 
     if (!nom || !telephone) {
@@ -654,7 +584,7 @@ export default async function handler(req, res) {
 
     const phoneE164 = toE164(telephone);
     const estimation = computeEstimation(answers || {});
-    const zoneStatus = getZoneStatus(code_postal); // "core" | "extended" | "out"
+    const zoneStatus = getZoneStatus(code_postal);
     const inZone = zoneStatus !== "out";
     const isExtendedZone = zoneStatus === "extended";
 
@@ -678,12 +608,6 @@ export default async function handler(req, res) {
         : "",
     };
 
-    // Le téléphone est unique dans la table leads : si un dossier existe déjà
-    // pour ce numéro (contact précédent par WhatsApp, chat, ou une estimation
-    // antérieure), on le MET À JOUR avec cette nouvelle estimation plutôt que
-    // d'essayer d'en créer un doublon, ce qui échouerait systématiquement.
-    // Fait AVANT la génération du PDF pour disposer de l'id du lead (utilisé
-    // pour le bouton "Prendre rendez-vous" cliquable dans le PDF).
     const existing = await supabaseRequest(
       `leads?telephone=eq.${encodeURIComponent(phoneE164 || telephone)}`
     );
@@ -726,51 +650,19 @@ export default async function handler(req, res) {
         });
       }
     } catch (pdfErr) {
-      // Un échec de génération/upload du PDF ne doit jamais empêcher
-      // l'enregistrement du lead ni l'envoi du SMS/email avec le texte seul.
       console.error("PDF estimateur error:", pdfErr.message);
     }
 
-    // SMS au client avec son estimation (zone cœur = message normal, zone
-    // élargie = même message + précision sur la validation distance, hors
-    // zone = refus poli).
-    if (phoneE164 && inZone) {
-      const pdfLine = pdfUrl ? ` Votre estimateur détaillé (n°${numero}) : ${pdfUrl}` : "";
-      const remiseLine = estimation.chiffrable
-        ? ` 🎁 Remise de ${estimation.remisePourcent}% possible selon le volume (${estimation.montantApresRemise}€ TTC au lieu de ${estimation.montantTTC}€) — contactez un technicien pour voir si vous pouvez en bénéficier.`
-        : "";
-      const zoneLine = isExtendedZone
-        ? " Votre secteur étant un peu excentré, une éventuelle plus-value de déplacement sera à valider par le technicien."
-        : "";
-      const clientMessage =
-        `Bonjour ${prenom || ""}, merci pour votre demande sur RMS ECOSKY ! ` +
-        `${estimation.texte} Cette estimation reste indicative et sera confirmée par l'un de nos techniciens lors d'un appel.${remiseLine}${zoneLine}${pdfLine} À très vite !`;
-      await sendSms(phoneE164, clientMessage);
-    } else if (phoneE164 && !inZone) {
-      await sendSms(
-        phoneE164,
-        "Bonjour, merci pour votre demande. Malheureusement RMS ECOSKY n'intervient pas dans votre secteur pour le moment. Bonne continuation dans votre projet !"
-      );
-    }
-
-    // SMS au propriétaire : nouveau lead qualifié avec toutes les réponses
-    const zoneNote = isExtendedZone
-      ? "\n⚠️ SECTEUR ÉLARGI (44) — vérifier distance, plus-value déplacement possible"
-      : "";
-    const ownerMessage =
-      `🔔 Nouvelle estimation détaillée ! (n°${numero})\n${prenom || ""} ${nom} — ${telephone}\n` +
-      `${type_projet || ""}${code_postal ? " — " + code_postal : ""}${zoneNote}\n` +
-      `${estimation.texte}${pdfUrl ? "\nPDF : " + pdfUrl : ""}`;
-    await sendSms(TWILIO_TO_NUMBER, ownerMessage);
-
-    // Email au client avec son estimateur en pièce jointe. Canal indépendant
-    // du SMS Twilio (qui reste bloqué en mode trial pour les numéros non
-    // vérifiés) — l'email part donc même quand le SMS client échoue.
+    // Email au client avec son estimateur en pièce jointe (canal unique de
+    // notification client, les SMS Twilio ont été retirés).
     if (email && inZone) {
       const remiseHtml = estimation.chiffrable
         ? `<div style="background:#fff7e6; border:1.5px solid #e8b74a; border-radius:10px; padding:14px 16px; margin:0 0 18px; font-size:13.5px;">🎁 <strong>Remise de ${estimation.remisePourcent}% possible selon le volume</strong> (${estimation.montantApresRemise}€ TTC au lieu de ${estimation.montantTTC}€) — contactez un technicien pour voir si vous pouvez en bénéficier.</div>`
         : "";
-      const clientHtml = buildClientEmailHtml({ prenom, estimation, numero, remiseHtml });
+      const zoneHtml = isExtendedZone
+        ? `<p style="font-size:13px; color:#4a5a54;">Votre secteur étant un peu excentré, une éventuelle plus-value de déplacement sera à valider par le technicien.</p>`
+        : "";
+      const clientHtml = buildClientEmailHtml({ prenom, estimation, numero, remiseHtml: remiseHtml + zoneHtml });
       await sendEmail({
         to: email,
         subject: `Votre estimation RMS EcoSky n°${numero}`,
@@ -787,18 +679,32 @@ export default async function handler(req, res) {
       });
     }
 
-    // Email au propriétaire : copie de la notification, avec le PDF joint
+    // Email au propriétaire : notification de nouveau prospect qualifié,
+    // avec le PDF joint (remplace l'ancien SMS Twilio).
+    const zoneNote = isExtendedZone ? " — ⚠️ secteur élargi (44)" : "";
     await sendEmail({
       to: OWNER_EMAIL,
       subject: `🔔 Nouvelle estimation détaillée n°${numero} — ${prenom || ""} ${nom}`,
       html:
         `<p>${prenom || ""} ${nom} — ${telephone}</p>` +
-        `<p>${type_projet || ""}${code_postal ? " — " + code_postal : ""}${isExtendedZone ? " — ⚠️ secteur élargi (44)" : ""}</p>` +
+        `<p>${type_projet || ""}${code_postal ? " — " + code_postal : ""}${zoneNote}</p>` +
         `<p>${estimation.texte}</p>` +
         (pdfUrl ? `<p>PDF : <a href="${pdfUrl}">${pdfUrl}</a></p>` : ""),
       pdfBytes,
       pdfFilename: `estimation-${numero}.pdf`,
     });
+
+    // SMS au client (conservé volontairement, seul SMS restant du parcours) :
+    // demande de l'adresse exacte du chantier et invitation à envoyer des
+    // photos via une petite page dédiée, pour affiner l'estimation.
+    if (phoneE164 && inZone && leadId) {
+      const photosUrl = `https://salesflow-ecosky.vercel.app/photos.html?lead_id=${leadId}`;
+      const smsBody =
+        `Merci pour votre demande sur RMS ECOSKY ! Pour affiner votre estimation, ` +
+        `pouvez-vous nous indiquer l'adresse exacte du chantier et nous envoyer quelques photos ? ` +
+        `Ça prend 2 minutes, c'est ici : ${photosUrl}`;
+      await sendSms(phoneE164, smsBody);
+    }
 
     return res.status(200).json({ success: true, estimation, lead_id: leadId, numero, pdf_url: pdfUrl });
   } catch (err) {
