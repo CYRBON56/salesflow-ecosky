@@ -489,13 +489,24 @@ function EmptyState({ onImport }) {
 }
 function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onCallbackHandled, onDelete, onWhatsApp, wa }) {
   const stageInfo = ALL_STAGES.find((s) => s.id === lead.stage) || ALL_STAGES[0];
+  const isClickOnly = !lead.telephone || lead.telephone === "";
   return (
-    <div style={{ background: "white", borderRadius: 10, border: lead.callback_demande ? "1px solid #dc2626" : "1px solid #e7e3d8", overflow: "hidden" }}>
+    <div style={{
+      background: isClickOnly ? "#fdf6ec" : "white",
+      borderRadius: 10,
+      border: lead.callback_demande ? "1px solid #dc2626" : (isClickOnly ? "1px solid #f0b93a" : "1px solid #e7e3d8"),
+      overflow: "hidden",
+    }}>
       <div style={{ display: "flex", alignItems: "center", padding: "14px 16px", gap: 14, cursor: "pointer" }} onClick={onToggle}>
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: stageInfo.color, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 15, color: TEAL_DARK, display: "flex", alignItems: "center", gap: 8 }}>
             {lead.nom}
+            {isClickOnly && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#7c5a0a", background: "#f7e2ae", borderRadius: 999, padding: "2px 8px" }}>
+                🖱️ Clic pub uniquement
+              </span>
+            )}
             {lead.callback_demande && (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#fff", background: "#dc2626", borderRadius: 999, padding: "2px 8px" }}>
                 <Phone size={10} /> À rappeler
@@ -503,7 +514,7 @@ function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onCal
             )}
           </div>
           <div style={{ fontSize: 13, color: "#64748b", display: "flex", gap: 10, marginTop: 2, flexWrap: "wrap" }}>
-            <span><Phone size={11} style={{ verticalAlign: -1 }} /> {lead.telephone}</span>
+            <span><Phone size={11} style={{ verticalAlign: -1 }} /> {lead.telephone || "—"}</span>
             {lead.source && <span>• {lead.source}</span>}
             {lead.callback_demande_le && (
               <span>• Demandé le {new Date(lead.callback_demande_le).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</span>
@@ -557,18 +568,20 @@ function LeadRow({ lead, expanded, onToggle, onStageChange, onNotesChange, onCal
               )}
             </div>
           )}
-          <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-            <button onClick={() => onWhatsApp("intro")} style={btnWA}>
-              <MessageCircle size={14} /> Message de prise de contact
-            </button>
-            <button onClick={() => onWhatsApp("catalogue")} style={btnWA}>
-              <FileText size={14} /> Envoyer le catalogue
-            </button>
-            <button onClick={() => onWhatsApp("devis")} style={btnWA}>
-              <Send size={14} /> Demander un devis (photos/vidéo)
-            </button>
-          </div>
-          <WhatsAppHistory wa={wa} />
+          {!isClickOnly && (
+            <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+              <button onClick={() => onWhatsApp("intro")} style={btnWA}>
+                <MessageCircle size={14} /> Message de prise de contact
+              </button>
+              <button onClick={() => onWhatsApp("catalogue")} style={btnWA}>
+                <FileText size={14} /> Envoyer le catalogue
+              </button>
+              <button onClick={() => onWhatsApp("devis")} style={btnWA}>
+                <Send size={14} /> Demander un devis (photos/vidéo)
+              </button>
+            </div>
+          )}
+          {!isClickOnly && <WhatsAppHistory wa={wa} />}
           <textarea
             value={lead.notes}
             onChange={(e) => onNotesChange(e.target.value)}
