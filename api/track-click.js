@@ -2,8 +2,11 @@
 // Enregistre chaque arrivée sur le site depuis une pub Facebook, Google Ads
 // (ou autre source trackée), même si la personne ne finit jamais par discuter
 // avec Skyeco. Appelé automatiquement par le widget de chat au chargement de la page.
-// Envoie aussi un SMS à Cyrille dès qu'un visiteur arrive via une pub Meta (fbclid ou ad_id)
-// ou une pub Google Ads (gclid), avec sa provenance géographique approximative (déduite de l'IP par Vercel).
+//
+// SMS "arrivée pub" DÉSACTIVÉ (demande Cyrille, 19/08/2026) — trop de
+// notifications avant même qu'un vrai prospect se manifeste. Le clic reste
+// enregistré en base pour les statistiques ; seul l'envoi du SMS est coupé.
+// Pour réactiver : décommenter le bloc d'appel à sendClickAlertSms plus bas.
 
 import { logSms } from "./_sms-log.js";
 
@@ -158,15 +161,10 @@ export default async function handler(req, res) {
       }),
     });
 
-    // SMS pour une arrivée identifiée comme venant d'une pub Meta
-    // (fbclid ou ad_id) OU d'une pub Google Ads (gclid) — pas pour
-    // chaque visite organique. On filtre aussi les provenances hors
-    // France : ce sont presque toujours des clics automatisés (bots de
-    // vérification qualité/anti-fraude de Google, souvent localisés aux
-    // US) plutôt que de vrais visiteurs — le clic reste enregistré en
-    // base pour les stats, mais ne déclenche plus de SMS inutile. On
-    // laisse passer les provenances inconnues, pour ne jamais rater un
-    // vrai visiteur si Vercel n'a pas pu déterminer le pays.
+    // SMS "arrivée pub" DÉSACTIVÉ — le clic est bien enregistré ci-dessus
+    // (pour les stats), mais on n'envoie plus de SMS immédiat à chaque
+    // visite venant d'une pub. Pour réactiver, décommenter le bloc ci-dessous.
+    /*
     const isMetaAdClick = Boolean(fbclid || ad_id);
     const isGoogleAdClick = Boolean(gclid);
     const isFrenchOrUnknown = !geo.country || geo.country === "FR";
@@ -185,6 +183,7 @@ export default async function handler(req, res) {
         // On ne bloque jamais le visiteur pour un souci d'envoi SMS
       }
     }
+    */
 
     return res.status(200).json({ success: true });
   } catch (err) {
