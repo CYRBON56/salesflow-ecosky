@@ -106,6 +106,8 @@
   }
   th { font-weight: 700; color: var(--vert); }
   tbody tr:hover { background: #f8fbfa; }
+  tbody tr.groupe-alterne { background: #fbfaf5; }
+  tbody tr.groupe-alterne:hover { background: #f5f2e8; }
   .badge {
     display: inline-block;
     padding: 3px 9px;
@@ -303,6 +305,45 @@
     return (s || "").toString().replace(/</g, "&lt;");
   }
 
+  // Extrait un identifiant de clic publicitaire (gclid, fbclid, ou "Ad ID")
+  // depuis le texte du message SMS, pour pouvoir regrouper les lignes qui
+  // viennent du même clic exact.
+  function extraireIdClic(messageBody) {
+    if (!messageBody) return null;
+    const matchGclid = messageBody.match(/gclid=([^&\s]+)/);
+    if (matchGclid) return matchGclid[1];
+    const matchFbclid = messageBody.match(/fbclid=([^&\s]+)/);
+    if (matchFbclid) return matchFbclid[1];
+    const matchAdId = messageBody.match(/Ad ID:\s*([^\n]+)/);
+    if (matchAdId) return matchAdId[1].trim();
+    return null;
+  }
+
+  // Regroupe les lignes partageant le même ID de clic (gclid/fbclid/Ad ID)
+  // côte à côte, chaque groupe restant trié du plus récent au plus ancien ;
+  // les lignes sans ID identifiable gardent leur ordre chronologique normal,
+  // mélangées à la suite des groupes.
+  function regrouperParIdClic(lignes) {
+    const groupes = new Map(); // id -> [lignes]
+    const sansId = [];
+    lignes.forEach(l => {
+      const id = extraireIdClic(l.message_body);
+      if (!id) { sansId.push(l); return; }
+      if (!groupes.has(id)) groupes.set(id, []);
+      groupes.get(id).push(l);
+    });
+    const groupesTries = Array.from(groupes.values()).sort(
+      (a, b) => new Date(b[0].created_at) - new Date(a[0].created_at)
+    );
+    const resultat = [];
+    groupesTries.forEach(groupe => {
+      groupe.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      resultat.push(...groupe);
+    });
+    resultat.push(...sansId);
+    return resultat;
+  }
+
   function majBarreSelection() {
     const barre = document.getElementById("barreSelection");
     const texte = document.getElementById("texteSelection");
@@ -347,8 +388,19 @@
       conteneur.innerHTML = `<div class="vide">Aucun SMS pour ce filtre.</div>`;
       return;
     }
-    const lignesHtml = lignes.map(l => `
-      <tr>
+    const lignesTriees = regrouperParIdClic(lignes);
+
+    let dernierIdVu = undefined;
+    let alterne = false;
+    const lignesHtml = lignesTriees.map(l => {
+      const idClic = extraireIdClic(l.message_body);
+      if (idClic !== dernierIdVu) {
+        alterne = !alterne;
+        dernierIdVu = idClic;
+      }
+      const classeGroupe = idClic && alterne ? ' class="groupe-alterne"' : "";
+      return `
+      <tr${classeGroupe}>
         <td class="checkbox-col"><input type="checkbox" class="case-sms" data-id="${l.id}" ${selectionSms.has(l.id) ? "checked" : ""}></td>
         <td>${formatDate(l.created_at)}</td>
         <td><span class="badge badge-type">${LIBELLES_TYPE_SMS[l.sms_type] || l.sms_type}</span></td>
@@ -359,7 +411,8 @@
         <td class="msg-col">${echapper(l.message_body)}</td>
         <td><button class="btn-suppr" data-id-suppr="${l.id}" title="Supprimer">🗑️</button></td>
       </tr>
-    `).join("");
+    `;
+    }).join("");
     conteneur.innerHTML = `
       <table>
         <thead>
