@@ -3,10 +3,13 @@
 // (ou autre source trackée), même si la personne ne finit jamais par discuter
 // avec Skyeco. Appelé automatiquement par le widget de chat au chargement de la page.
 //
-// SMS "arrivée pub" DÉSACTIVÉ (demande Cyrille, 19/08/2026) — trop de
-// notifications avant même qu'un vrai prospect se manifeste. Le clic reste
-// enregistré en base pour les statistiques ; seul l'envoi du SMS est coupé.
-// Pour réactiver : décommenter le bloc d'appel à sendClickAlertSms plus bas.
+// Deux choses se produisent à chaque clic pub identifié (fbclid/gclid) :
+//   1. Enregistrement dans web_clicks (stats brutes, comme avant)
+//   2. Création d'une fiche minimale dans "leads" (demande Cyrille, 19/08/2026)
+//      pour que ces visiteurs apparaissent directement dans le dashboard
+//      SalesFlow, pas seulement dans la modale "Clics pub" séparée.
+//
+// SMS "arrivée pub" reste DÉSACTIVÉ (demande précédente du 19/08/2026).
 
 import { logSms } from "./_sms-log.js";
 
@@ -112,6 +115,47 @@ async function sendClickAlertSms({ source, ad_id, utm_campaign, landing_page, ge
   });
 }
 
+// Crée une fiche lead minimale pour ce clic pub, afin qu'il apparaisse dans
+// le dashboard SalesFlow au même titre qu'un lead venu du formulaire. On
+// déduplique sur session_id (stocké au début des notes, préfixé) pour ne
+// pas créer une nouvelle fiche à chaque rechargement de page du même visiteur.
+async function createLeadFromClick({ source, utm_campaign, session_id, geo }) {
+  if (!session_id) return; // pas de session = pas de dédoublonnage fiable, on n'insère pas
+
+  const marker = `[clic_session:${session_id}]`;
+
+  try {
+    const existing = await supabaseRequest(
+      `leads?notes=ilike.*${encodeURIComponent(marker)}*&select=id&limit=1`
+    );
+    if (Array.isArray(existing) && existing.length > 0) return; // déjà créé pour cette session
+  } catch (err) {
+    console.error("createLeadFromClick dedupe check error:", err.message);
+    // en cas de doute on continue quand même, mieux vaut un doublon occasionnel que perdre le lead
+  }
+
+  const localisation = [geo.city, geo.region, geo.country].filter(Boolean).join(", ");
+
+  try {
+    await supabaseRequest("leads", {
+      method: "POST",
+      body: JSON.stringify({
+        nom: `Visiteur pub ${source}`,
+        prenom: null,
+        telephone: "",
+        type_projet: null,
+        source: `Clic pub ${source}${utm_campaign ? " — " + utm_campaign : ""}`,
+        statut: "nouveau",
+        formulaire_complete: false,
+        notes: `${marker} Clic publicitaire détecté${localisation ? `, provenance approximative : ${localisation}` : ""}. Ce visiteur n'a pas encore rempli de formulaire.`,
+      }),
+    });
+  } catch (err) {
+    console.error("createLeadFromClick insert error:", err.message);
+    // on ne bloque jamais le visiteur pour un souci de création de fiche
+  }
+}
+
 export default async function handler(req, res) {
   // On répond toujours OK côté CORS pour que le widget (appelé depuis
   // ecoskybyrms.fr, un domaine différent de Vercel) puisse l'appeler.
@@ -161,18 +205,32 @@ export default async function handler(req, res) {
       }),
     });
 
-    // SMS "arrivée pub" DÉSACTIVÉ — le clic est bien enregistré ci-dessus
-    // (pour les stats), mais on n'envoie plus de SMS immédiat à chaque
-    // visite venant d'une pub. Pour réactiver, décommenter le bloc ci-dessous.
-    /*
+    // On filtre aussi les provenances hors France : ce sont presque
+    // toujours des clics automatisés (bots de vérification qualité/anti-
+    // fraude de Google, souvent localisés aux US) plutôt que de vrais
+    // visiteurs — le clic reste enregistré en base pour les stats, mais ne
+    // déclenche plus de SMS ni de fiche lead inutile. On laisse passer les
+    // provenances inconnues, pour ne jamais rater un vrai visiteur si Vercel
+    // n'a pas pu déterminer le pays.
     const isMetaAdClick = Boolean(fbclid || ad_id);
     const isGoogleAdClick = Boolean(gclid);
     const isFrenchOrUnknown = !geo.country || geo.country === "FR";
 
     if ((isMetaAdClick || isGoogleAdClick) && isFrenchOrUnknown) {
+      const source = isGoogleAdClick && !isMetaAdClick ? "Google Ads" : "Meta";
+
+      // Fiche lead dans le dashboard SalesFlow
+      try {
+        await createLeadFromClick({ source, utm_campaign, session_id, geo });
+      } catch (leadErr) {
+        console.error("track-click lead creation error:", leadErr.message);
+      }
+
+      // SMS "arrivée pub" DÉSACTIVÉ — décommenter pour réactiver.
+      /*
       try {
         await sendClickAlertSms({
-          source: isGoogleAdClick && !isMetaAdClick ? "Google Ads" : "Meta",
+          source,
           ad_id: ad_id || gclid,
           utm_campaign,
           landing_page,
@@ -182,8 +240,8 @@ export default async function handler(req, res) {
         console.error("track-click SMS error:", smsErr.message);
         // On ne bloque jamais le visiteur pour un souci d'envoi SMS
       }
+      */
     }
-    */
 
     return res.status(200).json({ success: true });
   } catch (err) {
