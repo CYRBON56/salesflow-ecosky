@@ -21,7 +21,8 @@
   }
   .split-layout {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
   }
   .image-panel {
     flex: 1 1 45%;
@@ -103,11 +104,10 @@
     flex: 1 1 55%;
     position: relative;
     display: flex;
-    align-items: center;
+    align-items: stretch;
     justify-content: center;
-    padding: 40px 24px;
-    overflow-y: auto;
-    overflow-x: hidden;
+    padding: 20px 24px;
+    overflow: hidden;
   }
   .form-bg-video {
     position: absolute;
@@ -125,42 +125,64 @@
     background: rgba(246,244,239,0.55);
   }
   @media (max-width: 800px) {
-    .split-layout { flex-direction: column; }
-    .image-panel { flex: 0 0 220px; }
-    .form-panel { padding: 28px 20px 60px; }
+    .split-layout { flex-direction: column; height: 100vh; overflow: hidden; }
+    .image-panel { flex: 0 0 110px; }
+    .form-panel { padding: 12px 16px; }
   }
 
   /* Optimisations pour téléphones (petits écrans) */
   @media (max-width: 480px) {
-    .image-panel { flex: 0 0 160px; }
-    .form-panel { padding: 20px 16px 48px; }
-    .header-block { padding: 12px 14px; margin-bottom: 16px; }
-    h1 { font-size: 19px; }
-    .sub { font-size: 13.5px; margin-bottom: 18px; }
-    .card { padding: 16px; }
-    .question { font-size: 15px; }
-    .option { padding: 12px 14px; font-size: 14px; }
+    .image-panel { flex: 0 0 90px; }
+    .form-panel { padding: 10px 14px; }
+    .header-block { padding: 8px 12px; margin-bottom: 8px; }
+    h1 { font-size: 17px; margin: 4px 0 4px; }
+    .eyebrow { font-size: 10.5px; }
+    .sub { font-size: 12.5px; margin-bottom: 0; }
+    .card { padding: 14px; }
+    .question { font-size: 14px; margin-bottom: 10px; }
+    .option { padding: 10px 12px; font-size: 13.5px; }
+    .progress { margin-bottom: 10px; }
 
     /* Empêche le zoom automatique de Safari iOS sur les champs (nécessite 16px min) */
     input[type="text"], input[type="tel"], input[type="email"], input[type="number"] {
       font-size: 16px;
-      padding: 11px 12px;
+      padding: 9px 10px;
+      margin-bottom: 8px;
     }
 
-    .nav-row { flex-wrap: wrap; }
-    button.btn { font-size: 14px; padding: 12px 16px; }
+    .nav-row { flex-wrap: wrap; margin-top: 12px; }
+    button.btn { font-size: 13.5px; padding: 10px 14px; }
     .btn-primary { flex: 1 1 100%; order: 1; }
-    .btn-ghost { order: 2; padding: 8px 0; }
+    .btn-ghost { order: 2; padding: 6px 0; }
 
-    .trust-footer .trust-badges { gap: 10px; font-size: 11px; }
-    .trust-footer .legal-line { font-size: 10.5px; }
+    .trust-footer { margin-top: 6px; padding-top: 6px; }
+    .trust-footer .trust-badges { gap: 8px; font-size: 10px; margin-bottom: 4px; }
+    .trust-footer .legal-line { font-size: 9px; line-height: 1.35; }
+    .trust-footer .legal-line br { display: none; }
+    .header-block > div[style*="font-size:20px"] { font-size:15px !important; margin:0 0 4px !important; }
+    .trust-badges-row { display:none !important; }
   }
-  .wrap { max-width: 480px; width: 100%; margin: 0; padding: 0; }
+  .wrap {
+    max-width: 480px;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .middle-scroll {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+    padding-right: 2px;
+  }
   .header-block {
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     background: rgba(255,255,255,0.7);
     border-radius: 14px;
-    padding: 14px 16px;
+    padding: 12px 16px;
+    flex-shrink: 0;
   }
   .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 1px; color: #1e6f4c; text-transform: uppercase; }
   h1 { font-size: 22px; margin: 6px 0 8px; }
@@ -257,13 +279,14 @@
   .success-icon { font-size: 40px; text-align: center; margin-bottom: 8px; }
 
   .trust-footer {
-    margin-top: 28px;
-    padding-top: 18px;
+    margin-top: 12px;
+    padding-top: 12px;
     border-top: 1px solid #e2e0d5;
-    font-size: 11.5px;
+    font-size: 11px;
     color: #8a9490;
-    line-height: 1.6;
+    line-height: 1.5;
     text-align: center;
+    flex-shrink: 0;
   }
   .trust-footer .trust-badges {
     display: flex;
@@ -323,21 +346,23 @@
         <div style="font-size:20px; font-weight:800; color:#1e6f4c; margin:2px 0 10px; line-height:1.2;">⏱️ Estimation en 3 minutes</div>
         <p class="sub" style="margin-bottom:0;">Répondez à quelques questions sur votre projet pour recevoir une estimation la plus précise possible, envoyée directement par mail.</p>
       </div>
-      <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px; font-size:12.5px; color:#4a5a54;">
+      <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; font-size:12.5px; color:#4a5a54;" class="trust-badges-row">
         <span>✅ Sans engagement</span>
         <span>⏱️ Réponse sous 24h</span>
         <span>🔒 Données confidentielles</span>
       </div>
 
-      <a href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf"
-         target="_blank" rel="noopener"
-         onclick="window.va && window.va('event', { name: 'catalogue_telecharge' }); notifyCatalogueDownloadEstimation();"
-         style="display:inline-flex; align-items:center; gap:8px; margin-bottom:20px; padding:10px 16px; border:1px solid #14312a; border-radius:8px; color:#14312a; text-decoration:none; font-size:13.5px; font-weight:600; background:#fff;">
-        📄 Pas encore prêt·e ? Téléchargez le catalogue EcoSky'Gum
-      </a>
+      <div class="middle-scroll">
+        <a href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf"
+           target="_blank" rel="noopener"
+           onclick="window.va && window.va('event', { name: 'catalogue_telecharge' }); notifyCatalogueDownloadEstimation();"
+           style="display:inline-flex; align-items:center; gap:8px; margin-bottom:14px; padding:10px 16px; border:1px solid #14312a; border-radius:8px; color:#14312a; text-decoration:none; font-size:13.5px; font-weight:600; background:#fff;">
+          📄 Pas encore prêt·e ? Téléchargez le catalogue EcoSky'Gum
+        </a>
 
-      <div class="progress" id="progress"></div>
-      <div class="card" id="card"></div>
+        <div class="progress" id="progress"></div>
+        <div class="card" id="card"></div>
+      </div>
 
       <div class="trust-footer">
         <div class="trust-badges">
@@ -352,8 +377,8 @@
           &nbsp;—&nbsp;
           <a href="mailto:infos@ecosky.fr" style="color:#1e6f4c;">infos@ecosky.fr</a>
         </div>
-        <div id="footerCallback" style="margin-top:14px;">
-          <button class="btn" id="btnFooterCallback" style="background:white; border:1.5px solid #1e6f4c; color:#14312a; padding:10px 18px; font-size:13px; font-weight:700; border-radius:10px; cursor:pointer;">
+        <div id="footerCallback" style="margin-top:10px;">
+          <button class="btn" id="btnFooterCallback" style="background:white; border:1.5px solid #1e6f4c; color:#14312a; padding:8px 16px; font-size:12.5px; font-weight:700; border-radius:10px; cursor:pointer;">
             📞 Être rappelé
           </button>
         </div>
