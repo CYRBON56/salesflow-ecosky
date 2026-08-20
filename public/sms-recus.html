@@ -451,6 +451,10 @@
       <div class="lien-pdf">Devis chargé : <a id="lienPdfDevisCharge" href="#" target="_blank" rel="noopener">voir le PDF</a></div>
       <label for="messageDevis">Message (généré automatiquement, modifiable)</label>
       <textarea id="messageDevis" rows="4" style="width:100%; padding:9px 10px; border-radius:8px; border:1px solid var(--bordure); font-size:0.85rem; font-family:inherit; resize:vertical;"></textarea>
+      <label style="display:flex; align-items:center; gap:8px; font-weight:500; margin-top:10px;">
+        <input type="checkbox" id="inclureRibDevis" style="width:auto;">
+        Joindre le RIB
+      </label>
       <div class="boutons-envoi-devis" style="margin-top:12px;">
         <button id="btnEnvoyerDevisEmail">✉️ Envoyer par email</button>
         <button id="btnEnvoyerDevisSms">📲 Envoyer par SMS</button>
@@ -905,6 +909,7 @@
   function reinitialiserModaleDevis() {
     document.getElementById("fichierDevis").value = "";
     document.getElementById("messageDevis").value = "";
+    document.getElementById("inclureRibDevis").checked = false;
     document.getElementById("etapeChargementDevis").style.display = "block";
     document.getElementById("zoneEnvoiDevis").classList.remove("visible");
     document.getElementById("statutEnvoiDevis").textContent = "";
@@ -977,6 +982,7 @@
     document.getElementById("zoneEnvoiDevis").classList.add("visible");
     document.getElementById("lienPdfDevisCharge").href = pdfUrl;
     document.getElementById("messageDevis").value = message || "";
+    document.getElementById("inclureRibDevis").checked = false;
     document.getElementById("statutEnvoiDevis").textContent = "";
     document.getElementById("statutEnvoiDevis").className = "statut-envoi-devis";
   }
@@ -1060,6 +1066,7 @@
           devis_id: devisIdCharge,
           channels,
           message: document.getElementById("messageDevis").value,
+          inclure_rib: document.getElementById("inclureRibDevis").checked,
         }),
       });
       const data = await res.json();
@@ -1088,6 +1095,7 @@
   document.getElementById("btnChargerAutreDevis").addEventListener("click", () => {
     document.getElementById("fichierDevis").value = "";
     document.getElementById("messageDevis").value = "";
+    document.getElementById("inclureRibDevis").checked = false;
     document.getElementById("etapeChargementDevis").style.display = "block";
     document.getElementById("zoneEnvoiDevis").classList.remove("visible");
     document.getElementById("statutEnvoiDevis").textContent = "";
@@ -1101,6 +1109,20 @@
   document.getElementById("btnEnvoyerDevisEmail").addEventListener("click", () => envoyerDevis(["email"]));
   document.getElementById("btnEnvoyerDevisSms").addEventListener("click", () => envoyerDevis(["sms"]));
   document.getElementById("btnEnvoyerDevisLesDeux").addEventListener("click", () => envoyerDevis(["email", "sms"]));
+
+  const PHRASE_RIB = "Vous trouverez également notre RIB pour le règlement.";
+  document.getElementById("inclureRibDevis").addEventListener("change", (e) => {
+    const champMessage = document.getElementById("messageDevis");
+    if (e.target.checked) {
+      if (!champMessage.value.includes(PHRASE_RIB)) {
+        champMessage.value = champMessage.value.trim()
+          ? `${champMessage.value.trim()} ${PHRASE_RIB}`
+          : PHRASE_RIB;
+      }
+    } else {
+      champMessage.value = champMessage.value.replace(` ${PHRASE_RIB}`, "").replace(PHRASE_RIB, "").trim();
+    }
+  });
 
   function appliquerFiltreLeads() {
     const statut = document.getElementById("filtreType").value;
