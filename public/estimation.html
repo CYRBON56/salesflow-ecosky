@@ -446,16 +446,29 @@
     }, FORM_BG_INTERVAL_MS);
   })();
 
-  // ---------- Tracking des clics pub + SMS immédiat ----------
-  (function trackAdClickIfNeeded() {
+  // ---------- Tracking de toute arrivée sur le formulaire ----------
+  (function trackArrivalIfNeeded() {
     const params = new URLSearchParams(window.location.search);
     const fbclid = params.get("fbclid");
     const gclid = params.get("gclid");
     const utmSource = params.get("utm_source");
-    const isFromAd = !!fbclid || !!gclid || utmSource === "facebook" || utmSource === "google";
-    if (!isFromAd) return;
+    // Avant, seuls les visiteurs identifiés comme venant d'une pub étaient
+    // trackés. Désormais on tracke TOUTE arrivée sur le formulaire, pour
+    // avoir un prospect comptabilisé même sans clic pub identifiable
+    // (lien partagé, recherche directe, réseaux sociaux organiques...).
 
-    const dedupeKey = fbclid || gclid || "generic";
+    const dedupeKey = fbclid || gclid || "session_" + (function () {
+      try {
+        let s = sessionStorage.getItem("ecosky_visit_dedupe_key");
+        if (!s) {
+          s = "v_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+          sessionStorage.setItem("ecosky_visit_dedupe_key", s);
+        }
+        return s;
+      } catch (e) {
+        return "v_" + Date.now();
+      }
+    })();
     let alreadyTracked = null;
     try { alreadyTracked = sessionStorage.getItem("ecosky_click_tracked_key"); } catch (e) {}
     if (alreadyTracked === dedupeKey) return;
