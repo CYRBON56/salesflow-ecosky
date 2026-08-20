@@ -6,6 +6,7 @@ import {
   Users, Filter, Download, RefreshCw, AlertCircle
 } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
+import DevisManuel from "./DevisManuel.jsx";
 const STAGES = [
   { id: "nouveau", label: "Nouveau", color: "#64748b" },
   { id: "contacte", label: "Contacté", color: "#2563eb" },
@@ -99,6 +100,7 @@ export default function SalesFlowSystem() {
   const [waData, setWaData] = useState({}); // { [telephone]: { loading, conversation, messages } }
   const [adClicks, setAdClicks] = useState([]);
   const [showClicks, setShowClicks] = useState(false);
+  const [showDevis, setShowDevis] = useState(false);
   const fileInputRef = useRef(null);
   useEffect(() => {
     (async () => {
@@ -364,6 +366,9 @@ export default function SalesFlowSystem() {
           <button onClick={() => setShowClicks(true)} style={btnGhost}>
             <MessageCircle size={16} /> Clics pub ({adClicks.length})
           </button>
+          <button onClick={() => setShowDevis(true)} style={btnGhost}>
+            <FileText size={16} /> Devis
+          </button>
           <button onClick={() => setShowSettings(true)} style={btnGhost}>
             <SettingsIcon size={16} /> Réglages
           </button>
@@ -471,6 +476,11 @@ export default function SalesFlowSystem() {
       )}
       {showClicks && (
         <AdClicksModal clicks={adClicks} leads={leads} onClose={() => setShowClicks(false)} />
+      )}
+      {showDevis && (
+        <Modal onClose={() => setShowDevis(false)} title="Envoyer un devis">
+          <DevisManuel leads={leads} />
+        </Modal>
       )}
     </div>
   );
