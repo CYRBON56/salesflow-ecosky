@@ -10,8 +10,7 @@ const supabase = createClient(
 const resend = new Resend(process.env.RESEND_API_KEY);
 const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-// Le RIB est un fichier statique servi par le site lui-même (public/rib-ecosky.pdf),
-// donc accessible à cette URL fixe sur le domaine de production.
+// Le RIB est un fichier statique servi par le site lui-même (public/rib-ecosky.pdf).
 const RIB_URL = "https://salesflow-ecosky.vercel.app/rib-ecosky.pdf";
 
 export default async function handler(req, res) {
@@ -20,7 +19,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { devis_id, channels, message } = req.body; // channels: ["email", "sms"], message: texte personnalisé (optionnel)
+    const { devis_id, channels, message, inclure_rib } = req.body; // channels: ["email", "sms"]
 
     if (!devis_id || !Array.isArray(channels) || channels.length === 0) {
       return res.status(400).json({ error: "Champs manquants (devis_id, channels)" });
@@ -42,17 +41,13 @@ export default async function handler(req, res) {
       || `Bonjour, veuillez recevoir votre devis n° ${devis.numero}.`;
     const results = { email: null, sms: null };
 
-    // --- Email (via Resend), PDF du devis + RIB joints en pièce jointe ---
+    // --- Email (via Resend), PDF du devis + RIB (si coché) en pièce jointe ---
     if (channels.includes("email")) {
       if (!lead?.email) {
         results.email = { sent: false, reason: "Pas d'email sur cette fiche" };
       } else {
-        const [pdfResponse, ribResponse] = await Promise.all([
-          fetch(devis.pdf_url),
-          fetch(RIB_URL),
-        ]);
+        const pdfResponse = await fetch(devis.pdf_url);
         const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
-        const ribBuffer = ribResponse.ok ? Buffer.from(await ribResponse.arrayBuffer()) : null;
 
         const attachments = [
           {
@@ -60,11 +55,16 @@ export default async function handler(req, res) {
             content: pdfBuffer.toString("base64"),
           },
         ];
-        if (ribBuffer) {
-          attachments.push({
-            filename: "RIB-RMS-EcoSky.pdf",
-            content: ribBuffer.toString("base64"),
-          });
+
+        if (inclure_rib) {
+          const ribResponse = await fetch(RIB_URL);
+          if (ribResponse.ok) {
+            const ribBuffer = Buffer.from(await ribResponse.arrayBuffer());
+            attachments.push({
+              filename: "RIB-RMS-EcoSky.pdf",
+              content: ribBuffer.toString("base64"),
+            });
+          }
         }
 
         await resend.emails.send({
@@ -74,7 +74,6 @@ export default async function handler(req, res) {
           subject: `Votre devis RMS EcoSky${devis.numero ? ` n° ${devis.numero}` : ""}`,
           html: `
             <p>${texteMessage.replace(/\n/g, "<br>")}</p>
-            <p>Vous trouverez ci-joint le devis ainsi que notre RIB pour le règlement.</p>
             <p>N'hésitez pas à nous contacter pour toute question.</p>
             <p>L'équipe RMS EcoSky</p>
           `,
@@ -86,15 +85,19 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- SMS (via Twilio), message personnalisé + lien devis + lien RIB ---
+    // --- SMS (via Twilio), message personnalisé + lien devis + lien RIB (si coché) ---
     if (channels.includes("sms")) {
       if (!lead?.telephone) {
         results.sms = { sent: false, reason: "Pas de téléphone sur cette fiche" };
       } else {
+        const corps = inclure_rib
+          ? `${texteMessage}\nDevis : ${devis.pdf_url}\nRIB : ${RIB_URL}`
+          : `${texteMessage}\nDevis : ${devis.pdf_url}`;
+
         await twilioClient.messages.create({
           from: process.env.TWILIO_FROM_NUMBER,
           to: lead.telephone,
-          body: `${texteMessage}\nDevis : ${devis.pdf_url}\nRIB : ${RIB_URL}`,
+          body: corps,
         });
 
         await supabase.from("devis").update({ envoye_sms_at: new Date().toISOString() }).eq("id", devis_id);
