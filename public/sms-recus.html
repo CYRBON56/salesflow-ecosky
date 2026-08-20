@@ -194,6 +194,20 @@
     margin-left: 4px;
   }
   .btn-photos:disabled { opacity: 0.6; cursor: default; }
+  .btn-devis {
+    display: inline-block;
+    background: #0f5c56;
+    color: white;
+    border: none;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    white-space: nowrap;
+    margin-left: 4px;
+  }
+  .btn-devis:disabled { opacity: 0.6; cursor: default; }
   .btn-lien {
     display: inline-block;
     background: white;
@@ -242,6 +256,107 @@
   td.editable.sauvegarde-erreur { background: #fbe6e6 !important; transition: background 0.4s; }
   .vide { padding: 40px; text-align: center; color: #7a8983; }
   .chargement { padding: 40px; text-align: center; color: #7a8983; }
+
+  /* ---- Modale envoi de devis ---- */
+  .overlay-modale {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 49, 42, 0.45);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  .overlay-modale.visible { display: flex; }
+  .modale {
+    background: white;
+    border-radius: 14px;
+    padding: 24px;
+    width: 100%;
+    max-width: 440px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .modale h2 {
+    font-size: 1.1rem;
+    margin: 0 0 4px;
+    color: var(--vert);
+  }
+  .modale .client-modale {
+    font-size: 0.82rem;
+    color: #5a6b64;
+    margin-bottom: 16px;
+  }
+  .modale label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--vert);
+    margin-bottom: 4px;
+    margin-top: 12px;
+  }
+  .modale input[type="text"],
+  .modale input[type="number"],
+  .modale input[type="file"] {
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--bordure);
+    font-size: 0.85rem;
+    font-family: inherit;
+  }
+  .modale-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+  .modale-actions button {
+    font-size: 0.82rem;
+  }
+  .btn-annuler-modale {
+    background: white;
+    border: 1px solid var(--bordure);
+    color: var(--vert);
+  }
+  .btn-charger-devis {
+    background: var(--vert-clair);
+    color: white;
+    border: none;
+    font-weight: 600;
+  }
+  .btn-charger-devis:disabled { opacity: 0.6; cursor: default; }
+  .zone-envoi-devis {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--bordure);
+    display: none;
+  }
+  .zone-envoi-devis.visible { display: block; }
+  .zone-envoi-devis .lien-pdf {
+    font-size: 0.82rem;
+    margin-bottom: 10px;
+  }
+  .boutons-envoi-devis {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .boutons-envoi-devis button {
+    background: #0f5c56;
+    color: white;
+    border: none;
+    font-weight: 600;
+    font-size: 0.8rem;
+  }
+  .boutons-envoi-devis button:disabled { opacity: 0.6; cursor: default; }
+  .statut-envoi-devis {
+    margin-top: 12px;
+    font-size: 0.82rem;
+  }
+  .statut-envoi-devis.ok { color: #1e6f4c; }
+  .statut-envoi-devis.erreur { color: #b3261e; }
 </style>
 </head>
 <body>
@@ -274,9 +389,49 @@
   </div>
 </main>
 
+<!-- Modale d'envoi de devis manuel -->
+<div class="overlay-modale" id="overlayDevis">
+  <div class="modale">
+    <h2>Envoyer un devis</h2>
+    <div class="client-modale" id="clientModaleDevis">—</div>
+
+    <div id="etapeChargementDevis">
+      <label for="numeroDevis">Numéro de devis</label>
+      <input type="text" id="numeroDevis" placeholder="D-2026-08-134">
+
+      <label for="montantDevis">Montant TTC (optionnel)</label>
+      <input type="number" step="0.01" id="montantDevis" placeholder="7840.80">
+
+      <label for="fichierDevis">Fichier PDF</label>
+      <input type="file" id="fichierDevis" accept="application/pdf">
+
+      <div class="modale-actions">
+        <button class="btn-annuler-modale" id="btnFermerModaleDevis">Annuler</button>
+        <button class="btn-charger-devis" id="btnChargerDevis">Charger le devis</button>
+      </div>
+    </div>
+
+    <div class="zone-envoi-devis" id="zoneEnvoiDevis">
+      <div class="lien-pdf">Devis chargé : <a id="lienPdfDevisCharge" href="#" target="_blank" rel="noopener">voir le PDF</a></div>
+      <div class="boutons-envoi-devis">
+        <button id="btnEnvoyerDevisEmail">✉️ Envoyer par email</button>
+        <button id="btnEnvoyerDevisSms">📲 Envoyer par SMS</button>
+        <button id="btnEnvoyerDevisLesDeux">Envoyer les deux</button>
+      </div>
+      <div class="modale-actions">
+        <button class="btn-annuler-modale" id="btnFermerModaleDevisFin">Fermer</button>
+      </div>
+    </div>
+
+    <div class="statut-envoi-devis" id="statutEnvoiDevis"></div>
+  </div>
+</div>
+
 <script>
   const API_SMS = "/api/sms-recus";
   const API_LEADS = "/api/leads-recus";
+  const API_UPLOAD_DEVIS = "/api/upload-devis";
+  const API_SEND_DEVIS = "/api/send-devis";
 
   const LIBELLES_TYPE_SMS = {
     arrivee_pub: "Arrivée pub",
@@ -538,6 +693,7 @@
             ? `<a class="btn-lien" href="${l.estimation_pdf_url}" target="_blank" rel="noopener">📄 Devis PDF</a>`
             : `<span class="btn-lien-desactive" title="Pas encore de PDF généré pour ce lead">📄 Devis PDF</span>`}
           <a class="btn-lien" href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf" target="_blank" rel="noopener">📄 Catalogue</a>
+          <button class="btn-devis" data-lead-id="${l.id}" data-lead-nom="${echapper(nomComplet)}" data-lead-tel="${echapper(l.telephone)}" data-lead-email="${echapper(l.email)}">📄➕ Devis</button>
           <button class="btn-suppr-lead" data-lead-id="${l.id}" title="Supprimer ce lead">🗑️</button>
         </td>
       </tr>
@@ -586,6 +742,9 @@
     });
     document.querySelectorAll(".btn-suppr-lead").forEach(btn => {
       btn.addEventListener("click", () => supprimerLead(btn));
+    });
+    document.querySelectorAll(".btn-devis").forEach(btn => {
+      btn.addEventListener("click", () => ouvrirModaleDevis(btn));
     });
   }
 
@@ -696,6 +855,148 @@
       btn.disabled = false;
     }
   }
+
+  // ---------- Modale d'envoi de devis manuel ----------
+
+  let leadDevisEnCours = null; // { id, nom, telephone, email }
+  let devisIdCharge = null;
+  let pdfUrlCharge = null;
+
+  function reinitialiserModaleDevis() {
+    document.getElementById("numeroDevis").value = "";
+    document.getElementById("montantDevis").value = "";
+    document.getElementById("fichierDevis").value = "";
+    document.getElementById("etapeChargementDevis").style.display = "block";
+    document.getElementById("zoneEnvoiDevis").classList.remove("visible");
+    document.getElementById("statutEnvoiDevis").textContent = "";
+    document.getElementById("statutEnvoiDevis").className = "statut-envoi-devis";
+    document.getElementById("btnChargerDevis").disabled = false;
+    document.getElementById("btnChargerDevis").textContent = "Charger le devis";
+    devisIdCharge = null;
+    pdfUrlCharge = null;
+  }
+
+  function ouvrirModaleDevis(btn) {
+    leadDevisEnCours = {
+      id: btn.dataset.leadId,
+      nom: btn.dataset.leadNom,
+      telephone: btn.dataset.leadTel,
+      email: btn.dataset.leadEmail,
+    };
+    reinitialiserModaleDevis();
+    document.getElementById("clientModaleDevis").textContent =
+      `${leadDevisEnCours.nom} — ${leadDevisEnCours.telephone || "sans tél."} — ${leadDevisEnCours.email && leadDevisEnCours.email !== "—" ? leadDevisEnCours.email : "sans email"}`;
+    document.getElementById("overlayDevis").classList.add("visible");
+  }
+
+  function fermerModaleDevis() {
+    document.getElementById("overlayDevis").classList.remove("visible");
+    leadDevisEnCours = null;
+  }
+
+  function fichierEnBase64(fichier) {
+    return new Promise((resolve, reject) => {
+      const lecteur = new FileReader();
+      lecteur.onload = () => resolve(lecteur.result.split(",")[1]);
+      lecteur.onerror = reject;
+      lecteur.readAsDataURL(fichier);
+    });
+  }
+
+  async function chargerDevis() {
+    const numero = document.getElementById("numeroDevis").value.trim();
+    const montant = document.getElementById("montantDevis").value;
+    const fichierInput = document.getElementById("fichierDevis");
+    const fichier = fichierInput.files[0];
+    const statutEl = document.getElementById("statutEnvoiDevis");
+
+    if (!numero || !fichier) {
+      statutEl.textContent = "Merci d'indiquer un numéro de devis et de choisir un fichier PDF.";
+      statutEl.className = "statut-envoi-devis erreur";
+      return;
+    }
+
+    const btnCharger = document.getElementById("btnChargerDevis");
+    btnCharger.disabled = true;
+    btnCharger.textContent = "Envoi en cours…";
+    statutEl.textContent = "";
+    statutEl.className = "statut-envoi-devis";
+
+    try {
+      const pdf_base64 = await fichierEnBase64(fichier);
+      const res = await fetch(API_UPLOAD_DEVIS, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: leadDevisEnCours.id,
+          numero,
+          montant_ttc: montant ? parseFloat(montant) : null,
+          pdf_base64,
+          filename: fichier.name,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Échec de l'upload");
+
+      devisIdCharge = data.devis_id;
+      pdfUrlCharge = data.pdf_url;
+
+      document.getElementById("etapeChargementDevis").style.display = "none";
+      const zoneEnvoi = document.getElementById("zoneEnvoiDevis");
+      zoneEnvoi.classList.add("visible");
+      const lien = document.getElementById("lienPdfDevisCharge");
+      lien.href = pdfUrlCharge;
+    } catch (err) {
+      statutEl.textContent = "Erreur : " + err.message;
+      statutEl.className = "statut-envoi-devis erreur";
+      btnCharger.disabled = false;
+      btnCharger.textContent = "Charger le devis";
+    }
+  }
+
+  async function envoyerDevis(channels) {
+    if (!devisIdCharge) return;
+    const statutEl = document.getElementById("statutEnvoiDevis");
+    statutEl.textContent = "Envoi en cours…";
+    statutEl.className = "statut-envoi-devis";
+
+    document.querySelectorAll(".boutons-envoi-devis button").forEach(b => b.disabled = true);
+
+    try {
+      const res = await fetch(API_SEND_DEVIS, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ devis_id: devisIdCharge, channels }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Échec de l'envoi");
+
+      const parties = [];
+      if (data.results.email) {
+        parties.push(data.results.email.sent ? "email envoyé" : `email non envoyé (${data.results.email.reason})`);
+      }
+      if (data.results.sms) {
+        parties.push(data.results.sms.sent ? "SMS envoyé" : `SMS non envoyé (${data.results.sms.reason})`);
+      }
+      statutEl.textContent = parties.join(" — ");
+      statutEl.className = "statut-envoi-devis ok";
+    } catch (err) {
+      statutEl.textContent = "Erreur : " + err.message;
+      statutEl.className = "statut-envoi-devis erreur";
+    } finally {
+      document.querySelectorAll(".boutons-envoi-devis button").forEach(b => b.disabled = false);
+    }
+  }
+
+  document.getElementById("btnChargerDevis").addEventListener("click", chargerDevis);
+  document.getElementById("btnFermerModaleDevis").addEventListener("click", fermerModaleDevis);
+  document.getElementById("btnFermerModaleDevisFin").addEventListener("click", fermerModaleDevis);
+  document.getElementById("overlayDevis").addEventListener("click", (e) => {
+    if (e.target.id === "overlayDevis") fermerModaleDevis();
+  });
+  document.getElementById("btnEnvoyerDevisEmail").addEventListener("click", () => envoyerDevis(["email"]));
+  document.getElementById("btnEnvoyerDevisSms").addEventListener("click", () => envoyerDevis(["sms"]));
+  document.getElementById("btnEnvoyerDevisLesDeux").addEventListener("click", () => envoyerDevis(["email", "sms"]));
 
   function appliquerFiltreLeads() {
     const statut = document.getElementById("filtreType").value;
