@@ -396,13 +396,7 @@
     <div class="client-modale" id="clientModaleDevis">—</div>
 
     <div id="etapeChargementDevis">
-      <label for="numeroDevis">Numéro de devis</label>
-      <input type="text" id="numeroDevis" placeholder="D-2026-08-134">
-
-      <label for="montantDevis">Montant TTC (optionnel)</label>
-      <input type="number" step="0.01" id="montantDevis" placeholder="7840.80">
-
-      <label for="fichierDevis">Fichier PDF</label>
+      <label for="fichierDevis">Fichier PDF du devis</label>
       <input type="file" id="fichierDevis" accept="application/pdf">
 
       <div class="modale-actions">
@@ -413,7 +407,9 @@
 
     <div class="zone-envoi-devis" id="zoneEnvoiDevis">
       <div class="lien-pdf">Devis chargé : <a id="lienPdfDevisCharge" href="#" target="_blank" rel="noopener">voir le PDF</a></div>
-      <div class="boutons-envoi-devis">
+      <label for="messageDevis">Message (généré automatiquement, modifiable)</label>
+      <textarea id="messageDevis" rows="4" style="width:100%; padding:9px 10px; border-radius:8px; border:1px solid var(--bordure); font-size:0.85rem; font-family:inherit; resize:vertical;"></textarea>
+      <div class="boutons-envoi-devis" style="margin-top:12px;">
         <button id="btnEnvoyerDevisEmail">✉️ Envoyer par email</button>
         <button id="btnEnvoyerDevisSms">📲 Envoyer par SMS</button>
         <button id="btnEnvoyerDevisLesDeux">Envoyer les deux</button>
@@ -863,9 +859,8 @@
   let pdfUrlCharge = null;
 
   function reinitialiserModaleDevis() {
-    document.getElementById("numeroDevis").value = "";
-    document.getElementById("montantDevis").value = "";
     document.getElementById("fichierDevis").value = "";
+    document.getElementById("messageDevis").value = "";
     document.getElementById("etapeChargementDevis").style.display = "block";
     document.getElementById("zoneEnvoiDevis").classList.remove("visible");
     document.getElementById("statutEnvoiDevis").textContent = "";
@@ -904,21 +899,19 @@
   }
 
   async function chargerDevis() {
-    const numero = document.getElementById("numeroDevis").value.trim();
-    const montant = document.getElementById("montantDevis").value;
     const fichierInput = document.getElementById("fichierDevis");
     const fichier = fichierInput.files[0];
     const statutEl = document.getElementById("statutEnvoiDevis");
 
-    if (!numero || !fichier) {
-      statutEl.textContent = "Merci d'indiquer un numéro de devis et de choisir un fichier PDF.";
+    if (!fichier) {
+      statutEl.textContent = "Merci de choisir un fichier PDF.";
       statutEl.className = "statut-envoi-devis erreur";
       return;
     }
 
     const btnCharger = document.getElementById("btnChargerDevis");
     btnCharger.disabled = true;
-    btnCharger.textContent = "Envoi en cours…";
+    btnCharger.textContent = "Analyse du devis…";
     statutEl.textContent = "";
     statutEl.className = "statut-envoi-devis";
 
@@ -929,8 +922,6 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lead_id: leadDevisEnCours.id,
-          numero,
-          montant_ttc: montant ? parseFloat(montant) : null,
           pdf_base64,
           filename: fichier.name,
         }),
@@ -946,6 +937,8 @@
       zoneEnvoi.classList.add("visible");
       const lien = document.getElementById("lienPdfDevisCharge");
       lien.href = pdfUrlCharge;
+      document.getElementById("messageDevis").value = data.message_perso
+        || `Bonjour, veuillez recevoir votre devis${data.numero ? ` n° ${data.numero}` : ""}.`;
     } catch (err) {
       statutEl.textContent = "Erreur : " + err.message;
       statutEl.className = "statut-envoi-devis erreur";
@@ -966,7 +959,11 @@
       const res = await fetch(API_SEND_DEVIS, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ devis_id: devisIdCharge, channels }),
+        body: JSON.stringify({
+          devis_id: devisIdCharge,
+          channels,
+          message: document.getElementById("messageDevis").value,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Échec de l'envoi");
