@@ -117,18 +117,20 @@ async function sendClickAlertSms({ source, ad_id, utm_campaign, landing_page, ge
 
 // Crée une fiche lead minimale pour ce clic pub, afin qu'il apparaisse dans
 // le dashboard SalesFlow au même titre qu'un lead venu du formulaire. On
-// déduplique sur session_id (stocké au début des notes, préfixé) pour ne
-// pas créer une nouvelle fiche à chaque rechargement de page du même visiteur.
-async function createLeadFromClick({ source, utm_campaign, session_id, geo }) {
-  if (!session_id) return; // pas de session = pas de dédoublonnage fiable, on n'insère pas
+// déduplique sur le clic publicitaire exact (gclid ou fbclid, stocké au
+// début des notes, préfixé) plutôt que sur la session : deux clics sur la
+// même pub avec le même gclid/fbclid ne créent qu'une seule fiche, même si
+// le visiteur recharge la page ou revient dans un nouvel onglet.
+async function createLeadFromClick({ source, utm_campaign, click_id, geo }) {
+  if (!click_id) return; // pas de gclid/fbclid = pas de dédoublonnage fiable, on n'insère pas
 
-  const marker = `[clic_session:${session_id}]`;
+  const marker = `[clic_id:${click_id}]`;
 
   try {
     const existing = await supabaseRequest(
       `leads?notes=ilike.*${encodeURIComponent(marker)}*&select=id&limit=1`
     );
-    if (Array.isArray(existing) && existing.length > 0) return; // déjà créé pour cette session
+    if (Array.isArray(existing) && existing.length > 0) return; // déjà créé pour ce clic
   } catch (err) {
     console.error("createLeadFromClick dedupe check error:", err.message);
     // en cas de doute on continue quand même, mieux vaut un doublon occasionnel que perdre le lead
@@ -205,23 +207,32 @@ export default async function handler(req, res) {
       }),
     });
 
-    // On filtre aussi les provenances hors France : ce sont presque
-    // toujours des clics automatisés (bots de vérification qualité/anti-
-    // fraude de Google, souvent localisés aux US) plutôt que de vrais
-    // visiteurs — le clic reste enregistré en base pour les stats, mais ne
-    // déclenche plus de SMS ni de fiche lead inutile. On laisse passer les
-    // provenances inconnues, pour ne jamais rater un vrai visiteur si Vercel
-    // n'a pas pu déterminer le pays.
+    // On filtre les provenances hors France pour la création de fiche
+    // lead : ce sont presque toujours des clics automatisés (bots de
+    // vérification qualité/anti-fraude de Google, souvent localisés aux
+    // US) plutôt que de vrais visiteurs — le passage reste enregistré en
+    // base pour les stats, mais ne crée plus de fiche lead inutile. On
+    // laisse passer les provenances inconnues, pour ne jamais rater un
+    // vrai visiteur si Vercel n'a pas pu déterminer le pays.
     const isMetaAdClick = Boolean(fbclid || ad_id);
     const isGoogleAdClick = Boolean(gclid);
     const isFrenchOrUnknown = !geo.country || geo.country === "FR";
 
-    if ((isMetaAdClick || isGoogleAdClick) && isFrenchOrUnknown) {
-      const source = isGoogleAdClick && !isMetaAdClick ? "Google Ads" : "Meta";
+    if (isFrenchOrUnknown) {
+      // Toute arrivée sur le formulaire crée une fiche — pas seulement les
+      // clics pub identifiés. La source distingue Google Ads / Meta / et
+      // "Direct ou organique" (lien partagé, recherche directe, réseaux
+      // sociaux non payants...) pour qu'on garde une vue claire de l'origine.
+      const source = isGoogleAdClick && !isMetaAdClick
+        ? "Google Ads"
+        : isMetaAdClick
+        ? "Meta"
+        : "Direct ou organique";
+      const clickId = fbclid || ad_id || gclid || session_id;
 
       // Fiche lead dans le dashboard SalesFlow
       try {
-        await createLeadFromClick({ source, utm_campaign, session_id, geo });
+        await createLeadFromClick({ source, utm_campaign, click_id: clickId, geo });
       } catch (leadErr) {
         console.error("track-click lead creation error:", leadErr.message);
       }
