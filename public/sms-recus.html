@@ -231,6 +231,15 @@
     margin-left: 4px;
   }
   .btn-suppr-lead:hover { background: #fdeaea; border-color: #e5a3a3; }
+  td.editable {
+    cursor: text;
+    border-radius: 5px;
+    outline: none;
+  }
+  td.editable:hover { background: #eef4f1; }
+  td.editable:focus { background: #fff; box-shadow: 0 0 0 2px var(--vert-clair); white-space: normal; }
+  td.editable.sauvegarde-ok { background: #e3f5e9 !important; transition: background 0.4s; }
+  td.editable.sauvegarde-erreur { background: #fbe6e6 !important; transition: background 0.4s; }
   .vide { padding: 40px; text-align: center; color: #7a8983; }
   .chargement { padding: 40px; text-align: center; color: #7a8983; }
 </style>
@@ -512,11 +521,11 @@
       return `
       <tr>
         <td>${formatDate(l.created_at)}</td>
-        <td>${echapper(nomComplet)}</td>
-        <td>${echapper(l.telephone) || "—"}</td>
+        <td class="editable" data-lead-id="${l.id}" data-champ="nom" contenteditable="true" spellcheck="false">${echapper(l.nom) || ""}</td>
+        <td class="editable" data-lead-id="${l.id}" data-champ="telephone" contenteditable="true" spellcheck="false">${echapper(l.telephone) || ""}</td>
         <td>${echapper(l.email) || "—"}</td>
         <td>${echapper(l.type_projet) || "—"}</td>
-        <td>${echapper([l.adresse_projet, l.code_postal].filter(Boolean).join(", ")) || "—"}</td>
+        <td class="editable" data-lead-id="${l.id}" data-champ="adresse_projet" contenteditable="true" spellcheck="false">${echapper(l.adresse_projet) || ""}</td>
         <td>${echapper(l.source) || "—"}</td>
         <td>${badgeStatut(l.statut)}</td>
         <td>${l.formulaire_complete === true ? '<span class="badge badge-ok">Complet</span>' : '<span class="badge badge-ko">Incomplet</span>'}</td>
@@ -555,6 +564,17 @@
       </table>
     `;
 
+    document.querySelectorAll("td.editable").forEach(cell => {
+      // Sauvegarde à la perte de focus (clic ailleurs)
+      cell.addEventListener("blur", () => sauvegarderChampLead(cell));
+      // Entrée = valider et quitter le champ, sans sauter de ligne
+      cell.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          cell.blur();
+        }
+      });
+    });
     document.querySelectorAll(".btn-relance").forEach(btn => {
       btn.addEventListener("click", () => relancerLead(btn));
     });
@@ -567,6 +587,36 @@
     document.querySelectorAll(".btn-suppr-lead").forEach(btn => {
       btn.addEventListener("click", () => supprimerLead(btn));
     });
+  }
+
+  // Enregistre en base le nouveau contenu d'une cellule éditable (nom,
+  // téléphone ou adresse), et met à jour la donnée locale pour rester
+  // cohérent si le tableau se re-rend avant le prochain rechargement.
+  async function sauvegarderChampLead(cell) {
+    const leadId = cell.dataset.leadId;
+    const champ = cell.dataset.champ;
+    const nouvelleValeur = cell.textContent.trim();
+
+    const lead = toutesLignesLeads.find(l => String(l.id) === String(leadId));
+    const ancienneValeur = lead ? (lead[champ] || "") : "";
+    if (nouvelleValeur === ancienneValeur) return; // rien n'a changé, pas d'appel réseau
+
+    try {
+      const res = await fetch(API_LEADS, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: leadId, champ, valeur: nouvelleValeur }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      if (lead) lead[champ] = nouvelleValeur;
+      cell.classList.remove("sauvegarde-erreur");
+      cell.classList.add("sauvegarde-ok");
+      setTimeout(() => cell.classList.remove("sauvegarde-ok"), 800);
+    } catch (err) {
+      cell.classList.add("sauvegarde-erreur");
+      alert("Erreur lors de l'enregistrement : " + err.message);
+    }
   }
 
   async function proposerRdv(btn) {
