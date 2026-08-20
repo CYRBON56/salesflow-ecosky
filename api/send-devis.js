@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { devis_id, channels } = req.body; // channels: ["email", "sms"]
+    const { devis_id, channels, message } = req.body; // channels: ["email", "sms"], message: texte personnalisé (optionnel)
 
     if (!devis_id || !Array.isArray(channels) || channels.length === 0) {
       return res.status(400).json({ error: "Champs manquants (devis_id, channels)" });
@@ -33,6 +33,9 @@ export default async function handler(req, res) {
     }
 
     const lead = devis.leads;
+    const texteMessage = (message && message.trim())
+      || devis.message_perso
+      || `Bonjour, veuillez recevoir votre devis n° ${devis.numero}.`;
     const results = { email: null, sms: null };
 
     // --- Email (via Resend), PDF joint en pièce jointe ---
@@ -47,16 +50,15 @@ export default async function handler(req, res) {
           from: process.env.RESEND_FROM_EMAIL,
           to: lead.email,
           bcc: process.env.OWNER_EMAIL,
-          subject: `Votre devis RMS EcoSky n° ${devis.numero}`,
+          subject: `Votre devis RMS EcoSky${devis.numero ? ` n° ${devis.numero}` : ""}`,
           html: `
-            <p>Bonjour ${lead.prenom || ""},</p>
-            <p>Veuillez trouver ci-joint votre devis n° <strong>${devis.numero}</strong>${devis.montant_ttc ? ` d'un montant de <strong>${devis.montant_ttc} € TTC</strong>` : ""}.</p>
+            <p>${texteMessage.replace(/\n/g, "<br>")}</p>
             <p>N'hésitez pas à nous contacter pour toute question.</p>
             <p>L'équipe RMS EcoSky</p>
           `,
           attachments: [
             {
-              filename: `Devis_${devis.numero}.pdf`,
+              filename: `Devis_${devis.numero || devis_id}.pdf`,
               content: pdfBuffer.toString("base64"),
             },
           ],
@@ -67,7 +69,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- SMS (via Twilio), lien vers le PDF ---
+    // --- SMS (via Twilio), message personnalisé + lien vers le PDF ---
     if (channels.includes("sms")) {
       if (!lead?.telephone) {
         results.sms = { sent: false, reason: "Pas de téléphone sur cette fiche" };
@@ -75,7 +77,7 @@ export default async function handler(req, res) {
         await twilioClient.messages.create({
           from: process.env.TWILIO_FROM_NUMBER,
           to: lead.telephone,
-          body: `RMS EcoSky - Votre devis n° ${devis.numero} est disponible ici : ${devis.pdf_url}`,
+          body: `${texteMessage}\n${devis.pdf_url}`,
         });
 
         await supabase.from("devis").update({ envoye_sms_at: new Date().toISOString() }).eq("id", devis_id);
