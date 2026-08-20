@@ -357,6 +357,46 @@
   }
   .statut-envoi-devis.ok { color: #1e6f4c; }
   .statut-envoi-devis.erreur { color: #b3261e; }
+  .liste-devis-existants {
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--bordure);
+    padding-bottom: 14px;
+  }
+  .liste-devis-existants .titre-liste {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--vert);
+    margin-bottom: 8px;
+  }
+  .item-devis-existant {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--bordure);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-size: 0.8rem;
+  }
+  .item-devis-existant .infos-devis-existant { min-width: 0; }
+  .item-devis-existant .infos-devis-existant a { color: var(--vert); font-weight: 600; }
+  .item-devis-existant .statuts-devis-existant {
+    font-size: 0.72rem;
+    color: #5a6b64;
+    margin-top: 2px;
+  }
+  .item-devis-existant .btn-reutiliser-devis {
+    background: #eef4f1;
+    border: none;
+    color: var(--vert);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 5px 9px;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
 </style>
 </head>
 <body>
@@ -395,6 +435,8 @@
     <h2>Envoyer un devis</h2>
     <div class="client-modale" id="clientModaleDevis">—</div>
 
+    <div id="devisExistants"></div>
+
     <div id="etapeChargementDevis">
       <label for="fichierDevis">Fichier PDF du devis</label>
       <input type="file" id="fichierDevis" accept="application/pdf">
@@ -415,6 +457,7 @@
         <button id="btnEnvoyerDevisLesDeux">Envoyer les deux</button>
       </div>
       <div class="modale-actions">
+        <button class="btn-annuler-modale" id="btnChargerAutreDevis">Charger un autre devis</button>
         <button class="btn-annuler-modale" id="btnFermerModaleDevisFin">Fermer</button>
       </div>
     </div>
@@ -428,6 +471,7 @@
   const API_LEADS = "/api/leads-recus";
   const API_UPLOAD_DEVIS = "/api/upload-devis";
   const API_SEND_DEVIS = "/api/send-devis";
+  const API_DEVIS_LEAD = "/api/devis-lead";
 
   const LIBELLES_TYPE_SMS = {
     arrivee_pub: "Arrivée pub",
@@ -867,6 +911,7 @@
     document.getElementById("statutEnvoiDevis").className = "statut-envoi-devis";
     document.getElementById("btnChargerDevis").disabled = false;
     document.getElementById("btnChargerDevis").textContent = "Charger le devis";
+    document.getElementById("devisExistants").innerHTML = "";
     devisIdCharge = null;
     pdfUrlCharge = null;
   }
@@ -882,6 +927,58 @@
     document.getElementById("clientModaleDevis").textContent =
       `${leadDevisEnCours.nom} — ${leadDevisEnCours.telephone || "sans tél."} — ${leadDevisEnCours.email && leadDevisEnCours.email !== "—" ? leadDevisEnCours.email : "sans email"}`;
     document.getElementById("overlayDevis").classList.add("visible");
+    chargerDevisExistants(leadDevisEnCours.id);
+  }
+
+  async function chargerDevisExistants(leadId) {
+    const conteneur = document.getElementById("devisExistants");
+    conteneur.innerHTML = "";
+    try {
+      const res = await fetch(`${API_DEVIS_LEAD}?lead_id=${encodeURIComponent(leadId)}`);
+      const data = await res.json();
+      if (!data.ok || !data.rows || data.rows.length === 0) return;
+
+      const itemsHtml = data.rows.map(d => {
+        const statuts = [];
+        statuts.push(d.envoye_email_at ? "✅ Email envoyé" : "✉️ Email non envoyé");
+        statuts.push(d.envoye_sms_at ? "✅ SMS envoyé" : "📲 SMS non envoyé");
+        return `
+          <div class="item-devis-existant">
+            <div class="infos-devis-existant">
+              <a href="${d.pdf_url}" target="_blank" rel="noopener">${echapper(d.numero) || "Devis"}</a>
+              <div class="statuts-devis-existant">${formatDate(d.created_at)} — ${statuts.join(" · ")}</div>
+            </div>
+            <button class="btn-reutiliser-devis" data-devis-id="${d.id}" data-pdf-url="${d.pdf_url}" data-message="${echapper(d.message_perso || "")}">Renvoyer</button>
+          </div>
+        `;
+      }).join("");
+
+      conteneur.innerHTML = `
+        <div class="liste-devis-existants">
+          <div class="titre-liste">Devis déjà chargés pour ce client</div>
+          ${itemsHtml}
+        </div>
+      `;
+
+      conteneur.querySelectorAll(".btn-reutiliser-devis").forEach(b => {
+        b.addEventListener("click", () => {
+          reutiliserDevisExistant(b.dataset.devisId, b.dataset.pdfUrl, b.dataset.message);
+        });
+      });
+    } catch (err) {
+      // Pas bloquant : si la liste ne charge pas, on laisse simplement le formulaire d'upload.
+    }
+  }
+
+  function reutiliserDevisExistant(devisId, pdfUrl, message) {
+    devisIdCharge = devisId;
+    pdfUrlCharge = pdfUrl;
+    document.getElementById("etapeChargementDevis").style.display = "none";
+    document.getElementById("zoneEnvoiDevis").classList.add("visible");
+    document.getElementById("lienPdfDevisCharge").href = pdfUrl;
+    document.getElementById("messageDevis").value = message || "";
+    document.getElementById("statutEnvoiDevis").textContent = "";
+    document.getElementById("statutEnvoiDevis").className = "statut-envoi-devis";
   }
 
   function fermerModaleDevis() {
@@ -988,6 +1085,16 @@
   document.getElementById("btnChargerDevis").addEventListener("click", chargerDevis);
   document.getElementById("btnFermerModaleDevis").addEventListener("click", fermerModaleDevis);
   document.getElementById("btnFermerModaleDevisFin").addEventListener("click", fermerModaleDevis);
+  document.getElementById("btnChargerAutreDevis").addEventListener("click", () => {
+    document.getElementById("fichierDevis").value = "";
+    document.getElementById("messageDevis").value = "";
+    document.getElementById("etapeChargementDevis").style.display = "block";
+    document.getElementById("zoneEnvoiDevis").classList.remove("visible");
+    document.getElementById("statutEnvoiDevis").textContent = "";
+    document.getElementById("statutEnvoiDevis").className = "statut-envoi-devis";
+    devisIdCharge = null;
+    pdfUrlCharge = null;
+  });
   document.getElementById("overlayDevis").addEventListener("click", (e) => {
     if (e.target.id === "overlayDevis") fermerModaleDevis();
   });
