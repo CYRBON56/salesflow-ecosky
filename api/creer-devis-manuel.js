@@ -59,12 +59,16 @@ export default async function handler(req, res) {
 
     // 3. Ligne devis, avec token de signature déjà généré
     const token_signature = crypto.randomUUID();
+    const montantNumerique = montant
+      ? parseFloat(String(montant).replace(/[^\d,.-]/g, "").replace(",", "."))
+      : null;
     const { data: devis, error: devisError } = await supabase
       .from("devis")
       .insert({
         lead_id: lead.id,
         numero: numero || null,
-        montant: montant || null,
+        nom_client: `${prenom} ${nom}`.trim(),
+        montant_ttc: Number.isFinite(montantNumerique) ? montantNumerique : null,
         type_projet: type_projet || null,
         pdf_url,
         message_perso: message || null,
