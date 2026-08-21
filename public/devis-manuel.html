@@ -14,7 +14,7 @@
   fieldset { border:none; padding:0; margin:0 0 16px; }
   legend { font-weight:600; font-size:.9rem; color:var(--gray); margin-bottom:8px; }
   label { display:block; font-size:.85rem; color:var(--gray); margin-top:10px; }
-  input[type=text], input[type=email], input[type=tel], input[type=number], textarea {
+  input[type=text], input[type=email], input[type=tel], textarea {
     width:100%; padding:9px; border:1px solid var(--border); border-radius:6px; font-size:.95rem; margin-top:4px;
   }
   .row2 { display:flex; gap:10px; } .row2 > div { flex:1; }
@@ -23,8 +23,11 @@
   .canaux label { display:flex; align-items:center; gap:6px; color:var(--dark); }
   button.submit { width:100%; margin-top:20px; padding:14px; background:var(--brand); color:#fff; border:none; border-radius:8px; font-size:1rem; font-weight:600; }
   button.submit:disabled { background:#aaa; }
+  button.secondary { width:100%; margin-top:10px; padding:10px; background:none; border:1px solid var(--border); border-radius:8px; color:var(--gray); font-size:.85rem; }
   .msg { margin-top:14px; font-size:.9rem; }
   .msg.error { color:#c0392b; } .msg.success { color:var(--brand); }
+  .badge { display:inline-block; background:#e8f5ee; color:var(--brand); font-size:.72rem; padding:2px 7px; border-radius:10px; margin-left:6px; }
+  #step2 { display:none; }
 </style>
 </head>
 <body>
@@ -32,12 +35,22 @@
   <h1>Nouveau devis — client hors base</h1>
   <p style="color:var(--gray); font-size:.85rem;">
     À utiliser uniquement pour un devis dont le client n'a pas déjà une fiche dans SalesFlow.
-    Si le client est déjà dans la base, passe plutôt par le écran habituel "Devis" sur le tableau de bord.
+    Si le client est déjà dans la base, passe plutôt par l'écran "Devis" habituel sur le tableau de bord.
   </p>
-  <div class="card">
+
+  <div class="card" id="step1">
+    <fieldset>
+      <legend>1. PDF du devis</legend>
+      <input type="file" id="pdfInput" accept="application/pdf" required>
+      <button class="submit" id="analyzeBtn" disabled>Analyser le devis</button>
+      <div id="msg1" class="msg"></div>
+    </fieldset>
+  </div>
+
+  <div class="card" id="step2">
     <form id="form">
       <fieldset>
-        <legend>Client</legend>
+        <legend>2. Client</legend>
         <div class="row2">
           <div><label>Prénom</label><input type="text" name="prenom" required></div>
           <div><label>Nom</label><input type="text" name="nom" required></div>
@@ -46,13 +59,12 @@
         <label>Téléphone</label><input type="tel" name="telephone">
       </fieldset>
       <fieldset>
-        <legend>Devis</legend>
+        <legend>Devis <span class="badge">extrait automatiquement — à vérifier</span></legend>
         <div class="row2">
-          <div><label>Numéro (optionnel)</label><input type="text" name="numero"></div>
-          <div><label>Montant TTC</label><input type="text" name="montant" placeholder="ex: 3 200 €"></div>
+          <div><label>Numéro</label><input type="text" name="numero"></div>
+          <div><label>Montant TTC</label><input type="text" name="montant"></div>
         </div>
-        <label>Type de projet</label><input type="text" name="type_projet" placeholder="ex: terrasse résine EPDM">
-        <label>PDF du devis</label><input type="file" name="pdf" accept="application/pdf" required>
+        <label>Type de projet</label><input type="text" name="type_projet">
         <label>Message (optionnel)</label><textarea name="message" rows="3"></textarea>
       </fieldset>
       <fieldset>
@@ -63,34 +75,92 @@
         </div>
       </fieldset>
       <button class="submit" type="submit">Créer et envoyer le devis</button>
-      <div id="msg" class="msg"></div>
+      <button class="secondary" type="button" id="backBtn">← Changer de PDF</button>
+      <div id="msg2" class="msg"></div>
     </form>
   </div>
 </div>
 
 <script>
-document.getElementById('form').addEventListener('submit', async (e) => {
+let pdfBase64 = null;
+let pdfFilename = null;
+
+const pdfInput = document.getElementById('pdfInput');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const msg1 = document.getElementById('msg1');
+const step1 = document.getElementById('step1');
+const step2 = document.getElementById('step2');
+const form = document.getElementById('form');
+
+const toBase64 = (f) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result.split(',')[1]);
+  reader.onerror = reject;
+  reader.readAsDataURL(f);
+});
+
+pdfInput.addEventListener('change', () => {
+  analyzeBtn.disabled = !pdfInput.files.length;
+});
+
+analyzeBtn.addEventListener('click', async () => {
+  const file = pdfInput.files[0];
+  if (!file) return;
+  analyzeBtn.disabled = true;
+  analyzeBtn.textContent = 'Analyse en cours…';
+  msg1.textContent = '';
+  try {
+    pdfBase64 = await toBase64(file);
+    pdfFilename = file.name;
+    const res = await fetch('/api/extraire-devis-manuel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdf_base64: pdfBase64 })
+    });
+    const data = await res.json();
+
+    // pré-remplissage : nom_client découpé en prénom / nom (heuristique simple)
+    if (data.nom_client) {
+      const parts = data.nom_client.trim().split(/\s+/);
+      form.prenom.value = parts[0] || '';
+      form.nom.value = parts.slice(1).join(' ') || '';
+    }
+    form.numero.value = data.numero || '';
+    form.montant.value = data.montant || '';
+    form.type_projet.value = data.type_projet || '';
+
+    step1.style.display = 'none';
+    step2.style.display = 'block';
+  } catch (err) {
+    msg1.className = 'msg error';
+    msg1.textContent = "Erreur d'analyse, vous pouvez quand même continuer et compléter à la main.";
+    step1.style.display = 'none';
+    step2.style.display = 'block';
+  } finally {
+    analyzeBtn.disabled = false;
+    analyzeBtn.textContent = 'Analyser le devis';
+  }
+});
+
+document.getElementById('backBtn').addEventListener('click', () => {
+  step2.style.display = 'none';
+  step1.style.display = 'block';
+  pdfInput.value = '';
+  analyzeBtn.disabled = true;
+});
+
+form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const form = e.target;
-  const btn = form.querySelector('button');
-  const msg = document.getElementById('msg');
-  btn.disabled = true; btn.textContent = 'Envoi en cours…'; msg.textContent = '';
+  const btn = form.querySelector('button.submit');
+  const msg2 = document.getElementById('msg2');
+  btn.disabled = true; btn.textContent = 'Envoi en cours…'; msg2.textContent = '';
 
   const fd = new FormData(form);
   const channels = [];
   if (fd.get('canal_email')) channels.push('email');
   if (fd.get('canal_sms')) channels.push('sms');
 
-  const file = fd.get('pdf');
-  const toBase64 = (f) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(f);
-  });
-
   try {
-    const pdf_base64 = await toBase64(file);
     const res = await fetch('/api/creer-devis-manuel', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -98,17 +168,18 @@ document.getElementById('form').addEventListener('submit', async (e) => {
         prenom: fd.get('prenom'), nom: fd.get('nom'), email: fd.get('email'), telephone: fd.get('telephone'),
         numero: fd.get('numero'), montant: fd.get('montant'), type_projet: fd.get('type_projet'),
         message: fd.get('message'), channels,
-        pdf_base64, pdf_filename: file.name
+        pdf_base64: pdfBase64, pdf_filename: pdfFilename
       })
     });
     const out = await res.json();
     if (!res.ok) throw new Error(out.error || 'Erreur');
-    msg.className = 'msg success';
-    msg.textContent = 'Devis créé et envoyé avec succès.';
+    msg2.className = 'msg success';
+    msg2.textContent = 'Devis créé et envoyé avec succès.';
     form.reset();
+    setTimeout(() => { step2.style.display = 'none'; step1.style.display = 'block'; pdfInput.value=''; analyzeBtn.disabled=true; }, 1500);
   } catch (err) {
-    msg.className = 'msg error';
-    msg.textContent = "Erreur : " + err.message;
+    msg2.className = 'msg error';
+    msg2.textContent = "Erreur : " + err.message;
   } finally {
     btn.disabled = false; btn.textContent = 'Créer et envoyer le devis';
   }
