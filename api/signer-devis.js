@@ -28,12 +28,14 @@ async function handleGet(req, res) {
 
   const { data, error } = await supabase
     .from('devis')
-    .select('numero, nom_client, montant, type_projet, pdf_url, statut, date_signature') // [VÉRIFIER]
+    .select('numero, montant, type_projet, pdf_url, statut, date_signature, leads(prenom, nom)') // [VÉRIFIER montant/type_projet]
     .eq('token_signature', token)
     .single();
 
   if (error || !data) return res.status(404).json({ error: 'Devis introuvable' });
-  return res.status(200).json(data);
+
+  const nom_client = [data.leads?.prenom, data.leads?.nom].filter(Boolean).join(' ');
+  return res.status(200).json({ ...data, nom_client });
 }
 
 async function handlePost(req, res) {
