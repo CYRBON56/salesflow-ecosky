@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signature du devis — RMS EcoSky</title>
+<style>
+  :root { --brand:#0f7a4a; --dark:#1a1a1a; --gray:#666; --border:#ddd; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:0; background:#f7f7f5; color:var(--dark); }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 20px 16px 60px; }
+  header { text-align:center; padding: 24px 0 8px; }
+  header h1 { font-size: 1.25rem; margin: 0; color: var(--brand); }
+  .card { background:#fff; border-radius:12px; padding:20px; margin-top:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .card h2 { font-size:1rem; margin:0 0 12px; }
+  .row { display:flex; justify-content:space-between; padding:6px 0; font-size:.95rem; border-bottom:1px solid #f0f0f0; }
+  .row span:first-child { color:var(--gray); }
+  a.pdf-link { display:block; text-align:center; margin-top:12px; color:var(--brand); font-weight:600; text-decoration:none; }
+  canvas { width:100%; height:180px; border:2px dashed var(--border); border-radius:8px; touch-action:none; background:#fff; }
+  .canvas-actions { display:flex; justify-content:flex-end; margin-top:6px; }
+  .canvas-actions button { background:none; border:none; color:var(--gray); font-size:.85rem; text-decoration:underline; }
+  label.consent { display:flex; gap:8px; align-items:flex-start; font-size:.85rem; color:var(--gray); margin-top:16px; }
+  input[type=text] { width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:1rem; margin-top:8px; }
+  button.submit { width:100%; margin-top:18px; padding:14px; background:var(--brand); color:#fff; border:none; border-radius:8px; font-size:1rem; font-weight:600; }
+  button.submit:disabled { background:#aaa; }
+  .msg { text-align:center; padding:40px 16px; }
+  .msg.error { color:#c0392b; }
+  .msg.success { color:var(--brand); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>RMS EcoSky</h1></header>
+  <div id="app"><div class="msg">Chargement du devis…</div></div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const token = params.get('token');
+const app = document.getElementById('app');
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function init() {
+  if (!token) { app.innerHTML = '<div class="msg error">Lien invalide.</div>'; return; }
+  try {
+    const res = await fetch('/api/signer-devis?token=' + encodeURIComponent(token));
+    if (!res.ok) { app.innerHTML = '<div class="msg error">Devis introuvable ou lien expiré.</div>'; return; }
+    const d = await res.json();
+    if (d.statut === 'signe') {
+      app.innerHTML = '<div class="msg success">Ce devis a déjà été signé le ' +
+        new Date(d.date_signature).toLocaleDateString('fr-FR') + '. Merci !</div>';
+      return;
+    }
+    render(d);
+  } catch (e) {
+    app.innerHTML = '<div class="msg error">Erreur de chargement. Réessayez plus tard.</div>';
+  }
+}
+
+function render(d) {
+  app.innerHTML = `
+    <div class="card">
+      <h2>Devis ${escapeHtml(d.numero || '')}</h2>
+      <div class="row"><span>Client</span><span>${escapeHtml(d.nom_client || '')}</span></div>
+      <div class="row"><span>Montant TTC</span><span>${escapeHtml(d.montant || '')}</span></div>
+      <div class="row"><span>Projet</span><span>${escapeHtml(d.type_projet || '')}</span></div>
+      ${d.pdf_url ? `<a class="pdf-link" href="${d.pdf_url}" target="_blank">Voir le PDF du devis</a>` : ''}
+    </div>
+    <div class="card">
+      <h2>Signez ci-dessous</h2>
+      <canvas id="pad"></canvas>
+      <div class="canvas-actions"><button type="button" id="clear">Effacer</button></div>
+      <input type="text" id="nom" placeholder="Nom et prénom du signataire" />
+      <label class="consent">
+        <input type="checkbox" id="consent" />
+        J'ai lu et j'accepte les termes de ce devis. Cette signature électronique vaut acceptation ferme du devis.
+      </label>
+      <button class="submit" id="send" disabled>Signer et valider le devis</button>
+    </div>
+  `;
+  setupCanvas(d);
+}
+
+function setupCanvas(d) {
+  const canvas = document.getElementById('pad');
+  const ctx = canvas.getContext('2d');
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = canvas.clientWidth * ratio;
+  canvas.height = canvas.clientHeight * ratio;
+  ctx.scale(ratio, ratio);
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#111';
+
+  let drawing = false, hasStroke = false;
+  const pos = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    return { x: p.clientX - r.left, y: p.clientY - r.top };
+  };
+  const start = (e) => { drawing = true; hasStroke = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); checkReady(); };
+  const move = (e) => { if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); };
+  const end = () => { drawing = false; };
+
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start);
+  canvas.addEventListener('touchmove', move);
+  canvas.addEventListener('touchend', end);
+
+  document.getElementById('clear').onclick = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasStroke = false; checkReady(); };
+
+  const nomInput = document.getElementById('nom');
+  const consent = document.getElementById('consent');
+  const sendBtn = document.getElementById('send');
+  function checkReady() {
+    sendBtn.disabled = !(hasStroke && nomInput.value.trim().length > 1 && consent.checked);
+  }
+  nomInput.addEventListener('input', checkReady);
+  consent.addEventListener('change', checkReady);
+
+  sendBtn.onclick = async () => {
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Envoi en cours…';
+    try {
+      const res = await fetch('/api/signer-devis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          signature: canvas.toDataURL('image/png'),
+          nom_signataire: nomInput.value.trim()
+        })
+      });
+      if (!res.ok) throw new Error('fail');
+      app.innerHTML = '<div class="msg success">Merci ! Votre signature a bien été enregistrée. Une confirmation vous sera envoyée.</div>';
+    } catch (e) {
+      sendBtn.disabled = false;
+      sendBtn.textContent = 'Signer et valider le devis';
+      alert("Une erreur est survenue, merci de réessayer.");
+    }
+  };
+}
+
+init();
+</script>
+</body>
+</html>
