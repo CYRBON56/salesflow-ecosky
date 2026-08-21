@@ -39,13 +39,26 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Il faut au moins un email ou un téléphone" });
     }
 
-    // 1. Fiche lead minimale
-    const { data: lead, error: leadError } = await supabase
-      .from("leads")
-      .insert({ prenom, nom, email: email || null, telephone: telephone || null, source: "devis_manuel" })
-      .select()
-      .single();
-    if (leadError) throw leadError;
+    // 1. Fiche lead — réutilise une fiche existante (même téléphone ou email) plutôt que de planter
+    //    sur la contrainte unique telephone_unique
+    let lead = null;
+    if (telephone) {
+      const { data: existant } = await supabase.from("leads").select().eq("telephone", telephone).maybeSingle();
+      lead = existant;
+    }
+    if (!lead && email) {
+      const { data: existant } = await supabase.from("leads").select().eq("email", email).maybeSingle();
+      lead = existant;
+    }
+    if (!lead) {
+      const { data: nouveau, error: leadError } = await supabase
+        .from("leads")
+        .insert({ prenom, nom, email: email || null, telephone: telephone || null, source: "devis_manuel" })
+        .select()
+        .single();
+      if (leadError) throw leadError;
+      lead = nouveau;
+    }
 
     // 2. Upload du PDF
     const pdfBuffer = Buffer.from(pdf_base64, "base64");
