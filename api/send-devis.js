@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import twilio from "twilio";
+import crypto from "crypto";
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
@@ -33,11 +34,15 @@ export default async function handler(req, res) {
       || devis.message_perso
       || `Bonjour, veuillez recevoir votre devis n° ${devis.numero}.`;
 
-    // Lien de signature électronique (nécessite la migration sql-signature-devis.sql :
-    // colonne token_signature déjà générée pour chaque devis)
-    const lienSignature = devis.token_signature
-      ? `${SITE_URL}/signature-devis.html?token=${devis.token_signature}`
-      : null;
+    // Lien de signature électronique (nécessite la migration sql-signature-devis.sql).
+    // Si le devis n'a pas encore de token (ex: créé via l'ancien écran d'upload
+    // sur sms-recus.html), on le génère et on le sauvegarde ici, à la volée.
+    let tokenSignature = devis.token_signature;
+    if (!tokenSignature) {
+      tokenSignature = crypto.randomUUID();
+      await supabase.from("devis").update({ token_signature: tokenSignature }).eq("id", devis_id);
+    }
+    const lienSignature = `${SITE_URL}/signature-devis.html?token=${tokenSignature}`;
 
     const results = { email: null, sms: null };
     // --- Email (via Resend), PDF du devis + RIB (si coché) en pièce jointe ---
