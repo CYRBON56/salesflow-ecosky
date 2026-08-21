@@ -2,11 +2,9 @@
 // GET  /api/signer-devis?token=xxx   -> infos du devis pour affichage
 // POST /api/signer-devis             -> enregistre la signature, tamponne le PDF, notifie Cyrille
 //
-// ⚠️ À VÉRIFIER avant mise en prod : les noms des colonnes de la table "devis"
-// (numero, nom_client, montant, type_projet, pdf_url) doivent correspondre à ton
-// schéma réel — adapte les lignes marquées [VÉRIFIER] si les noms diffèrent.
-// Nécessite le package "pdf-lib" (npm i pdf-lib) — probablement déjà présent
-// vu l'usage de pdf-lib pour l'ESTIMATEUR.
+// Schéma confirmé (table devis) : numero, montant_ttc (numeric), type_projet,
+// pdf_url, nom_client — tous en colonnes directes.
+// Nécessite le package "pdf-lib" (npm i pdf-lib).
 
 import { createClient } from '@supabase/supabase-js';
 import { PDFDocument } from 'pdf-lib';
@@ -28,14 +26,13 @@ async function handleGet(req, res) {
 
   const { data, error } = await supabase
     .from('devis')
-    .select('numero, montant, type_projet, pdf_url, statut, date_signature, leads(prenom, nom)') // [VÉRIFIER montant/type_projet]
+    .select('numero, montant_ttc, type_projet, pdf_url, statut, date_signature, nom_client')
     .eq('token_signature', token)
     .single();
 
   if (error || !data) return res.status(404).json({ error: 'Devis introuvable' });
 
-  const nom_client = [data.leads?.prenom, data.leads?.nom].filter(Boolean).join(' ');
-  return res.status(200).json({ ...data, nom_client });
+  return res.status(200).json({ ...data, montant: data.montant_ttc });
 }
 
 async function handlePost(req, res) {
