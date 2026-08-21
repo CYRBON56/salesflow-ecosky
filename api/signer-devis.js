@@ -32,7 +32,11 @@ async function handleGet(req, res) {
 
   if (error || !data) return res.status(404).json({ error: 'Devis introuvable' });
 
-  return res.status(200).json({ ...data, montant: data.montant_ttc });
+  const montantFormate = data.montant_ttc != null
+    ? Number(data.montant_ttc).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+    : null;
+
+  return res.status(200).json({ ...data, montant: montantFormate });
 }
 
 async function handlePost(req, res) {
