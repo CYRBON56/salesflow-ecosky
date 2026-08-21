@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nouveau devis (hors base) — RMS EcoSky</title>
+<style>
+  :root { --brand:#0f7a4a; --dark:#1a1a1a; --gray:#666; --border:#ddd; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:0; background:#f7f7f5; color:var(--dark); }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 1.2rem; color: var(--brand); }
+  .card { background:#fff; border-radius:12px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  fieldset { border:none; padding:0; margin:0 0 16px; }
+  legend { font-weight:600; font-size:.9rem; color:var(--gray); margin-bottom:8px; }
+  label { display:block; font-size:.85rem; color:var(--gray); margin-top:10px; }
+  input[type=text], input[type=email], input[type=tel], input[type=number], textarea {
+    width:100%; padding:9px; border:1px solid var(--border); border-radius:6px; font-size:.95rem; margin-top:4px;
+  }
+  .row2 { display:flex; gap:10px; } .row2 > div { flex:1; }
+  input[type=file] { margin-top:6px; }
+  .canaux { display:flex; gap:16px; margin-top:8px; font-size:.9rem; }
+  .canaux label { display:flex; align-items:center; gap:6px; color:var(--dark); }
+  button.submit { width:100%; margin-top:20px; padding:14px; background:var(--brand); color:#fff; border:none; border-radius:8px; font-size:1rem; font-weight:600; }
+  button.submit:disabled { background:#aaa; }
+  .msg { margin-top:14px; font-size:.9rem; }
+  .msg.error { color:#c0392b; } .msg.success { color:var(--brand); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Nouveau devis — client hors base</h1>
+  <p style="color:var(--gray); font-size:.85rem;">
+    À utiliser uniquement pour un devis dont le client n'a pas déjà une fiche dans SalesFlow.
+    Si le client est déjà dans la base, passe plutôt par le écran habituel "Devis" sur le tableau de bord.
+  </p>
+  <div class="card">
+    <form id="form">
+      <fieldset>
+        <legend>Client</legend>
+        <div class="row2">
+          <div><label>Prénom</label><input type="text" name="prenom" required></div>
+          <div><label>Nom</label><input type="text" name="nom" required></div>
+        </div>
+        <label>Email</label><input type="email" name="email">
+        <label>Téléphone</label><input type="tel" name="telephone">
+      </fieldset>
+      <fieldset>
+        <legend>Devis</legend>
+        <div class="row2">
+          <div><label>Numéro (optionnel)</label><input type="text" name="numero"></div>
+          <div><label>Montant TTC</label><input type="text" name="montant" placeholder="ex: 3 200 €"></div>
+        </div>
+        <label>Type de projet</label><input type="text" name="type_projet" placeholder="ex: terrasse résine EPDM">
+        <label>PDF du devis</label><input type="file" name="pdf" accept="application/pdf" required>
+        <label>Message (optionnel)</label><textarea name="message" rows="3"></textarea>
+      </fieldset>
+      <fieldset>
+        <legend>Envoyer par</legend>
+        <div class="canaux">
+          <label><input type="checkbox" name="canal_email" checked> Email</label>
+          <label><input type="checkbox" name="canal_sms" checked> SMS</label>
+        </div>
+      </fieldset>
+      <button class="submit" type="submit">Créer et envoyer le devis</button>
+      <div id="msg" class="msg"></div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const btn = form.querySelector('button');
+  const msg = document.getElementById('msg');
+  btn.disabled = true; btn.textContent = 'Envoi en cours…'; msg.textContent = '';
+
+  const fd = new FormData(form);
+  const channels = [];
+  if (fd.get('canal_email')) channels.push('email');
+  if (fd.get('canal_sms')) channels.push('sms');
+
+  const file = fd.get('pdf');
+  const toBase64 = (f) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(f);
+  });
+
+  try {
+    const pdf_base64 = await toBase64(file);
+    const res = await fetch('/api/creer-devis-manuel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prenom: fd.get('prenom'), nom: fd.get('nom'), email: fd.get('email'), telephone: fd.get('telephone'),
+        numero: fd.get('numero'), montant: fd.get('montant'), type_projet: fd.get('type_projet'),
+        message: fd.get('message'), channels,
+        pdf_base64, pdf_filename: file.name
+      })
+    });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error || 'Erreur');
+    msg.className = 'msg success';
+    msg.textContent = 'Devis créé et envoyé avec succès.';
+    form.reset();
+  } catch (err) {
+    msg.className = 'msg error';
+    msg.textContent = "Erreur : " + err.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Créer et envoyer le devis';
+  }
+});
+</script>
+</body>
+</html>
