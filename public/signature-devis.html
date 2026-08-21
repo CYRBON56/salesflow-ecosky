@@ -137,7 +137,18 @@ function setupCanvas(d) {
         })
       });
       if (!res.ok) throw new Error('fail');
-      app.innerHTML = '<div class="msg success">Merci ! Votre signature a bien été enregistrée. Une confirmation vous sera envoyée.</div>';
+      const result = await res.json();
+      let details = '';
+      if (result.acompte && result.acompte.pourcentage) {
+        const montantTxte = result.acompte.montant != null
+          ? ` (soit ${result.acompte.montant.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €)`
+          : '';
+        details += `<p>Un acompte de <strong>${result.acompte.pourcentage}%</strong>${montantTxte} est à régler à la commande.</p>`;
+      }
+      if (result.rib_url) {
+        details += `<p><a href="${result.rib_url}" target="_blank" style="color:var(--brand);font-weight:600;">Télécharger notre RIB</a></p>`;
+      }
+      app.innerHTML = '<div class="msg success">Merci ! Votre signature a bien été enregistrée.' + details + '</div>';
     } catch (e) {
       sendBtn.disabled = false;
       sendBtn.textContent = 'Signer et valider le devis';
