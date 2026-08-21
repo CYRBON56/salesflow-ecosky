@@ -8,6 +8,9 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { PDFDocument } from 'pdf-lib';
+import pdfParse from 'pdf-parse';
+
+const RIB_URL = 'https://salesflow-ecosky.vercel.app/rib-ecosky.pdf';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -89,9 +92,30 @@ async function handlePost(req, res) {
     return res.status(500).json({ error: 'Erreur enregistrement' });
   }
 
-  notifierCyrille(devis, nom_signataire).catch(e => console.error('Notif SMS échouée:', e));
+  const acompte = await extraireAcompte(devis.pdf_url, devis.montant_ttc);
 
-  return res.status(200).json({ ok: true, pdf_signe_url: pdfSigneUrl });
+  notifierCyrille(devis, nom_signataire, acompte).catch(e => console.error('Notif SMS échouée:', e));
+
+  return res.status(200).json({ ok: true, pdf_signe_url: pdfSigneUrl, acompte, rib_url: RIB_URL });
+}
+
+// Cherche un pourcentage d'acompte dans le texte du devis (ex: "ACOMPTE 40% à la
+// commande") et calcule le montant correspondant sur la base du montant TTC.
+// Retourne null si aucune mention d'acompte n'est trouvée dans le texte.
+async function extraireAcompte(pdfUrl, montantTtc) {
+  if (!pdfUrl) return null;
+  try {
+    const bytes = await fetch(pdfUrl).then(r => r.arrayBuffer());
+    const { text } = await pdfParse(Buffer.from(bytes));
+    const match = text.match(/acompte[^\d%]{0,20}(\d{1,3})\s*%/i);
+    if (!match) return null;
+    const pourcentage = parseInt(match[1], 10);
+    const montant = montantTtc != null ? Math.round(montantTtc * pourcentage) / 100 : null;
+    return { pourcentage, montant };
+  } catch (e) {
+    console.error('Erreur extraction acompte:', e);
+    return null;
+  }
 }
 
 async function tamponnerPdf({ pdfUrl, signatureDataUrl, nomSignataire, ip, date, token }) {
@@ -134,15 +158,20 @@ async function tamponnerPdf({ pdfUrl, signatureDataUrl, nomSignataire, ip, date,
   return publicUrlData?.publicUrl || null;
 }
 
-async function notifierCyrille(devis, nomSignataire) {
+async function notifierCyrille(devis, nomSignataire, acompte) {
   if (!process.env.TWILIO_ACCOUNT_SID) return; // notif SMS optionnelle
   const twilio = (await import('twilio')).default(
     process.env.TWILIO_ACCOUNT_SID,
     process.env.TWILIO_AUTH_TOKEN
   );
+  let body = `Devis ${devis.numero || ''} signé par ${nomSignataire}. ✅`;
+  if (acompte && acompte.pourcentage) {
+    body += ` Acompte attendu : ${acompte.pourcentage}%`;
+    if (acompte.montant != null) body += ` (${acompte.montant.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €)`;
+  }
   await twilio.messages.create({
     to: process.env.TWILIO_TO_NUMBER,
     from: process.env.TWILIO_FROM_NUMBER,
-    body: `Devis ${devis.numero || ''} signé par ${nomSignataire}. ✅`
+    body
   });
 }
