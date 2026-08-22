@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     const lead = devis.leads;
     const texteMessage = (message && message.trim())
       || devis.message_perso
-      || `Bonjour, veuillez recevoir votre devis n° ${devis.numero}.`;
+      || `RMS EcoSky - Bonjour, voici votre devis${devis.numero ? ` n° ${devis.numero}` : ''}. Vous pouvez le consulter et le signer en ligne via le lien ci-dessous. À bientôt, l'équipe RMS EcoSky.`;
 
     // Lien de signature électronique (nécessite la migration sql-signature-devis.sql).
     // Si le devis n'a pas encore de token (ex: créé via l'ancien écran d'upload
