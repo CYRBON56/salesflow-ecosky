@@ -9,8 +9,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { PDFDocument } from 'pdf-lib';
 import pdfParse from 'pdf-parse';
+import { Resend } from 'resend';
 
 const RIB_URL = 'https://salesflow-ecosky.vercel.app/rib-ecosky.pdf';
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -95,6 +97,7 @@ async function handlePost(req, res) {
   const acompte = await extraireAcompte(devis.pdf_url, devis.montant_ttc);
 
   notifierCyrille(devis, nom_signataire, acompte).catch(e => console.error('Notif SMS échouée:', e));
+  notifierCyrilleEmail(devis, nom_signataire, acompte, pdfSigneUrl).catch(e => console.error('Notif email échouée:', e));
 
   return res.status(200).json({ ok: true, pdf_signe_url: pdfSigneUrl, acompte, rib_url: RIB_URL });
 }
@@ -156,6 +159,47 @@ async function tamponnerPdf({ pdfUrl, signatureDataUrl, nomSignataire, ip, date,
 
   const { data: publicUrlData } = supabase.storage.from('media').getPublicUrl(path);
   return publicUrlData?.publicUrl || null;
+}
+
+async function notifierCyrilleEmail(devis, nomSignataire, acompte, pdfSigneUrl) {
+  if (!process.env.RESEND_API_KEY || !process.env.OWNER_EMAIL) return; // notif email optionnelle
+
+  let acompteTexte = '';
+  if (acompte && acompte.pourcentage) {
+    acompteTexte = `<p>Acompte attendu : <strong>${acompte.pourcentage}%</strong>`;
+    if (acompte.montant != null) {
+      acompteTexte += ` (${acompte.montant.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €)`;
+    }
+    acompteTexte += '</p>';
+  }
+
+  const attachments = [];
+  try {
+    if (pdfSigneUrl) {
+      const pdfResponse = await fetch(pdfSigneUrl);
+      if (pdfResponse.ok) {
+        const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+        attachments.push({
+          filename: `Devis_signe_${devis.numero || devis.id}.pdf`,
+          content: pdfBuffer.toString('base64'),
+        });
+      }
+    }
+  } catch (e) {
+    console.error('Récupération PDF signé pour email échouée:', e);
+  }
+
+  await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL,
+    to: process.env.OWNER_EMAIL,
+    subject: `Devis ${devis.numero || ''} signé par ${nomSignataire} ✅`,
+    html: `
+      <p>Le devis ${devis.numero || ''} (${devis.nom_client || ''}) vient d'être signé par <strong>${nomSignataire}</strong>.</p>
+      ${acompteTexte}
+      ${pdfSigneUrl ? `<p><a href="${pdfSigneUrl}">Ouvrir le PDF signé</a></p>` : ''}
+    `,
+    attachments,
+  });
 }
 
 async function notifierCyrille(devis, nomSignataire, acompte) {
