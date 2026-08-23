@@ -421,6 +421,7 @@
     <div class="sous-titre" id="sousTitrePage">Historique des notifications SMS envoyées automatiquement</div>
   </div>
   <div class="controles">
+    <span id="compteurClicsPub" style="color:white; font-size:0.85rem; font-weight:600; padding:8px 12px; border:1px solid rgba(255,255,255,0.35); border-radius:8px;">🖱️ …</span>
     <select id="filtreType"></select>
     <a href="/devis-manuel.html" target="_blank" rel="noopener" class="secondaire" style="padding:8px 12px;border-radius:8px;font-size:0.85rem;">➕ Devis (client hors base)</a>
     <button class="principal" id="btnActualiser">🔄 Actualiser</button>
@@ -493,6 +494,7 @@
   const API_SEND_DEVIS = "/api/send-devis";
   const API_DEVIS_LEAD = "/api/devis-lead";
   const API_DEVIS_SIGNES = "/api/devis-signes";
+  const API_CLICS_PUB = "/api/clics-pub";
 
   const LIBELLES_TYPE_SMS = {
     arrivee_pub: "Arrivée pub",
@@ -1305,10 +1307,25 @@
     if (ongletActif === "sms") appliquerFiltreSms();
     else if (ongletActif === "leads") appliquerFiltreLeads();
   });
+  // ---------- Compteur global de clics publicitaires ----------
+
+  async function chargerCompteurClicsPub() {
+    const el = document.getElementById("compteurClicsPub");
+    try {
+      const res = await fetch(API_CLICS_PUB);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      el.textContent = `🖱️ ${data.total} clic(s) pub (${data.google} Google · ${data.meta} Meta)`;
+    } catch (err) {
+      el.textContent = "🖱️ Erreur";
+    }
+  }
+
   document.getElementById("btnActualiser").addEventListener("click", () => {
     if (ongletActif === "sms") chargerSms();
     else if (ongletActif === "leads") chargerLeads();
     else chargerDevisSignes();
+    chargerCompteurClicsPub();
   });
   document.getElementById("btnSupprimerSelection").addEventListener("click", () => {
     supprimerSms(Array.from(selectionSms));
@@ -1319,6 +1336,7 @@
   });
 
   activerOnglet("sms");
+  chargerCompteurClicsPub();
 </script>
 
 </body>
