@@ -948,6 +948,7 @@
         <td>${l.pdf_signe_url
           ? `<a class="btn-lien" href="${l.pdf_signe_url}" target="_blank" rel="noopener">📄 PDF signé</a>`
           : "—"}</td>
+        <td><button class="btn-suppr" data-id-suppr-devis-signe="${l.id}" title="Supprimer">🗑️</button></td>
       </tr>
     `).join("");
     conteneur.innerHTML = `
@@ -961,11 +962,30 @@
             <th>Montant TTC</th>
             <th>Signataire</th>
             <th>PDF signé</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>${lignesHtml}</tbody>
       </table>
     `;
+
+    document.querySelectorAll("[data-id-suppr-devis-signe]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        supprimerDevisSigne(btn.dataset.idSupprDevisSigne);
+      });
+    });
+  }
+
+  async function supprimerDevisSigne(id) {
+    if (!confirm("Supprimer définitivement ce devis signé ? Cette action est irréversible.")) return;
+    try {
+      const res = await fetch(`${API_DEVIS_SIGNES}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      await chargerDevisSignes();
+    } catch (err) {
+      alert("Erreur lors de la suppression : " + err.message);
+    }
   }
 
   function appliquerFiltreDevisSignes() {
