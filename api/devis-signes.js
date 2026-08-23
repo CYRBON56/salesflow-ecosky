@@ -1,8 +1,8 @@
 // api/devis-signes.js
-// GET /api/devis-signes
+// GET    /api/devis-signes           -> liste tous les devis au statut "signe"
+// DELETE /api/devis-signes?id=123    -> supprime un devis signé (ligne définitive)
 //
-// Retourne la liste de tous les devis au statut "signe", triés du plus
-// récent au plus ancien, pour l'onglet "Devis signés" du dashboard.
+// Pour l'onglet "Devis signés" du dashboard.
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -24,29 +24,49 @@ async function supabaseRequest(path, options = {}) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "GET") {
-    return res.status(405).send("Method not allowed");
-  }
   try {
-    const colonnes = [
-      "id",
-      "numero",
-      "nom_client",
-      "montant_ttc",
-      "type_projet",
-      "date_signature",
-      "nom_signataire",
-      "pdf_signe_url",
-    ].join(",");
-    const rows = await supabaseRequest(
-      `devis?select=${colonnes}&statut=eq.signe&order=date_signature.desc`,
-      { prefer: "return=representation" }
-    );
-    return res.status(200).json({ ok: true, rows: rows || [] });
+    if (req.method === "GET") {
+      const colonnes = [
+        "id",
+        "numero",
+        "nom_client",
+        "montant_ttc",
+        "type_projet",
+        "date_signature",
+        "nom_signataire",
+        "pdf_signe_url",
+      ].join(",");
+      const rows = await supabaseRequest(
+        `devis?select=${colonnes}&statut=eq.signe&order=date_signature.desc`,
+        { prefer: "return=representation" }
+      );
+      return res.status(200).json({ ok: true, rows: rows || [] });
+    }
+
+    if (req.method === "DELETE") {
+      const idsParam = req.query.ids || req.query.id;
+      if (!idsParam) {
+        return res.status(400).json({ ok: false, error: "id requis." });
+      }
+      const ids = idsParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (!ids.length) {
+        return res.status(400).json({ ok: false, error: "id requis." });
+      }
+      await supabaseRequest(`devis?id=in.(${ids.join(",")})`, {
+        method: "DELETE",
+        prefer: "return=minimal",
+      });
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(405).send("Method not allowed");
   } catch (err) {
     console.error("devis-signes error:", err.message);
     return res
       .status(500)
-      .json({ ok: false, error: "Erreur lors de la récupération des devis signés" });
+      .json({ ok: false, error: "Erreur lors de la récupération/suppression des devis signés" });
   }
 }
