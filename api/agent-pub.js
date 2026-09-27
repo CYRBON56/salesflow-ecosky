@@ -35,7 +35,7 @@ const SOURCES = {
   },
   google: {
     connector: "google_ads",
-    fields: ["date", "campaign", "spend", "impressions", "clicks", "cpc", "conversions"],
+    fields: ["date", "campaign", "campaign_status", "spend", "impressions", "clicks", "cpc", "conversions"],
   },
 };
 
@@ -117,6 +117,7 @@ function agreger(lignes, plateforme, debutSemaine) {
     const semaine = l.date >= debutSemaine ? "cette_semaine" : "semaine_precedente";
     const nom = l.campaign || "(sans nom)";
     parCampagne[nom] ??= {
+      statut: l.campaign_status || null,
       cette_semaine: { depense: 0, impressions: 0, clics: 0, leads_ou_conversions: 0, vues_page: 0 },
       semaine_precedente: { depense: 0, impressions: 0, clics: 0, leads_ou_conversions: 0, vues_page: 0 },
     };
@@ -126,6 +127,11 @@ function agreger(lignes, plateforme, debutSemaine) {
     s.clics += num(plateforme === "meta" ? l.link_clicks : l.clicks);
     s.leads_ou_conversions += num(plateforme === "meta" ? l.actions_lead : l.conversions);
     s.vues_page += num(l.actions_landing_page_view);
+  }
+  // Les campagnes supprimées sans aucune dépense sur la période ne sont que du bruit.
+  for (const [nom, c] of Object.entries(parCampagne)) {
+    const total = c.cette_semaine.depense + c.semaine_precedente.depense + c.cette_semaine.impressions + c.semaine_precedente.impressions;
+    if (c.statut === "REMOVED" && total === 0) delete parCampagne[nom];
   }
   for (const c of Object.values(parCampagne)) {
     for (const s of [c.cette_semaine, c.semaine_precedente]) {
@@ -166,6 +172,8 @@ Tunnel : pub → formulaire d'estimation salesflow-ecosky.vercel.app/estimation.
 (ou formulaire instantané Meta) → lead dans Supabase → appel technicien.
 Les "leads Supabase" sont la vérité terrain ; les conversions déclarées par les plateformes
 peuvent être mal suivies (0 conversion Google alors que des leads arrivent = tracking à revoir).
+Une campagne au statut REMOVED (supprimée) ne peut pas être réactivée : il faut en créer une nouvelle.
+Une campagne ENABLED avec 0 impression peut simplement être en cours de validation par Google (moins de 48h).
 Le dirigeant n'est pas un spécialiste pub : actions concrètes, chiffrées, faisables en 15 min.
 `;
 
