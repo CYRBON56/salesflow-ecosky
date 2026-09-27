@@ -585,6 +585,21 @@ async function uploadPdfToSupabase(bytes, filename) {
   return `${SUPABASE_URL}/storage/v1/object/public/media/estimateurs/${filename}`;
 }
 
+// 🤖 Déclenche l'agent IA (api/agent-leads.js) sur ce lead, sans ralentir le
+// formulaire : on n'attend pas l'analyse (coupure après 1,5 s, l'agent continue
+// de tourner de son côté). Un échec ici ne bloque jamais le client.
+async function declencherAgentLeads(leadId) {
+  if (!leadId || !process.env.CRON_SECRET) return;
+  try {
+    await fetch(`https://salesflow-ecosky.vercel.app/api/agent-leads?lead_id=${encodeURIComponent(leadId)}`, {
+      headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
+      signal: AbortSignal.timeout(1500),
+    });
+  } catch (e) {
+    // Timeout attendu : l'agent poursuit son analyse en arrière-plan.
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -747,6 +762,8 @@ export default async function handler(req, res) {
       pdfBytes,
       pdfFilename: `estimation-${numero}.pdf`,
     });
+
+    await declencherAgentLeads(lead?.[0]?.id);
 
     return res.status(200).json({ success: true, estimation, lead_id: lead?.[0]?.id, numero, pdf_url: pdfUrl });
   } catch (err) {
