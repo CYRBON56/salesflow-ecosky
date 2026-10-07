@@ -5,7 +5,6 @@ import {
   Settings as SettingsIcon, Phone, X, Check, ChevronDown,
   Users, Filter, Download, RefreshCw, AlertCircle
 } from "lucide-react";
-import { supabase } from "./supabaseClient.js";
 import DevisManuel from "./DevisManuel.jsx";
 const STAGES = [
   { id: "nouveau", label: "Nouveau", color: "#64748b" },
@@ -103,66 +102,26 @@ export default function SalesFlowSystem() {
   const [showDevis, setShowDevis] = useState(false);
   const fileInputRef = useRef(null);
   useEffect(() => {
-    (async () => {
+    let first = true;
+    const loadAll = async () => {
       try {
-        const { data: leadRows, error: leadErr } = await supabase
-          .from("leads")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (leadErr) throw leadErr;
-        setLeads((leadRows || []).map(mapRowToLead));
+        const res = await fetch("/api/dashboard-data?view=main", { credentials: "same-origin" });
+        if (!res.ok) throw new Error(String(res.status));
+        const data = await res.json();
+        setLeads((data.leads || []).map(mapRowToLead));
+        if (data.settings && first) setSettings(settingsFromRow(data.settings));
+        setAdClicks(data.clicks || []);
       } catch (e) {
-        setError("Impossible de charger les leads depuis Supabase. Vérifie ton URL/clé dans supabaseClient.js.");
+        if (first) setError("Impossible de charger les leads (connexion au serveur).");
       }
-      try {
-        const { data: settingsRow, error: settingsErr } = await supabase
-          .from("settings")
-          .select("*")
-          .eq("id", 1)
-          .single();
-        if (settingsErr) throw settingsErr;
-        if (settingsRow) setSettings(settingsFromRow(settingsRow));
-      } catch (e) {}
-      try {
-        const { data: clickRows, error: clickErr } = await supabase
-          .from("web_clicks")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(200);
-        if (clickErr) throw clickErr;
-        setAdClicks(clickRows || []);
-      } catch (e) {
-        // Table pas encore créée ou inaccessible : on n'affiche simplement rien,
-        // sans bloquer le reste du dashboard.
-      }
-      setLoading(false);
-    })();
-    // Temps réel : un nouveau clic pub apparaît instantanément
-    const clicksChannel = supabase
-      .channel("web-clicks-changes")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "web_clicks" }, (payload) => {
-        setAdClicks((prev) => [payload.new, ...prev]);
-      })
-      .subscribe();
-    // Temps réel : un nouveau lead ajouté par Make.com (ou un autre utilisateur) apparaît instantanément
-    const channel = supabase
-      .channel("leads-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "leads" }, (payload) => {
-        if (payload.eventType === "INSERT") {
-          const lead = mapRowToLead(payload.new);
-          setLeads((prev) => (prev.some((l) => l.id === lead.id) ? prev : [lead, ...prev]));
-        } else if (payload.eventType === "UPDATE") {
-          const lead = mapRowToLead(payload.new);
-          setLeads((prev) => prev.map((l) => (l.id === lead.id ? lead : l)));
-        } else if (payload.eventType === "DELETE") {
-          setLeads((prev) => prev.filter((l) => l.id !== payload.old.id));
-        }
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-      supabase.removeChannel(clicksChannel);
+      if (first) setLoading(false);
+      first = false;
     };
+    loadAll();
+    // Rafraîchissement automatique toutes les 30 secondes (remplace le temps
+    // réel Supabase, qui exigeait d'ouvrir la base à la clé publique).
+    const timer = setInterval(loadAll, 30000);
+    return () => clearInterval(timer);
   }, []);
   const LEADS_ADMIN_URL = "/api/leads-admin";
 
@@ -274,16 +233,9 @@ export default function SalesFlowSystem() {
   const loadWhatsApp = useCallback(async (telephone) => {
     setWaData((prev) => ({ ...prev, [telephone]: { ...(prev[telephone] || {}), loading: true } }));
     try {
-      const { data: conversation } = await supabase
-        .from("wa_conversations")
-        .select("*")
-        .eq("phone", telephone)
-        .maybeSingle();
-      const { data: messages } = await supabase
-        .from("wa_messages")
-        .select("*")
-        .eq("phone", telephone)
-        .order("created_at", { ascending: true });
+      const res = await fetch(`/api/dashboard-data?view=whatsapp&phone=${encodeURIComponent(telephone)}`, { credentials: "same-origin" });
+      if (!res.ok) throw new Error(String(res.status));
+      const { conversation, messages } = await res.json();
       setWaData((prev) => ({
         ...prev,
         [telephone]: { loading: false, conversation: conversation || null, messages: messages || [] },

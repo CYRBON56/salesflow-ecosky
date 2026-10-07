@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Phone, MousePointerClick, FileText, RefreshCw, Calendar } from "lucide-react";
-import { supabase } from "./supabaseClient.js";
 
 const TEAL = "#0f5c56";
 const TEAL_DARK = "#0a3f3c";
@@ -48,31 +47,10 @@ export default function MobileSummary() {
     setLoading(true);
     setError("");
     try {
-      const nowIso = new Date().toISOString();
-      const [clicksRes, devisRes, callbacksRes, rdvRes] = await Promise.all([
-        supabase.from("web_clicks").select("*").order("created_at", { ascending: false }).limit(50),
-        supabase
-          .from("leads")
-          .select("*")
-          .not("estimation_pdf_url", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(30),
-        supabase
-          .from("leads")
-          .select("*")
-          .eq("callback_demande", true)
-          .order("callback_demande_le", { ascending: false }),
-        supabase
-          .from("leads")
-          .select("*")
-          .not("rdv_date", "is", null)
-          .gte("rdv_date", nowIso)
-          .order("rdv_date", { ascending: true }),
-      ]);
-      if (clicksRes.error) throw clicksRes.error;
-      if (devisRes.error) throw devisRes.error;
-      if (callbacksRes.error) throw callbacksRes.error;
-      if (rdvRes.error) throw rdvRes.error;
+      const res = await fetch("/api/dashboard-data?view=mobile", { credentials: "same-origin" });
+      if (!res.ok) throw new Error(String(res.status));
+      const d = await res.json();
+      const clicksRes = { data: d.clicks }, devisRes = { data: d.devis }, callbacksRes = { data: d.callbacks }, rdvRes = { data: d.rdv };
       setClicks(clicksRes.data || []);
       setDevisLeads(devisRes.data || []);
       setCallbacks(callbacksRes.data || []);
@@ -85,12 +63,8 @@ export default function MobileSummary() {
 
   useEffect(() => {
     load();
-    const channel = supabase
-      .channel("mobile-summary-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "leads" }, load)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "web_clicks" }, load)
-      .subscribe();
-    return () => supabase.removeChannel(channel);
+    const timer = setInterval(load, 30000);
+    return () => clearInterval(timer);
   }, []);
 
   const clicksToday = clicks.filter((c) => isToday(c.created_at)).length;

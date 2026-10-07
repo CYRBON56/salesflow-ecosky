@@ -28,6 +28,7 @@ export const config = {
     "/api/leads-admin",
     "/api/leads-anc-en-attente",
     "/api/valider-estimation-anc",
+    "/api/dashboard-data",
   ],
 };
 export default function middleware(request) {
