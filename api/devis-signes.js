@@ -25,6 +25,29 @@ async function supabaseRequest(path, options = {}) {
 
 export default async function handler(req, res) {
   try {
+    if (req.method === "GET" && req.query.tous) {
+      // Onglet "Tous les devis" : tous les devis, quel que soit leur statut.
+      const colonnesTous = [
+        "id",
+        "numero",
+        "nom_client",
+        "montant_ttc",
+        "type_projet",
+        "statut",
+        "created_at",
+        "envoye_email_at",
+        "envoye_sms_at",
+        "date_signature",
+        "pdf_url",
+        "pdf_signe_url",
+      ].join(",");
+      const rowsTous = await supabaseRequest(
+        `devis?select=${colonnesTous}&order=created_at.desc`,
+        { prefer: "return=representation" }
+      );
+      return res.status(200).json({ ok: true, rows: rowsTous || [] });
+    }
+
     if (req.method === "GET") {
       const colonnes = [
         "id",

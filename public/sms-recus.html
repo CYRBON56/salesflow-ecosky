@@ -431,6 +431,7 @@
 <div class="onglets">
   <div class="onglet actif" data-onglet="sms">SMS reçus</div>
   <div class="onglet" data-onglet="leads">Demandes d'estimation</div>
+  <div class="onglet" data-onglet="tous-devis">📄 Tous les devis</div>
   <div class="onglet" data-onglet="devis-signes">✅ Devis signés</div>
 </div>
 
@@ -922,6 +923,104 @@
     }
   }
 
+  // ---------- Onglet Tous les devis ----------
+
+  let toutesLignesTousDevis = [];
+  const LIBELLES_STATUT_DEVIS = {
+    non_envoye: "⚪ Pas encore envoyé",
+    en_attente: "🟠 Envoyé, en attente de signature",
+    signe: "🟢 Signé",
+  };
+
+  function statutDevis(l) {
+    if (l.statut === "signe") return "signe";
+    if (l.envoye_email_at || l.envoye_sms_at) return "en_attente";
+    return "non_envoye";
+  }
+
+  function renderStatsTousDevis(lignes) {
+    const compter = s => lignes.filter(l => statutDevis(l) === s).length;
+    const montantAttente = lignes
+      .filter(l => statutDevis(l) === "en_attente")
+      .reduce((somme, l) => somme + (Number(l.montant_ttc) || 0), 0);
+    document.getElementById("stats").innerHTML = `
+      <div class="stat-carte"><div class="valeur">${lignes.length}</div><div class="libelle">Devis</div></div>
+      <div class="stat-carte"><div class="valeur">${compter("en_attente")}</div><div class="libelle">En attente de signature</div></div>
+      <div class="stat-carte"><div class="valeur">${compter("signe")}</div><div class="libelle">Signés</div></div>
+      <div class="stat-carte"><div class="valeur">${compter("non_envoye")}</div><div class="libelle">Pas encore envoyés</div></div>
+      <div class="stat-carte"><div class="valeur">${formatMontant(montantAttente)}</div><div class="libelle">Montant en attente</div></div>
+    `;
+  }
+
+  function renderTableTousDevis(lignes) {
+    const conteneur = document.getElementById("conteneurTableau");
+    if (!lignes.length) {
+      conteneur.innerHTML = `<div class="vide">Aucun devis pour le moment.</div>`;
+      return;
+    }
+    const envoi = l => {
+      const parts = [];
+      if (l.envoye_sms_at) parts.push("📲 SMS " + formatDate(l.envoye_sms_at));
+      if (l.envoye_email_at) parts.push("✉️ Email " + formatDate(l.envoye_email_at));
+      return parts.length ? parts.join("<br>") : "—";
+    };
+    const lignesHtml = lignes.map(l => `
+      <tr>
+        <td>${formatDate(l.created_at)}</td>
+        <td>${echapper(l.numero) || "—"}</td>
+        <td>${echapper(l.nom_client) || "—"}</td>
+        <td>${echapper(l.type_projet) || "—"}</td>
+        <td>${l.montant_ttc ? formatMontant(l.montant_ttc) : "—"}</td>
+        <td>${LIBELLES_STATUT_DEVIS[statutDevis(l)]}${l.date_signature ? "<br><small>le " + formatDate(l.date_signature) + "</small>" : ""}</td>
+        <td>${envoi(l)}</td>
+        <td>
+          ${l.pdf_url ? `<a class="btn-lien" href="${l.pdf_url}" target="_blank" rel="noopener">📄 Devis</a>` : ""}
+          ${l.pdf_signe_url ? `<a class="btn-lien" href="${l.pdf_signe_url}" target="_blank" rel="noopener">✅ Signé</a>` : ""}
+        </td>
+      </tr>
+    `).join("");
+    conteneur.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Créé le</th>
+            <th>Numéro</th>
+            <th>Client</th>
+            <th>Projet</th>
+            <th>Montant TTC</th>
+            <th>Statut</th>
+            <th>Envoyé</th>
+            <th>PDF</th>
+          </tr>
+        </thead>
+        <tbody>${lignesHtml}</tbody>
+      </table>
+    `;
+  }
+
+  function appliquerFiltreTousDevis() {
+    const filtre = document.getElementById("filtreType").value;
+    const lignes = filtre
+      ? toutesLignesTousDevis.filter(l => statutDevis(l) === filtre)
+      : toutesLignesTousDevis;
+    renderStatsTousDevis(toutesLignesTousDevis);
+    renderTableTousDevis(lignes);
+  }
+
+  async function chargerTousDevis() {
+    document.getElementById("conteneurTableau").innerHTML = `<div class="chargement">Chargement…</div>`;
+    try {
+      const res = await fetch(API_DEVIS_SIGNES + "?tous=1");
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      toutesLignesTousDevis = data.rows || [];
+      appliquerFiltreTousDevis();
+    } catch (err) {
+      document.getElementById("conteneurTableau").innerHTML =
+        `<div class="vide">Erreur de chargement : ${err.message}</div>`;
+    }
+  }
+
   // ---------- Onglet Devis signés ----------
 
   function renderStatsDevisSignes(lignes) {
@@ -1266,6 +1365,10 @@
       select.style.display = "";
       select.innerHTML = `<option value="">Tous les statuts</option>` +
         Object.entries(LIBELLES_STATUT_LEAD).map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+    } else if (ongletActif === "tous-devis") {
+      select.style.display = "";
+      select.innerHTML = `<option value="">Tous les statuts</option>` +
+        Object.entries(LIBELLES_STATUT_DEVIS).map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
     } else {
       // Onglet "Devis signés" : pas de filtre, on masque simplement le sélecteur.
       select.style.display = "none";
@@ -1288,6 +1391,11 @@
       document.getElementById("sousTitrePage").textContent = "Visiteurs ayant rempli (ou entamé) le formulaire d'estimation";
       remplirFiltreSelonOnglet();
       chargerLeads();
+    } else if (onglet === "tous-devis") {
+      document.getElementById("titrePage").textContent = "📄 Tous les devis";
+      document.getElementById("sousTitrePage").textContent = "Tous les devis chargés, envoyés ou signés, avec leur statut";
+      remplirFiltreSelonOnglet();
+      chargerTousDevis();
     } else {
       document.getElementById("titrePage").textContent = "✅ Devis signés";
       document.getElementById("sousTitrePage").textContent = "Tous les devis signés électroniquement, avec accès direct au PDF signé";
@@ -1306,6 +1414,7 @@
     selectionSms.clear();
     if (ongletActif === "sms") appliquerFiltreSms();
     else if (ongletActif === "leads") appliquerFiltreLeads();
+    else if (ongletActif === "tous-devis") appliquerFiltreTousDevis();
   });
   // ---------- Compteur global de clics publicitaires ----------
 
@@ -1324,6 +1433,7 @@
   document.getElementById("btnActualiser").addEventListener("click", () => {
     if (ongletActif === "sms") chargerSms();
     else if (ongletActif === "leads") chargerLeads();
+    else if (ongletActif === "tous-devis") chargerTousDevis();
     else chargerDevisSignes();
     chargerCompteurClicsPub();
   });
