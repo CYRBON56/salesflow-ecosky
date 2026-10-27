@@ -27,6 +27,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import PRICING_CONFIG_ANC from "./anc-pricing-config-server.js";
+import { construireChiffrage, chiffrageHtml, chiffrageXlsxBase64 } from "./_chiffrage-anc.js";
 
 const supabaseAnc = createClient(
   process.env.SUPABASE_ANC_URL,
@@ -39,7 +40,7 @@ const supabaseAnc = createClient(
  * module partagé) : un échec d'envoi ne doit jamais empêcher l'enregistrement
  * du lead, géré par l'appelant via try/catch.
  */
-async function envoyerEmail({ to, subject, html }) {
+async function envoyerEmail({ to, subject, html, attachments }) {
   const reponse = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -51,6 +52,7 @@ async function envoyerEmail({ to, subject, html }) {
       to,
       subject,
       html,
+      ...(attachments && attachments.length ? { attachments } : {}),
     }),
   });
   if (!reponse.ok) {
@@ -111,6 +113,7 @@ export default async function handler(req, res) {
       ventilation,
       posteRelevage,
       filiereIndicative,
+      donneesEtude,
     } = req.body;
 
     if (!prenom || !telephone || !email || !adresseProjet) {
@@ -221,11 +224,33 @@ export default async function handler(req, res) {
       console.error("Échec envoi email confirmation client :", erreurEmailClient);
     }
 
+    // Chiffrage interne détaillé (pour RMS uniquement), envoyé dès que le
+    // client valide le formulaire. Un échec ne bloque jamais la notification.
+    let htmlChiffrage = "";
+    const piecesJointes = [];
+    try {
+      const chiffrage = construireChiffrage({
+        filiereKey: filiereIndicative, eh: ehRetenu, posteRelevage, ventilation, roche,
+        longueurRaccordement, longueurTrancheeEvacuation, donneesEtude,
+      });
+      htmlChiffrage = `<h3 style="font-family:Arial;color:#C62828;">Chiffrage interne détaillé (ne pas transmettre au client)</h3>` + chiffrageHtml(chiffrage);
+      const nomFichier = `Chiffrage_interne_ANC_${String(prenom).replace(/[^a-zA-Z0-9]+/g, "_")}.xlsx`;
+      const contenu = await chiffrageXlsxBase64(chiffrage, [
+        `Client : ${prenom} — ${telephone} — ${email}`,
+        `Chantier : ${adresseProjet}`,
+        `Filière : ${chiffrage.filiere.label} — ${ehRetenu} EH${etudePdfUrl ? " — étude : " + etudePdfUrl : ""}`,
+      ]);
+      piecesJointes.push({ filename: nomFichier, content: contenu });
+    } catch (erreurChiffrage) {
+      console.error("Chiffrage interne ANC impossible :", erreurChiffrage);
+    }
+
     try {
       await envoyerEmail({
         to: process.env.OWNER_EMAIL,
         subject: `Nouvelle demande ANC à valider — ${prenom}`,
-        html: emailNotificationOwner(contexteEmail),
+        html: emailNotificationOwner(contexteEmail) + htmlChiffrage,
+        attachments: piecesJointes,
       });
     } catch (erreurEmailOwner) {
       console.error("Échec envoi email notification owner :", erreurEmailOwner);

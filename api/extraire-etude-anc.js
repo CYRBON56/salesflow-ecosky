@@ -103,7 +103,8 @@ const PROMPT_EXTRACTION = `Tu vas lire le texte d'une étude de filière d'assai
   "posteDeRelevage": boolean|null,
   "exutoire": "infiltration" | "fosse" | null,
   "rocheSignalee": boolean|null,
-  "ventilationAPrevoir": boolean|null
+  "ventilationAPrevoir": boolean|null,
+  "eauFaibleProfondeur": boolean|null
 }
 
 Règles :
@@ -111,6 +112,7 @@ Règles :
 - "eh" : nombre d'équivalents-habitants (souvent indiqué directement, sinon égal au nombre de pièces principales).
 - "posteDeRelevage" : true si l'étude mentionne un poste de relevage, une pompe de relevage, ou "R" sur le schéma de principe.
 - "rocheSignalee" : true si l'étude mentionne un risque de roche, un brise-roche, ou une contrainte géologique de type roche/mylonitique/granite en profondeur.
+- "eauFaibleProfondeur" : true si l'étude signale de l'eau / une nappe / une hydromorphie à faible profondeur dans les sondages.
 - Si une information n'est pas présente dans le texte, mets null. N'invente rien.
 - Les études n'indiquent presque jamais d'email : laisse "email" à null sauf s'il est explicitement écrit.
 

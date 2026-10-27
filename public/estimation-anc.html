@@ -411,6 +411,7 @@
       const d = resultat.donneesExtraites || {};
 
       donnees.etudePdfUrl = resultat.etudePdfUrl || null;
+      donnees.donneesEtude = d;
       donnees.extractionReussie = true;
 
       if (d.demandeur) {
@@ -629,6 +630,7 @@
       ventilation: donnees.ventilation,
       posteRelevage: donnees.posteRelevage,
       filiereIndicative: donnees.filiere,
+      donneesEtude: donnees.donneesEtude || null,
       estimationIndicativeHT: typeof prixBase === "number" ? prixBase : null,
       estimationValidee: false,
     };
