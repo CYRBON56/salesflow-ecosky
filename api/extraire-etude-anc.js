@@ -136,13 +136,19 @@ export default async function handler(req, res) {
 
     // --- 1. Hébergement du PDF dans Supabase Storage (traçabilité + lien dans le lead) ---
     const cheminStorage = `etudes/${Date.now()}-${(nomFichier || "etude.pdf").replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-    const { error: erreurUpload } = await supabaseAnc.storage
-      .from("media-anc")
-      .upload(cheminStorage, bufferPdf, { contentType: "application/pdf" });
-    if (erreurUpload) throw erreurUpload;
-
-    const { data: urlPublique } = supabaseAnc.storage.from("media-anc").getPublicUrl(cheminStorage);
-    const etudePdfUrl = urlPublique.publicUrl;
+    // Non bloquant : si le stockage est indisponible (projet Supabase en pause,
+    // panne réseau…), on continue quand même l'analyse de l'étude.
+    let etudePdfUrl = null;
+    try {
+      const { error: erreurUpload } = await supabaseAnc.storage
+        .from("media-anc")
+        .upload(cheminStorage, bufferPdf, { contentType: "application/pdf" });
+      if (erreurUpload) throw erreurUpload;
+      const { data: urlPublique } = supabaseAnc.storage.from("media-anc").getPublicUrl(cheminStorage);
+      etudePdfUrl = urlPublique.publicUrl;
+    } catch (erreurStockage) {
+      console.error("Stockage PDF étude impossible (analyse poursuivie) :", erreurStockage?.message || erreurStockage);
+    }
 
     // --- 2. Texte de l'étude : priorité au texte pré-extrait côté navigateur ---
     // (le PDF reçu ici est compressé/rasterisé, pdf-parse n'y trouverait plus rien)
