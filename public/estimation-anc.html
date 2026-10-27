@@ -446,7 +446,7 @@
         // L'étude de sol indique seulement si un poste de relevage est
         // nécessaire, pas s'il est en amont ou en aval — on présélectionne
         // "amont" par défaut (cas le plus courant), à ajuster si besoin.
-        donnees.posteRelevage = d.posteDeRelevage ? "amont" : "non";
+        donnees.posteRelevage = d.posteDeRelevage ? (d.positionPosteRelevage === "amont" ? "amont" : "aval") : "non";
         appliquerCarteChoisie("choixRelevage", donnees.posteRelevage);
       }
       if (d.rocheSignalee !== null && d.rocheSignalee !== undefined) {

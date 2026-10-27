@@ -101,6 +101,7 @@ const PROMPT_EXTRACTION = `Tu vas lire le texte d'une étude de filière d'assai
   "dimensionFiltreM2": number|null,
   "volumeFosseLitres": number|null,
   "posteDeRelevage": boolean|null,
+  "positionPosteRelevage": "amont" | "aval" | null,
   "exutoire": "infiltration" | "fosse" | null,
   "rocheSignalee": boolean|null,
   "ventilationAPrevoir": boolean|null,
@@ -111,6 +112,7 @@ Règles :
 - "filiere" doit être EXACTEMENT une des 5 valeurs listées, choisie selon la filière réellement préconisée dans l'étude (ex : un "filtre à sable vertical drainé et imperméabilisé par géomembrane" = filtreSableDraineEtanche ; un système avec média filtrant / cuve compacte type Xperco, X-PERCO, filtre compact, filtre coco = filtreCompact ; un système avec pompe + cuve tout-en-un présenté comme microstation ou "OXYFIX" = microstation ; "tranchées d'épandage" ou "lit d'épandage" en sol naturel sans filtre rapporté = tranchesEpandage).
 - "eh" : nombre d'équivalents-habitants (souvent indiqué directement, sinon égal au nombre de pièces principales).
 - "posteDeRelevage" : true si l'étude mentionne un poste de relevage, une pompe de relevage, ou "R" sur le schéma de principe.
+- "positionPosteRelevage" : "amont" si le poste est AVANT la fosse (relevage des eaux usées brutes de la maison vers la fosse) ; "aval" s'il est APRÈS la fosse ou APRÈS le traitement (sortie de fosse, sortie de filtre, vers le fossé / l'exutoire). null si pas de poste.
 - "rocheSignalee" : true si l'étude mentionne un risque de roche, un brise-roche, ou une contrainte géologique de type roche/mylonitique/granite en profondeur.
 - "eauFaibleProfondeur" : true si l'étude signale de l'eau / une nappe / une hydromorphie à faible profondeur dans les sondages.
 - Si une information n'est pas présente dans le texte, mets null. N'invente rien.

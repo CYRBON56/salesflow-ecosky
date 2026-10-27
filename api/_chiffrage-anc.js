@@ -48,7 +48,7 @@ export function construireChiffrage(entree) {
   sections.push({ code: "3", titre: "COLLECTE ET RACCORDEMENTS", lignes: [
     L("3.1", O.teControleVisite.label, "unité", 1, O.teControleVisite.prixHT, true, "1 par sortie EU"),
     L("3.2", "Terrassement de raccordement (maison → fosse → traitement)", "ml", lRacc ?? 20, O.terrassementRaccordement.prixHT, lRacc == null, lRacc == null ? "Longueur estimée — à métrer" : "Longueur indiquée par le client"),
-    L("3.3", "Tranchée vers l'exutoire (fossé / infiltration)", "ml", lEvac ?? 15, O.terrassementRaccordement.prixHT, lEvac == null, lEvac == null ? "Longueur estimée — à métrer" : "Longueur indiquée par le client"),
+    L("3.3", O.trancheeTechniqueEvacuation.label, "ml", lEvac ?? 15, O.trancheeTechniqueEvacuation.prixHT, lEvac == null, lEvac == null ? "Longueur estimée — à métrer" : "Longueur indiquée par le client"),
   ]});
 
   if (relevage) {
