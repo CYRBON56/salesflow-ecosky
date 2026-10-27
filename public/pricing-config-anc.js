@@ -348,9 +348,9 @@
 
       evacuationDeblais: {
         label: "Évacuation des déblais terrigènes (terrassement fosse/cuve/filtres)",
-        unite: "€ HT / tonne, transport inclus",
-        prixHT: 100,
-        note: "à partir de",
+        unite: "€ HT / camion de 10 t, transport inclus",
+        prixHT: 450,
+        tonnesParCamion: 10,
       },
 
       neutralisationAncienDispositif: {

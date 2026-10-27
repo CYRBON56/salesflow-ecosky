@@ -582,7 +582,7 @@
       lignesOptions.push(`Poste de relevage en aval (fourniture et pose) : ${options.pompeRelevageAval.prixHT.toLocaleString("fr-FR")} € HT`);
     }
 
-    lignesOptions.push(`Évacuation des terres excédentaires (en option) : à partir de ${options.evacuationDeblais.prixHT} € HT / tonne`);
+    lignesOptions.push(`Évacuation des terres excédentaires (en option) : ${options.evacuationDeblais.prixHT} € HT le camion de 10 t`);
 
     let htmlRecap = `<h3>Logement de ${eh} EH — filière : ${filiere.label}</h3>`;
     if (donnees.extractionReussie) {

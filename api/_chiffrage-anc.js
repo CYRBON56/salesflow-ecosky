@@ -68,7 +68,7 @@ export function construireChiffrage(entree) {
   const surfaceTraitement = surfaceFiltre || 0;
   const tonnes = Math.max(10, Math.round((surfaceTraitement * 0.9 + 6) * 1.6));
   const remblai = [
-    L("6.1", O.evacuationDeblais.label, "tonne", tonnes, O.evacuationDeblais.prixHT, true, "Estimation automatique — à confirmer"),
+    L("6.1", O.evacuationDeblais.label + " — camion de 10 t", "camion", Math.ceil(tonnes / (O.evacuationDeblais.tonnesParCamion || 10)), O.evacuationDeblais.prixHT, true, `≈ ${tonnes} t estimées — à confirmer`),
   ];
   if (surfaceFiltre) remblai.push(L("6.2", O.apportTerreVegetale.label, "m³", Math.round(surfaceFiltre * 0.2 * 10) / 10, O.apportTerreVegetale.prixHT, true, `${surfaceFiltre} m² × 0,20 m ; 0 si terre réutilisée`));
   sections.push({ code: "6", titre: "DÉBLAIS / REMBLAIS", lignes: remblai });
