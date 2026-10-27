@@ -204,13 +204,13 @@
       pompeRelevageAmont: {
         label: "Poste de relevage en amont de la fosse — fourniture et pose",
         unite: "forfait",
-        prixHT: 1550,
+        prixHT: 2300,
       },
 
       pompeRelevageAval: {
         label: "Poste de relevage en aval de la fosse — fourniture et pose",
         unite: "forfait",
-        prixHT: 2300,
+        prixHT: 1500,
       },
 
       pompeRelevageEauxClaires: {
