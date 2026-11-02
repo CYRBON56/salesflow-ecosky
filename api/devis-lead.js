@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   try {
     const { data, error } = await supabase
       .from("devis")
-      .select("id, numero, pdf_url, nom_client, type_projet, message_perso, created_at, envoye_email_at, envoye_sms_at")
+      .select("id, numero, pdf_url, nom_client, type_projet, message_perso, created_at, envoye_email_at, envoye_sms_at, type_document, lien_paiement")
       .eq("lead_id", lead_id)
       .order("created_at", { ascending: false });
 
