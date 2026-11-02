@@ -450,13 +450,18 @@
 <!-- Modale d'envoi de devis manuel -->
 <div class="overlay-modale" id="overlayDevis">
   <div class="modale">
-    <h2>Envoyer un devis</h2>
+    <h2>Envoyer un devis ou une facture</h2>
     <div class="client-modale" id="clientModaleDevis">—</div>
 
     <div id="devisExistants"></div>
 
     <div id="etapeChargementDevis">
-      <label for="fichierDevis">Fichier PDF du devis</label>
+      <label for="typeDocument">Type de document</label>
+      <select id="typeDocument" style="width:100%; padding:9px 10px; border-radius:8px; border:1px solid var(--bordure); font-size:0.85rem; margin-bottom:10px;">
+        <option value="devis">📄 Devis (avec lien de signature)</option>
+        <option value="facture">🧾 Facture (avec lien de paiement)</option>
+      </select>
+      <label for="fichierDevis">Fichier PDF</label>
       <input type="file" id="fichierDevis" accept="application/pdf">
 
       <div class="modale-actions">
@@ -473,6 +478,8 @@
         <input type="checkbox" id="inclureRibDevis" style="width:auto;">
         Joindre le RIB
       </label>
+      <label for="lienPaiementDevis" style="margin-top:10px;">Lien de paiement par carte (optionnel, ex : lien Qonto)</label>
+      <input type="url" id="lienPaiementDevis" placeholder="https://pay.qonto.com/…" style="width:100%; padding:9px 10px; border-radius:8px; border:1px solid var(--bordure); font-size:0.85rem;">
       <div class="boutons-envoi-devis" style="margin-top:12px;">
         <button id="btnEnvoyerDevisEmail">✉️ Envoyer par email</button>
         <button id="btnEnvoyerDevisSms">📲 Envoyer par SMS</button>
@@ -1118,6 +1125,8 @@
     document.getElementById("fichierDevis").value = "";
     document.getElementById("messageDevis").value = "";
     document.getElementById("inclureRibDevis").checked = false;
+    document.getElementById("lienPaiementDevis").value = "";
+    document.getElementById("typeDocument").value = "devis";
     document.getElementById("etapeChargementDevis").style.display = "block";
     document.getElementById("zoneEnvoiDevis").classList.remove("visible");
     document.getElementById("statutEnvoiDevis").textContent = "";
@@ -1158,24 +1167,24 @@
         return `
           <div class="item-devis-existant">
             <div class="infos-devis-existant">
-              <a href="${d.pdf_url}" target="_blank" rel="noopener">${echapper(d.numero) || "Devis"}</a>
+              <a href="${d.pdf_url}" target="_blank" rel="noopener">${d.type_document === "facture" ? "🧾 " : "📄 "}${echapper(d.numero) || (d.type_document === "facture" ? "Facture" : "Devis")}</a>
               <div class="statuts-devis-existant">${formatDate(d.created_at)} — ${statuts.join(" · ")}</div>
             </div>
-            <button class="btn-reutiliser-devis" data-devis-id="${d.id}" data-pdf-url="${d.pdf_url}" data-message="${echapper(d.message_perso || "")}">Renvoyer</button>
+            <button class="btn-reutiliser-devis" data-devis-id="${d.id}" data-pdf-url="${d.pdf_url}" data-message="${echapper(d.message_perso || "")}" data-lien-paiement="${echapper(d.lien_paiement || "")}">Renvoyer</button>
           </div>
         `;
       }).join("");
 
       conteneur.innerHTML = `
         <div class="liste-devis-existants">
-          <div class="titre-liste">Devis déjà chargés pour ce client</div>
+          <div class="titre-liste">Devis / factures déjà chargés pour ce client</div>
           ${itemsHtml}
         </div>
       `;
 
       conteneur.querySelectorAll(".btn-reutiliser-devis").forEach(b => {
         b.addEventListener("click", () => {
-          reutiliserDevisExistant(b.dataset.devisId, b.dataset.pdfUrl, b.dataset.message);
+          reutiliserDevisExistant(b.dataset.devisId, b.dataset.pdfUrl, b.dataset.message, b.dataset.lienPaiement);
         });
       });
     } catch (err) {
@@ -1183,13 +1192,14 @@
     }
   }
 
-  function reutiliserDevisExistant(devisId, pdfUrl, message) {
+  function reutiliserDevisExistant(devisId, pdfUrl, message, lienPaiement) {
     devisIdCharge = devisId;
     pdfUrlCharge = pdfUrl;
     document.getElementById("etapeChargementDevis").style.display = "none";
     document.getElementById("zoneEnvoiDevis").classList.add("visible");
     document.getElementById("lienPdfDevisCharge").href = pdfUrl;
     document.getElementById("messageDevis").value = message || "";
+    document.getElementById("lienPaiementDevis").value = lienPaiement || "";
     document.getElementById("inclureRibDevis").checked = false;
     document.getElementById("statutEnvoiDevis").textContent = "";
     document.getElementById("statutEnvoiDevis").className = "statut-envoi-devis";
@@ -1222,7 +1232,7 @@
 
     const btnCharger = document.getElementById("btnChargerDevis");
     btnCharger.disabled = true;
-    btnCharger.textContent = "Analyse du devis…";
+    btnCharger.textContent = "Analyse du document…";
     statutEl.textContent = "";
     statutEl.className = "statut-envoi-devis";
 
@@ -1235,6 +1245,7 @@
           lead_id: leadDevisEnCours.id,
           pdf_base64,
           filename: fichier.name,
+          type_document: document.getElementById("typeDocument").value,
         }),
       });
       const data = await res.json();
@@ -1275,6 +1286,7 @@
           channels,
           message: document.getElementById("messageDevis").value,
           inclure_rib: document.getElementById("inclureRibDevis").checked,
+          lien_paiement: document.getElementById("lienPaiementDevis").value,
         }),
       });
       const data = await res.json();
