@@ -169,7 +169,10 @@ footer{text-align:center;font-size:12px;color:var(--mute);padding:30px 16px 10px
 const SB = 'https://wklddwumirkdjkbxvzyj.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrbGRkd3VtaXJrZGprYnh2enlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTMzNDksImV4cCI6MjA5ODc4OTM0OX0._2cVv3rmhHb-7VLTCqiMRq0F2S30NMnD8qRhTiBM7nc';
 const BUCKET = 'cc-medias';
-const LOTS_COURANTS = ['Terrassement','VRD','Maçonnerie','Charpente','Couverture','Menuiserie','Plomberie','Électricité','Chauffage / Clim','Plâtrerie','Isolation','Carrelage','Sols / Résine','Peinture','Cuisine','Paysagiste','Autre'];
+const LOTS_BASE = ['Terrassement','VRD','Maçonnerie','Charpente','Couverture','Étanchéité','Menuiserie','Serrurerie / Métallerie','Plomberie','Électricité','Chauffage / Clim','Photovoltaïque','Plâtrerie','Isolation','Carrelage','Sols / Résine','Peinture','Façade','Cuisine','Piscine','Paysagiste'];
+function metiersPerso(){ return LS.get('cc_metiers', []); }
+function ajouterMetierPerso(m){ m = String(m||'').trim(); if(!m) return; const l = metiersPerso().filter(x=>x.toLowerCase()!==m.toLowerCase()); l.push(m); LS.set('cc_metiers', l); }
+function lotsCourants(){ return [...LOTS_BASE, ...metiersPerso().filter(x=>!LOTS_BASE.some(b=>b.toLowerCase()===x.toLowerCase()))]; }
 
 /* ====================== API ====================== */
 async function rpc(fn, args){
@@ -239,14 +242,14 @@ const PAL = ['#8D6E63','#2C5D8F','#C98A00','#7E57C2','#2F8F5B','#D84E7A','#00838
 /* Vignette illustrée par corps de métier : [mots-clés, couleur, pictogramme] */
 const METIERS = [
   [['terrass','excav'], '#8D6E63', '<path d="M2 19h13"/><rect x="3" y="12" width="9" height="4" rx="1"/><path d="M6 12V9h4l2 3"/><path d="M12 13l5-6 4 3"/><path d="M21 10l-1 4h-3"/>', 'zcyh3BmFPzzghqnCHNOyL/3pfIphbSVAsYRCZea5c4l.jpg'],
-  [['vrd','voirie','enrob','assain','anc'], '#546E7A', '<path d="M5 21L9 3M19 21L15 3M12 5v3M12 11v3M12 17v3"/>', '4ZsLcz6Rsh058moDIcbF7/2r-mY0zq-QTYRAuoyP3WL.jpg'],
+  [['vrd','voirie','enrob','assain'], '#546E7A', '<path d="M5 21L9 3M19 21L15 3M12 5v3M12 11v3M12 17v3"/>', '4ZsLcz6Rsh058moDIcbF7/2r-mY0zq-QTYRAuoyP3WL.jpg'],
   [['macon','gros oeuvre','beton'], '#B5651D', '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 10h18M3 14.5h18M9 5v5M15 10v4.5M9 14.5V19"/>', 'zpoRyWJhmXbjfI2xy1yu4/ZEINRF5gy2I6T97iAFPr-.jpg'],
   [['charp','ossature'], '#6D4C41', '<path d="M2 18L12 5l10 13H2z"/><path d="M12 5v13M7 18l5-6 5 6"/>', 'TOc8hfp7GbfbWflQsrbei/dGRYU1QgVpmJ2dJ-frs6L.jpg'],
-  [['couv','toit','zinc'], '#C0392B', '<path d="M3 11l9-7 9 7"/><path d="M5 10v9h14v-9"/><path d="M5 14h14M9 10v4M15 10v4"/>', '3ukxuvM4tEpUWPVxuy77d/3XR5pzJ7mpDWd2c0e6alL.jpg'],
-  [['menuis','fenet','porte','portail'], '#2F8F5B', '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M12 3v18M4 12h16"/>', 'IhQpHb2RePTcovCG6oUX8/pIDcycRZYtCmZqA8aTjKM.jpg'],
+  [['couv','toit','zinc','etanch'], '#C0392B', '<path d="M3 11l9-7 9 7"/><path d="M5 10v9h14v-9"/><path d="M5 14h14M9 10v4M15 10v4"/>', '3ukxuvM4tEpUWPVxuy77d/3XR5pzJ7mpDWd2c0e6alL.jpg'],
+  [['menuis','fenet','porte','portail','serrur','metall','ferron','vitr','volet','store'], '#2F8F5B', '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M12 3v18M4 12h16"/>', 'IhQpHb2RePTcovCG6oUX8/pIDcycRZYtCmZqA8aTjKM.jpg'],
   [['plomb','sanit'], '#2C5D8F', '<path d="M3 8h8a4 4 0 0 1 4 4v2"/><path d="M6 5h4M8 5v3"/><path d="M15 18.5c0 1.1-.9 2-2 2s-2-.9-2-2c0-1.5 2-4 2-4s2 2.5 2 4z"/>', 'B7q8TRmNpzxuW8GoCkPYM/cue-MbHXpHEPMwJnQaEKc.jpg'],
-  [['electr','courant'], '#E0A800', '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>', 'itnFbZfp8LZg4mT27FfSY/GmVOxEZJ3SsAnO-IShGZZ.jpg'],
-  [['chauff','pac','pompe','poele'], '#E8590C', '<path d="M12 22c4 0 7-3 7-7 0-5-5-7-5-12-3 2-5 5-4 9-2-1-3-3-3-3-1 2-2 4-2 6 0 4 3 7 7 7z"/>', 'XFVDF1TLoOUqO4hFUV9lL/ZgU6HwWVVjWaHOFkfighc.jpg'],
+  [['electr','courant','photovolt','solaire','domot','alarme'], '#E0A800', '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>', 'itnFbZfp8LZg4mT27FfSY/GmVOxEZJ3SsAnO-IShGZZ.jpg'],
+  [['chauff','pompe','poele'], '#E8590C', '<path d="M12 22c4 0 7-3 7-7 0-5-5-7-5-12-3 2-5 5-4 9-2-1-3-3-3-3-1 2-2 4-2 6 0 4 3 7 7 7z"/>', 'XFVDF1TLoOUqO4hFUV9lL/ZgU6HwWVVjWaHOFkfighc.jpg'],
   [['clim','ventil','vmc'], '#00838F', '<path d="M12 2v20M4 6l16 12M20 6L4 18"/>', 'UPeelO532duUEjizQJoGS/2MZEVlajBXD3GAZllHq5d.jpg'],
   [['platr','placo','plaqu','cloison'], '#7E57C2', '<path d="M3 4h10v16H3z"/><path d="M14 14l6-6 1.5 1.5-6 6z"/><path d="M13 15l2 2"/>', '5ig8LQxDx0QrqWQKf40rw/C-yBAJxpJ9IPAZi0o2GPh.jpg'],
   [['isol'], '#D84E7A', '<path d="M3 6c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0M3 18c3-2 6 2 9 0s6-2 9 0"/>', 'vc0yKvrUoHaUHsazKgMOX/nAGwA7cUPldM75cP6UE-B.jpg'],
@@ -254,13 +257,13 @@ const METIERS = [
   [['sol','resin','parquet','chape'], '#5C6BC0', '<path d="M3 20h18"/><path d="M6 16h12v-3H6z"/><path d="M12 13V4"/>', '4oJ0dLrNUpjjSDieAVpWf/RhLfeTH8ghePwNPIVeqF4.jpg'],
   [['peint','facade','enduit'], '#AD1457', '<rect x="3" y="3" width="15" height="6" rx="1"/><path d="M18 6h3v5h-9v3"/><rect x="10" y="14" width="4" height="7" rx="1"/>', 'Eucr6iUmCiJbnhuHEZ2c4/vmBVx9mzxOKzOK-YFY3R-.jpg'],
   [['cuisin','agenc'], '#795548', '<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="9" cy="8" r="2"/><circle cx="15" cy="8" r="2"/><path d="M4 13h16"/>', 'D43RjmTDvTyM1yI5jDf8u/kUf-1LEkzmwTuO3ObqYi9.jpg'],
-  [['paysag','jardin','espaces verts','clotur'], '#558B2F', '<path d="M12 22v-6"/><path d="M12 2a6 6 0 0 0-6 6c0 4 3 6 6 8 3-2 6-4 6-8a6 6 0 0 0-6-6z"/>', 'FLPfSiivasVegbStKatOo/k-Xd-oXQQ-gj8DEtQh8xq.jpg']
+  [['paysag','jardin','espaces verts','clotur','piscin'], '#558B2F', '<path d="M12 22v-6"/><path d="M12 2a6 6 0 0 0-6 6c0 4 3 6 6 8 3-2 6-4 6-8a6 6 0 0 0-6-6z"/>', 'FLPfSiivasVegbStKatOo/k-Xd-oXQQ-gj8DEtQh8xq.jpg']
 ];
 const ICO_AUTRE = ['#6B7178',null,'<path d="M15 4l5 5-3 3-5-5z"/><path d="M12 7L3 16l3 3 9-9"/>'];
 const ICO_MOE = ['#1E2328','6Quk23MECf7VY2f6X2Z27/JhrgJUx9ShSstMmuHIQsm.jpg','<path d="M3 18h18"/><path d="M5 18v-3a7 7 0 0 1 14 0v3"/><path d="M10 8V5h4v3"/>'];
 const ICO_CLIENT = ['#2C5D8F','bweUxHvc8PfFzctXXiBlt/wcCgaQVkLcG8eqBYx7CfS.jpg','<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>'];
 const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-function metier(lot){ const n = norm(lot); const m = METIERS.find(([k])=>k.some(w=>n.includes(w))); return m ? [m[1], m[2], m[3]] : [ICO_AUTRE[0], ICO_AUTRE[2], null]; }
+function metier(lot){ const n = norm(lot); const m = METIERS.find(([k])=>k.some(w=>n.includes(w))); if(m) return [m[1], m[2], m[3]]; if(!n || n==='autre') return [ICO_AUTRE[0], ICO_AUTRE[2], null]; let h=0; for(const c of n) h=(h*31+c.charCodeAt(0))>>>0; return [PAL[h%PAL.length], ICO_AUTRE[2], null]; }
 const GAMMA = 'https://cdn.gamma.app/dmvjr62s5cif6ew/design-anything/';
 const photoUrl = (p, w) => p ? `/_vercel/image?url=${encodeURIComponent(GAMMA+p)}&w=${w}&q=70` : null;
 const colorOf = s => metier(s)[0];
@@ -450,7 +453,7 @@ function prosView(){
 function editPro(id, after){
   const p = (PROS||[]).find(x=>x.id===id) || {};
   sheet(`<div class="row" style="gap:12px"><span id="pVig">${vignette(p.metier||'Autre',52)}</span><h1 style="font-size:19px">${id?'Fiche professionnel':'Nouveau professionnel'}</h1></div>
-  <label class="lb">Corps de métier</label><input class="inp" id="pMet" list="lotsList2" value="${esc(p.metier||'')}" placeholder="Plomberie" oninput="$('#pVig').innerHTML=vignette(this.value||'Autre',52)"><datalist id="lotsList2">${LOTS_COURANTS.map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
+  <label class="lb">Corps de métier</label><input class="inp" id="pMet" list="lotsList2" value="${esc(p.metier||'')}" placeholder="Plomberie" oninput="$('#pVig').innerHTML=vignette(this.value||'Autre',52)"><datalist id="lotsList2">${lotsCourants().map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
   <label class="lb">Nom</label><input class="inp" id="pNom" value="${esc(p.nom||'')}" placeholder="Karim Benali">
   <label class="lb">Téléphone portable</label><input class="inp" id="pTel" type="tel" value="${esc(p.tel||'')}" placeholder="06 12 34 56 78">
   <label class="lb">Entreprise</label><input class="inp" id="pEnt" value="${esc(p.entreprise||'')}">
@@ -471,8 +474,17 @@ async function delPro(id){
   if(!$('#confDel')){ const b = document.createElement('p'); b.id='confDel'; b.className='note'; b.style.color='var(--bad)'; b.textContent='Touchez encore « Supprimer » pour confirmer (ses accès aux chantiers restent actifs).'; $('.sheet').appendChild(b); return; }
   try{ await rpc('cc_pro_supprimer',{p_token:proToken(),p_id:id}); PROS = await rpc('cc_pros_liste',{p_token:proToken()}); closeSheet(); render(); toast('Fiche supprimée'); }catch(e){ fail(e); }
 }
+function lotChip(l, on){ return `<button type="button" class="chip ${on?'on':''}" data-lot="${esc(l)}" onclick="this.classList.toggle('on')">${vignette(l,22)}${esc(l)}</button>`; }
 function lotsPicker(sel){
-  return `<div class="filters" id="lotsPick">${LOTS_COURANTS.map(l=>`<button type="button" class="chip ${sel.includes(l)?'on':''}" data-lot="${esc(l)}" onclick="this.classList.toggle('on')">${vignette(l,22)}${esc(l)}</button>`).join('')}</div>`;
+  const all = lotsCourants(); sel.forEach(l=>{ if(!all.some(x=>x.toLowerCase()===l.toLowerCase())) all.push(l); });
+  return `<div class="filters" id="lotsPick">${all.map(l=>lotChip(l, sel.includes(l))).join('')}</div>
+  <div class="row" style="margin-top:4px"><input class="inp" id="newLot" placeholder="Autre métier (ex. : géomètre, ascensoriste…)" onkeydown="if(event.key==='Enter'){event.preventDefault();addLotChip()}"><button type="button" class="btn" onclick="addLotChip()">${I.plus}</button></div>`;
+}
+function addLotChip(){
+  const i = $('#newLot'); const v = (i.value||'').trim(); if(!v) return;
+  const ex = [...document.querySelectorAll('#lotsPick .chip')].find(b=>b.dataset.lot.toLowerCase()===v.toLowerCase());
+  if(ex){ ex.classList.add('on'); } else { $('#lotsPick').insertAdjacentHTML('beforeend', lotChip(v, true)); }
+  ajouterMetierPerso(v); i.value=''; toast('Métier « '+v+' » ajouté');
 }
 function pickedLots(){ return [...document.querySelectorAll('#lotsPick .chip.on')].map(b=>b.dataset.lot); }
 function newChantier(){
@@ -576,7 +588,7 @@ function etapeRow(e, moe){
 function openEtape(id){
   const e = D().etapes.find(x=>x.id===id); if(!e) return;
   const who = D().membres.filter(x=>x.role==='artisan' && sameLot(x.lot, e.lot));
-  const lots = [...new Set([...allLots(), ...LOTS_COURANTS])];
+  const lots = [...new Set([...allLots(), ...lotsCourants()])];
   sheet(`<div class="row" style="gap:12px">${e.lot?vignette(e.lot,56):''}<div><div class="meta" style="margin:0">${esc(e.phase)}</div><h1 style="font-size:19px">${esc(e.nom)}</h1></div></div>
   ${e.statut==='déclaré'?`<div class="card" style="margin-top:14px;background:var(--acc-soft);border-color:#F6C9A8"><b>${esc(M(e.declare_par).nom)} déclare cette étape terminée</b> <span class="meta">(${ago(e.declare_le)})</span><p class="note" style="color:#8A3A0A">Vérifiez sur place ou sur les photos, puis validez ou refusez.</p>
     <div class="btns"><button class="btn" onclick="refuserEtape('${id}')">Pas fait</button><button class="btn ok" onclick="majEtape('${id}','validé')">Valider ✓</button></div></div>`:''}
@@ -606,7 +618,7 @@ async function demanderEtape(id, membreId){
 }
 function addEtape(){
   const phases = [...new Set((D().etapes||[]).map(e=>e.phase))];
-  const lots = [...new Set([...allLots(), ...LOTS_COURANTS])];
+  const lots = [...new Set([...allLots(), ...lotsCourants()])];
   sheet(`<h1 style="font-size:19px">Ajouter une étape</h1>
   <label class="lb">Phase</label><select class="inp" id="aPh">${phases.map(p=>`<option>${esc(p)}</option>`).join('')}<option>Autres</option></select>
   <label class="lb">Étape</label><input class="inp" id="aNom" placeholder="Ex. : pose du bac à douche">
@@ -914,12 +926,26 @@ function openDoc(id){ const d = D().documents.find(x=>x.id===id); window.open(d.
 
 /* ---------- EQUIPE ---------- */
 function lotsGrid(){
-  const lots = allLots(); if(!lots.length) return '';
-  return `<h2 style="margin-top:4px">Les corps de métier du chantier</h2><div class="lgrid">${lots.map(l=>{
+  const lots = allLots(); if(!lots.length && !isMoe()) return '';
+  const add = isMoe() ? `<div class="lcell tap" style="border-style:dashed;justify-content:center;cursor:pointer" onclick="addMetier()"><div class="lv" style="width:72px;height:72px;background:#EAE5DD;color:var(--acc)">${I.plus}</div><div class="ptitle" style="font-size:13.5px;margin-top:6px;color:var(--acc)">Ajouter un métier</div></div>` : '';
+  return `<h2 style="margin-top:4px">Les corps de métier du chantier</h2><div class="lgrid">${add}${lots.map(l=>{
     const who = D().membres.filter(x=>x.role==='artisan' && sameLot(x.lot,l)), st = who[0] ? who[0].statut_lot : '';
     const ouv = D().problemes.filter(p=>lotsOf(p).some(x=>sameLot(x,l)) && (p.statut==='ouvert'||p.statut==='en cours')).length;
     return `<div class="lcell">${vignette(l,72)}<div class="ptitle" style="font-size:13.5px;margin-top:6px">${esc(l)}</div><div class="meta" style="margin-top:2px">${who.length?esc(who.map(x=>x.nom.split(' ')[0]).join(', ')):'à inviter'}</div><div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;justify-content:center">${st?`<span class="pill ${LST[st]||'p-mute'}">${esc(st)}</span>`:''}${ouv?`<span class="pill p-acc">${ouv} pb</span>`:''}</div></div>`;
   }).join('')}</div><h2>Intervenants</h2>`;
+}
+function addMetier(){
+  const dispo = lotsCourants().filter(l=>!allLots().some(x=>sameLot(x,l)));
+  sheet(`<h1 style="font-size:19px">Ajouter un corps de métier</h1><p class="sub">Choisissez dans la liste ou créez le vôtre.</p>
+  <div class="filters" style="margin-top:12px">${dispo.map(l=>`<button class="chip" onclick="saveMetier(${esc(JSON.stringify(l))})">${vignette(l,22)}${esc(l)}</button>`).join('')}</div>
+  <label class="lb">Autre métier</label><div class="row"><input class="inp" id="mNew" placeholder="Ex. : géomètre, ascensoriste, désamiantage…" onkeydown="if(event.key==='Enter')saveMetier($('#mNew').value)"><button class="btn pri" onclick="saveMetier($('#mNew').value)">Ajouter</button></div>
+  <p class="note">Il apparaîtra dans les invitations, les problèmes, les documents et les étapes de ce chantier, et restera dans votre liste pour vos prochains chantiers.</p>`);
+}
+async function saveMetier(m){
+  m = String(m||'').trim(); if(!m) return;
+  try{ ajouterMetierPerso(m); const lots = [...new Set([...(D().chantier.lots||[]), m])];
+    await rpc('cc_modifier_chantier',{p_token:S.token,p_nom:null,p_adresse:null,p_client:null,p_debut:null,p_fin:null,p_lots:lots,p_avancement:null,p_archive:null});
+    closeSheet(); await loadChantier(true); toast('« '+m+' » ajouté au chantier'); }catch(e){ fail(e); }
 }
 function equipeView(){
   let h = '';
@@ -949,8 +975,7 @@ function editChantier(){
   <div class="btns"><button class="btn bad" onclick="archiver(${!c.archive})">${c.archive?'Désarchiver':'Archiver'}</button><button class="btn pri" onclick="saveEdit()">Enregistrer</button></div>`);
 }
 async function saveEdit(){
-  const extra = (D().chantier.lots||[]).filter(l=>!LOTS_COURANTS.includes(l));
-  try{ await rpc('cc_modifier_chantier',{p_token:S.token,p_nom:$('#eNom').value,p_adresse:$('#eAdr').value,p_client:$('#eCli').value,p_debut:$('#eDeb').value,p_fin:$('#eFin').value,p_lots:[...pickedLots(),...extra],p_avancement:null,p_archive:null}); closeSheet(); await loadChantier(true); toast('Chantier mis à jour'); }catch(e){ fail(e); }
+  try{ await rpc('cc_modifier_chantier',{p_token:S.token,p_nom:$('#eNom').value,p_adresse:$('#eAdr').value,p_client:$('#eCli').value,p_debut:$('#eDeb').value,p_fin:$('#eFin').value,p_lots:pickedLots(),p_avancement:null,p_archive:null}); closeSheet(); await loadChantier(true); toast('Chantier mis à jour'); }catch(e){ fail(e); }
 }
 async function archiver(v){ try{ await rpc('cc_modifier_chantier',{p_token:S.token,p_nom:null,p_adresse:null,p_client:null,p_debut:null,p_fin:null,p_lots:null,p_avancement:null,p_archive:v}); closeSheet(); await loadChantier(true); toast(v?'Chantier archivé':'Chantier réactivé'); }catch(e){ fail(e); } }
 async function invite(){
