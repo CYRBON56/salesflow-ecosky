@@ -415,6 +415,10 @@ function logout(){ LS.del('cc_compte'); location.hash = '#/'; }
 /* ---------- ESPACE PILOTE ---------- */
 function espaceView(){
   const e = S.espace; if(!e) return '';
+  const tab = S.etab || 'chantiers';
+  let h = `<h1>Bonjour ${esc(e.compte.nom.split(' ')[0])}</h1><p class="sub">${esc(e.compte.entreprise||'')} · architecte / maître d’œuvre</p>
+  <div class="seg" style="margin:16px 0 4px"><button class="${tab==='chantiers'?'on':''}" onclick="S.etab='chantiers';render()">Mes chantiers</button><button class="${tab==='pros'?'on':''}" onclick="S.etab='pros';loadPros()">Mes professionnels</button></div>`;
+  if(tab==='pros') return h + prosView();
   const act = e.chantiers.filter(c=>!c.archive), arch = e.chantiers.filter(c=>c.archive);
   const card = c => `<a class="card tap" style="display:block;text-decoration:none" href="#/c/${c.token}">
       <div class="row between"><div style="min-width:0"><div class="ptitle" style="font-size:16.5px">${esc(c.nom)}</div><div class="meta">${esc(c.adresse||'')}</div></div>
@@ -422,12 +426,50 @@ function espaceView(){
       ${(c.lots||[]).length?`<div class="row" style="gap:4px;margin-top:10px;flex-wrap:wrap">${c.lots.slice(0,8).map(l=>vignette(l,34)).join('')}${c.lots.length>8?`<span class="meta">+${c.lots.length-8}</span>`:''}</div>`:''}
       <div class="bar"><i style="width:${c.avancement}%"></i></div>
       <div class="stats"><div class="stat"><b>${c.avancement}%</b><span>avancement</span></div><div class="stat"><b>${c.ouverts}</b><span>problèmes ouverts</span></div><div class="stat"><b>${c.membres}</b><span>intervenants</span></div></div></a>`;
-  return `<h1>Bonjour ${esc(e.compte.nom.split(' ')[0])}</h1><p class="sub">${esc(e.compte.entreprise||'')} · espace pilote</p>
-  <button class="btn pri full" style="margin-top:16px" onclick="newChantier()">${I.plus} Nouveau chantier</button>
+  return h + `<button class="btn pri full" style="margin-top:12px" onclick="newChantier()">${I.plus} Nouveau chantier</button>
   <h2>Chantiers en cours (${act.length})</h2>
-  ${act.map(card).join('') || '<div class="empty">Aucun chantier pour l’instant.<br>Créez le premier, puis invitez vos artisans par SMS.</div>'}
+  ${act.map(card).join('') || '<div class="empty">Aucun chantier pour l’instant.<br>Créez le premier : nom, adresse, documents, puis envoyez un lien SMS à chaque professionnel.</div>'}
   ${arch.length?`<h2>Archivés</h2>${arch.map(card).join('')}`:''}
   <footer>Contact Chantier · offre ${esc(e.compte.offre)} · ${esc(e.compte.email)}</footer>`;
+}
+/* ---------- CARNET DE PROFESSIONNELS ---------- */
+let PROS = null;
+function proToken(){ return S.route==='chantier' ? S.token : compteToken(); }
+async function loadPros(){ try{ PROS = await rpc('cc_pros_liste',{p_token:proToken()}); }catch(e){ fail(e); PROS = PROS||[]; } render(); }
+function prosView(){
+  if(!PROS){ loadPros(); return '<div class="spinner"></div>'; }
+  let h = `<p class="note">Créez une fois la fiche de chaque professionnel avec qui vous travaillez. Sur chaque chantier, vous l’ajoutez en un geste et lui envoyez son lien par SMS.</p>
+  <button class="btn pri full" style="margin:12px 0" onclick="editPro()">${I.plus} Nouveau professionnel</button>`;
+  if(!PROS.length) return h + '<div class="empty">Votre carnet est vide.</div>';
+  [...new Set(PROS.map(p=>p.metier||'Autre'))].forEach(mt=>{
+    h += `<h2>${vignette(mt,26)} <span style="vertical-align:6px;margin-left:6px">${esc(mt)}</span></h2>`;
+    PROS.filter(p=>(p.metier||'Autre')===mt).forEach(p=> h += `<div class="card tap person" onclick="editPro('${p.id}')">${vignette(p.metier||'Autre',44)}<div style="flex:1;min-width:0"><div class="ptitle">${esc(p.nom)}</div><div class="meta">${esc([p.entreprise,p.tel].filter(Boolean).join(' · '))}${p.chantiers?` · ${p.chantiers} chantier${p.chantiers>1?'s':''}`:''}</div></div><span style="font-size:22px;color:var(--mute)">›</span></div>`);
+  });
+  return h;
+}
+function editPro(id, after){
+  const p = (PROS||[]).find(x=>x.id===id) || {};
+  sheet(`<div class="row" style="gap:12px"><span id="pVig">${vignette(p.metier||'Autre',52)}</span><h1 style="font-size:19px">${id?'Fiche professionnel':'Nouveau professionnel'}</h1></div>
+  <label class="lb">Corps de métier</label><input class="inp" id="pMet" list="lotsList2" value="${esc(p.metier||'')}" placeholder="Plomberie" oninput="$('#pVig').innerHTML=vignette(this.value||'Autre',52)"><datalist id="lotsList2">${LOTS_COURANTS.map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
+  <label class="lb">Nom</label><input class="inp" id="pNom" value="${esc(p.nom||'')}" placeholder="Karim Benali">
+  <label class="lb">Téléphone portable</label><input class="inp" id="pTel" type="tel" value="${esc(p.tel||'')}" placeholder="06 12 34 56 78">
+  <label class="lb">Entreprise</label><input class="inp" id="pEnt" value="${esc(p.entreprise||'')}">
+  <label class="lb">E-mail (facultatif)</label><input class="inp" id="pMail" type="email" value="${esc(p.email||'')}">
+  <label class="lb">Notes (facultatif)</label><input class="inp" id="pNotes" value="${esc(p.notes||'')}" placeholder="Ex. : dispo le mardi, très réactif">
+  <div class="btns">${id?`<button class="btn bad" onclick="delPro('${id}')">Supprimer</button>`:`<button class="btn" onclick="closeSheet()">Annuler</button>`}<button class="btn pri" id="proBtn" onclick="savePro(${id?`'${id}'`:'null'}, ${after?`'${after}'`:'null'})">${after?'Enregistrer et inviter':'Enregistrer'}</button></div>`);
+}
+async function savePro(id, after){
+  const b = $('#proBtn'); b.disabled = true;
+  try{
+    const r = await rpc('cc_pro_enregistrer',{p_token:proToken(),p_id:id,p_nom:$('#pNom').value,p_metier:$('#pMet').value,p_entreprise:$('#pEnt').value,p_tel:$('#pTel').value,p_email:$('#pMail').value,p_notes:$('#pNotes').value});
+    PROS = await rpc('cc_pros_liste',{p_token:proToken()});
+    if(after==='invite'){ await inviterPro(r.id); return; }
+    closeSheet(); render(); toast('Fiche enregistrée');
+  }catch(e){ fail(e); b.disabled=false; }
+}
+async function delPro(id){
+  if(!$('#confDel')){ const b = document.createElement('p'); b.id='confDel'; b.className='note'; b.style.color='var(--bad)'; b.textContent='Touchez encore « Supprimer » pour confirmer (ses accès aux chantiers restent actifs).'; $('.sheet').appendChild(b); return; }
+  try{ await rpc('cc_pro_supprimer',{p_token:proToken(),p_id:id}); PROS = await rpc('cc_pros_liste',{p_token:proToken()}); closeSheet(); render(); toast('Fiche supprimée'); }catch(e){ fail(e); }
 }
 function lotsPicker(sel){
   return `<div class="filters" id="lotsPick">${LOTS_COURANTS.map(l=>`<button type="button" class="chip ${sel.includes(l)?'on':''}" data-lot="${esc(l)}" onclick="this.classList.toggle('on')">${vignette(l,22)}${esc(l)}</button>`).join('')}</div>`;
@@ -446,7 +488,7 @@ async function saveChantier(){
   const b=$('#cBtn'); b.disabled=true;
   try{
     const r = await rpc('cc_creer_chantier', {p_token:compteToken(), p_nom:$('#cNom').value, p_adresse:$('#cAdr').value, p_client:$('#cCli').value, p_debut:$('#cDeb').value, p_fin:$('#cFin').value, p_lots:pickedLots()});
-    closeSheet(); S.tab='equipe'; location.hash = '#/c/'+r.token; toast('Chantier créé avec sa liste d’étapes · invitez vos artisans');
+    closeSheet(); S.lastTok=r.token; S.tab='avancement'; location.hash = '#/c/'+r.token; toast('Chantier créé avec sa liste d’étapes · invitez vos artisans');
   }catch(e){ fail(e); b.disabled=false; }
 }
 
@@ -493,13 +535,23 @@ function allLots(){ const s = new Set(D().chantier.lots||[]); D().membres.forEac
 const ET = {'à faire':['À faire','p-mute'],'en cours':['En cours','p-blue'],'déclaré':['À vérifier','p-acc'],'validé':['Fait ✓','p-ok'],'sans objet':['Sans objet','p-mute']};
 
 /* ---------- AVANCEMENT (architecte) ---------- */
+function miseEnRoute(){
+  const arts = D().membres.filter(x=>x.role==='artisan'), docs = D().documents.length, jamais = arts.filter(x=>!x.last_seen).length;
+  if(arts.length && docs && !jamais) return '';
+  const st = (ok, n, t, act) => `<div class="row" style="gap:10px;padding:8px 0"><span class="pill ${ok?'p-ok':'p-acc'}" style="min-width:26px;justify-content:center">${ok?'✓':n}</span><div style="flex:1">${t}</div>${ok?'':act}</div>`;
+  return `<div class="card" style="border-color:#F6C9A8"><b>Mise en route du chantier</b>
+    ${st(true,1,'Chantier créé','')}
+    ${st(docs>0,2,'Déposer les documents (pour tous ou par corps de métier)',`<button class="chip" onclick="setTab('docs');newDoc()">Ajouter</button>`)}
+    ${st(arts.length>0,3,'Ajouter les professionnels',`<button class="chip" onclick="invite()">Ajouter</button>`)}
+    ${st(arts.length>0&&!jamais,4,jamais?`Envoyer les liens SMS (${jamais} pas encore connecté${jamais>1?'s':''})`:'Envoyer les liens SMS',arts.length?`<button class="chip" onclick="setTab('equipe')">Voir</button>`:'')}</div>`;
+}
 function avancementView(){
   const et = D().etapes||[];
   const actifs = et.filter(e=>e.statut!=='sans objet'), ok = actifs.filter(e=>e.statut==='validé').length, decl = et.filter(e=>e.statut==='déclaré').length, enc = et.filter(e=>e.statut==='en cours').length;
   const F = {toutes:()=>true, verifier:e=>e.statut==='déclaré', cours:e=>e.statut==='en cours', faire:e=>e.statut==='à faire', faites:e=>e.statut==='validé'};
   if(!F[S.efiltre]) S.efiltre = 'toutes';
   const list = et.filter(F[S.efiltre]);
-  let h = `<div class="card"><div class="row between"><div><div class="meta" style="margin:0">Étapes validées</div><b style="font-size:24px">${ok}<span style="font-size:15px;color:var(--mute)"> / ${actifs.length}</span></b></div>
+  let h = miseEnRoute() + `<div class="card"><div class="row between"><div><div class="meta" style="margin:0">Étapes validées</div><b style="font-size:24px">${ok}<span style="font-size:15px;color:var(--mute)"> / ${actifs.length}</span></b></div>
     <div style="text-align:right"><div class="meta" style="margin:0">À vérifier</div><b style="font-size:24px;color:${decl?'var(--acc)':'var(--ink)'}">${decl}</b></div></div>
     <p class="note">Les artisans voient seulement leurs propres étapes. Quand l’un d’eux coche « c’est fait », l’étape passe en « à vérifier » : à vous de valider.</p></div>
   <div class="filters">${[['toutes','Toutes'],['verifier','À vérifier · '+decl],['cours','En cours · '+enc],['faire','À faire'],['faites','Faites']].map(([k,l])=>`<button class="chip ${S.efiltre===k?'on':''}" onclick="S.efiltre='${k}';render()">${l}</button>`).join('')}</div>`;
@@ -564,9 +616,17 @@ function addEtape(){
 async function saveEtape(){ try{ await rpc('cc_etape_ajouter',{p_token:S.token,p_phase:$('#aPh').value,p_nom:$('#aNom').value,p_lot:$('#aLot').value}); closeSheet(); await loadChantier(true); toast('Étape ajoutée'); }catch(e){ fail(e); } }
 
 /* ---------- MES TÂCHES (artisan) ---------- */
+function bienvenue(){
+  if(LS.get('cc_bv_'+S.token, false)) return '';
+  const moe = D().membres.find(x=>x.role==='moe')||{nom:'L’architecte'};
+  return `<div class="card" style="background:var(--ink);color:#fff;border-color:var(--ink)"><div class="row" style="gap:12px">${vignette(me().lot||'Autre',52)}<div><b style="font-size:16px">Bienvenue ${esc(me().nom.split(' ')[0])} 👋</b><div style="font-size:13.5px;opacity:.85;margin-top:3px">${esc(moe.nom)} vous a invité sur ce chantier.</div></div></div>
+  <p style="font-size:13.5px;line-height:1.5;margin-top:10px;opacity:.9">Ici : vos tâches à cocher, les problèmes qui concernent votre lot, vos messages et les plans qui vous sont destinés. Les autres corps de métier ne voient pas vos échanges privés.</p>
+  <p style="font-size:12.5px;margin-top:8px;opacity:.75">Astuce : ajoutez l’appli à l’écran d’accueil (iPhone : Partager → « Sur l’écran d’accueil » ; Android : menu ⋮ → « Ajouter à l’écran d’accueil »).</p>
+  <button class="btn pri full" style="margin-top:10px" onclick="LS.set('cc_bv_'+S.token,true);render()">C’est parti</button></div>`;
+}
 function tachesView(){
   const et = D().etapes||[], m = me(), st = (D().membres.find(x=>x.id===m.id)||{}).statut_lot;
-  let h = `<div class="card row" style="gap:12px">${vignette(m.lot||'Autre',52)}<div style="flex:1"><b>Lot ${esc(m.lot||'—')}</b><div class="meta">Statut de votre lot : ${esc(st||'à venir')}</div></div></div>
+  let h = bienvenue() + `<div class="card row" style="gap:12px">${vignette(m.lot||'Autre',52)}<div style="flex:1"><b>Lot ${esc(m.lot||'—')}</b><div class="meta">Statut de votre lot : ${esc(st||'à venir')}</div></div></div>
   <div class="quick">${st!=='en cours'&&st!=='terminé'?`<button class="chip" onclick="lotStatut('en cours')">▶️ Je démarre mon lot</button>`:''}${st!=='terminé'?`<button class="chip" onclick="lotStatut('terminé')">✅ J’ai terminé mon lot</button>`:''}</div>`;
   if(!et.length) return h + `<div class="empty">Aucune étape attribuée à votre lot pour l’instant.</div>`;
   h += `<p class="note" style="margin:0 0 10px">Cochez « C’est fait » quand une étape est terminée : l’architecte vérifiera et validera.</p>`;
@@ -806,25 +866,48 @@ function photosView(){
 }
 
 /* ---------- DOCUMENTS ---------- */
+function docConcernes(d){ return D().membres.filter(x=>x.role==='moe' || !(d.lots||[]).length || (x.role==='artisan' && d.lots.some(l=>sameLot(l,x.lot)))); }
 function docsView(){
-  const team = D().membres.length;
-  let h = `<label class="btn full" style="margin-bottom:12px">${I.plus} Ajouter un document ou un nouveau plan<input type="file" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.dwg" onchange="addDoc(this)"></label>
-  <p class="note" style="margin:-4px 0 12px">Pour une nouvelle version d’un plan, gardez le même nom de fichier : l’indice passe à la lettre suivante et tout le monde est prévenu.</p>`;
+  let h = `<button class="btn full" style="margin-bottom:12px" onclick="newDoc()">${I.plus} Ajouter un document ou un nouveau plan</button>
+  <p class="note" style="margin:-4px 0 12px">${isMoe()?'Choisissez pour chaque document : tout le monde, ou seulement certains corps de métier. ':''}Pour une nouvelle version d’un plan, gardez le même nom : l’indice passe à la lettre suivante.</p>`;
   if(!D().documents.length) h += `<div class="empty">Aucun document. Déposez les plans, le CCTP, les fiches techniques…</div>`;
   D().documents.forEach(d=>{
     const lu = d.lus.includes(me().id), ext = (d.url.split('.').pop()||'doc').slice(0,4);
-    const nonLus = D().membres.filter(x=>!d.lus.includes(x.id)).map(x=>x.nom.split(' ')[0]);
-    h += `<div class="card tap doc" onclick="openDoc('${d.id}')"><div class="dicon">${esc(ext)}</div>
+    const conc = docConcernes(d), nonLus = conc.filter(x=>!d.lus.includes(x.id)).map(x=>x.nom.split(' ')[0]);
+    const pour = (d.lots||[]).length ? d.lots.map(lotPill).join('') : '<span class="pill p-mute">Tout le monde</span>';
+    h += `<div class="card"><div class="tap doc" onclick="openDoc('${d.id}')"><div class="dicon">${esc(ext)}</div>
       <div style="flex:1;min-width:0"><div class="ptitle">${esc(d.nom)} <span class="pill p-mute">indice ${esc(d.indice)}</span></div>
-      <div class="meta">${esc(M(d.auteur_id).nom.split(' ')[0])} · ${ago(d.created_at)}${isMoe()?` · lu par ${d.lus.length}/${team}${nonLus.length&&nonLus.length<5?' (pas encore : '+esc(nonLus.join(', '))+')':''}`:''}</div></div>
-      ${!lu?`<span class="pill p-acc">Nouveau</span>`:''}</div>`;
+      <div class="meta">${esc(M(d.auteur_id).nom.split(' ')[0])} · ${ago(d.created_at)}${isMoe()?` · lu par ${conc.filter(x=>d.lus.includes(x.id)).length}/${conc.length}${nonLus.length&&nonLus.length<5?' (pas encore : '+esc(nonLus.join(', '))+')':''}`:''}</div></div>
+      ${!lu?`<span class="pill p-acc">Nouveau</span>`:''}</div>
+      ${isMoe()?`<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px"><span class="meta" style="margin:0">Visible par :</span>${pour}<button class="chip" style="padding:3px 9px" onclick="docVisi('${d.id}')">Modifier</button></div>`:''}</div>`;
   });
   return h;
 }
-async function addDoc(inp){
-  const f = inp.files[0]; if(!f) return; toast('Envoi du document…');
-  try{ const md = await upload(f, D().chantier.id); const r = await rpc('cc_ajouter_doc', {p_token:S.token, p_nom:f.name.replace(/\.[^.]+$/,''), p_url:md.url}); await loadChantier(true); toast(r.indice!=='A'?`Nouvel indice ${r.indice} · tout le monde est prévenu`:'Document ajouté'); }catch(e){ fail(e); }
+let docDraft = null;
+function newDoc(){ docDraft = {file:null, lots:[]}; drawDoc(); }
+function drawDoc(){
+  const lots = allLots();
+  sheet(`<h1 style="font-size:19px">Ajouter un document</h1>
+  <label class="btn full" style="margin-top:12px">${I.doc} ${docDraft.file?esc(docDraft.file.name):'Choisir le fichier (plan, CCTP, devis, photo…)'}<input type="file" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.dwg" onchange="docDraft.file=this.files[0];drawDoc()"></label>
+  ${isMoe()?`<label class="lb">Qui peut le voir ?</label>
+  <div class="filters"><button class="chip ${!docDraft.lots.length?'on':''}" onclick="docDraft.lots=[];drawDoc()">👥 Tout le monde</button>${lots.map(l=>`<button class="chip ${docDraft.lots.includes(l)?'on':''}" onclick="toggleDocLot(${esc(JSON.stringify(l))})">${vignette(l,22)}${esc(l)}</button>`).join('')}</div>
+  <p class="note">${docDraft.lots.length?'Visible seulement par : '+esc(docDraft.lots.join(', '))+' (et vous).':'Visible par tous les intervenants du chantier.'}</p>`:''}
+  <div class="btns"><button class="btn" onclick="closeSheet()">Annuler</button><button class="btn pri" id="dBtn" onclick="saveDoc()" ${docDraft.file?'':'disabled'}>Envoyer</button></div>`);
 }
+function toggleDocLot(l){ const i = docDraft.lots.indexOf(l); if(i<0) docDraft.lots.push(l); else docDraft.lots.splice(i,1); drawDoc(); }
+async function saveDoc(){
+  const f = docDraft.file; if(!f) return; const b = $('#dBtn'); b.disabled = true; b.textContent = 'Envoi…';
+  try{ const md = await upload(f, D().chantier.id); const r = await rpc('cc_ajouter_doc2', {p_token:S.token, p_nom:f.name.replace(/\.[^.]+$/,''), p_url:md.url, p_lots:docDraft.lots}); closeSheet(); await loadChantier(true); toast(r.indice!=='A'?`Nouvel indice ${r.indice} · les intervenants concernés sont prévenus`:'Document ajouté'); }catch(e){ fail(e); b.disabled=false; b.textContent='Réessayer'; }
+}
+function docVisi(id){ const d = D().documents.find(x=>x.id===id); docDraft = {id, lots:[...(d.lots||[])]}; drawVisi(); }
+function drawVisi(){
+  const d = D().documents.find(x=>x.id===docDraft.id), lots = allLots();
+  sheet(`<h1 style="font-size:19px">Qui voit « ${esc(d.nom)} » ?</h1>
+  <div class="filters" style="margin-top:12px"><button class="chip ${!docDraft.lots.length?'on':''}" onclick="docDraft.lots=[];drawVisi()">👥 Tout le monde</button>${lots.map(l=>`<button class="chip ${docDraft.lots.includes(l)?'on':''}" onclick="toggleVisi(${esc(JSON.stringify(l))})">${vignette(l,22)}${esc(l)}</button>`).join('')}</div>
+  <div class="btns"><button class="btn" onclick="closeSheet()">Annuler</button><button class="btn pri" onclick="saveVisi()">Enregistrer</button></div>`);
+}
+function toggleVisi(l){ const i = docDraft.lots.indexOf(l); if(i<0) docDraft.lots.push(l); else docDraft.lots.splice(i,1); drawVisi(); }
+async function saveVisi(){ try{ await rpc('cc_doc_lots',{p_token:S.token,p_doc:docDraft.id,p_lots:docDraft.lots}); closeSheet(); await loadChantier(true); toast('Visibilité mise à jour'); }catch(e){ fail(e); } }
 function openDoc(id){ const d = D().documents.find(x=>x.id===id); window.open(d.url,'_blank'); rpc('cc_lire_doc',{p_token:S.token,p_doc:id}).then(()=>loadChantier(false)).catch(()=>{}); }
 
 
@@ -841,7 +924,7 @@ function lotsGrid(){
 function equipeView(){
   let h = '';
   if(isMoe()){
-    h += `<div class="btns" style="margin:0 0 12px"><button class="btn pri" onclick="invite()">${I.plus} Inviter</button><button class="btn" onclick="editChantier()">Modifier le chantier</button></div>`;
+    h += `<div class="btns" style="margin:0 0 12px"><button class="btn pri" onclick="invite()">${I.plus} Ajouter un professionnel</button><button class="btn" onclick="editChantier()">Modifier le chantier</button></div>`;
   }
   h += lotsGrid();
   D().membres.forEach(x=>{
@@ -850,7 +933,7 @@ function equipeView(){
     h += `<div class="card"><div class="person">${vignette(x.lot||'Autre', 48, x.role)}
       <div style="flex:1;min-width:0"><div class="ptitle">${esc(x.nom)}${x.id===me().id?' (vous)':''}</div><div class="meta">${esc(role)}${x.entreprise?' · '+esc(x.entreprise):''}${x.last_seen?' · vu '+ago(x.last_seen):' · pas encore connecté'}</div></div>
       ${x.role==='artisan'?(isMoe()?`<select class="pill ${LST[x.statut_lot]||'p-mute'}" style="border:none" onchange="lotStatut(this.value,'${x.id}')">${['à venir','en cours','terminé'].map(s=>`<option ${x.statut_lot===s?'selected':''}>${s}</option>`).join('')}</select>`:`<span class="pill ${LST[x.statut_lot]||'p-mute'}">${esc(x.statut_lot)}</span>`):''}</div>
-      ${x.tel||canMsg||(isMoe()&&x.role!=='moe')?`<div class="btns" style="margin-top:10px">${canMsg?`<button class="btn" onclick="ecrireA('${x.id}')">💬 Message</button>`:''}${x.tel?`<a class="btn" href="tel:${esc(x.tel)}">📞 Appeler</a>`:''}${isMoe()&&x.role!=='moe'?`<button class="btn" onclick="showInvite('${x.id}')">Lien</button>`:''}</div>`:''}</div>`;
+      ${x.tel||canMsg||(isMoe()&&x.role!=='moe')?`<div class="btns" style="margin-top:10px">${canMsg?`<button class="btn" onclick="ecrireA('${x.id}')">💬 Message</button>`:''}${x.tel?`<a class="btn" href="tel:${esc(x.tel)}">📞 Appeler</a>`:''}${isMoe()&&x.role!=='moe'?`<button class="btn ${x.last_seen?'':'pri'}" onclick="showInvite('${x.id}')">${x.last_seen?'Lien':'📩 Envoyer le lien SMS'}</button>`:''}</div>`:''}</div>`;
   });
   return h;
 }
@@ -870,26 +953,35 @@ async function saveEdit(){
   try{ await rpc('cc_modifier_chantier',{p_token:S.token,p_nom:$('#eNom').value,p_adresse:$('#eAdr').value,p_client:$('#eCli').value,p_debut:$('#eDeb').value,p_fin:$('#eFin').value,p_lots:[...pickedLots(),...extra],p_avancement:null,p_archive:null}); closeSheet(); await loadChantier(true); toast('Chantier mis à jour'); }catch(e){ fail(e); }
 }
 async function archiver(v){ try{ await rpc('cc_modifier_chantier',{p_token:S.token,p_nom:null,p_adresse:null,p_client:null,p_debut:null,p_fin:null,p_lots:null,p_avancement:null,p_archive:v}); closeSheet(); await loadChantier(true); toast(v?'Chantier archivé':'Chantier réactivé'); }catch(e){ fail(e); } }
-function invite(){
+async function invite(){
+  if(!PROS) { try{ PROS = await rpc('cc_pros_liste',{p_token:S.token}); }catch(e){ PROS = []; } }
+  const deja = new Set(D().membres.map(x=>x.pro_id).filter(Boolean));
+  const dispo = PROS.filter(p=>!deja.has(p.id));
   const lots = allLots();
-  sheet(`<h1 style="font-size:19px">Inviter sur le chantier</h1><p class="sub">Il recevra un lien : pas de compte, pas de mot de passe, gratuit pour lui.</p>
-  <div class="seg" style="margin-top:12px"><button class="on" id="rA" onclick="this.classList.add('on');$('#rC').classList.remove('on');$('#lotZone').style.display=''">Artisan</button><button id="rC" onclick="this.classList.add('on');$('#rA').classList.remove('on');$('#lotZone').style.display='none'">Client</button></div>
-  <label class="lb">Nom</label><input class="inp" id="iNom" placeholder="Karim Benali">
-  <label class="lb">Téléphone portable</label><input class="inp" id="iTel" type="tel" placeholder="06 12 34 56 78">
-  <div id="lotZone"><label class="lb">Corps de métier</label><div class="row"><span id="iVig">${vignette(lots[0]||'Autre',46)}</span><input class="inp" id="iLot" list="lotsList" placeholder="Plomberie" value="${esc(lots[0]||'')}" oninput="$('#iVig').innerHTML=vignette(this.value||'Autre',46)"></div><datalist id="lotsList">${[...new Set([...lots,...LOTS_COURANTS])].map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
-  <label class="lb">Entreprise (facultatif)</label><input class="inp" id="iEnt"></div>
-  <div class="btns"><button class="btn" onclick="closeSheet()">Annuler</button><button class="btn pri" id="iBtn" onclick="saveInvite()">Créer l’invitation</button></div>`);
+  const tri = dispo.slice().sort((a,b)=> (lots.some(l=>sameLot(l,b.metier))?1:0) - (lots.some(l=>sameLot(l,a.metier))?1:0));
+  sheet(`<h1 style="font-size:19px">Ajouter un professionnel</h1><p class="sub">Il recevra un lien par SMS : pas de compte, pas de mot de passe. Il ne verra que sa partie du chantier.</p>
+  <button class="btn pri full" style="margin-top:14px" onclick="editPro(null,'invite')">${I.plus} Nouveau professionnel</button>
+  ${tri.length?`<h2>Depuis mon carnet</h2>${tri.map(p=>`<div class="card tap person" onclick="inviterPro('${p.id}')">${vignette(p.metier||'Autre',44)}<div style="flex:1;min-width:0"><div class="ptitle">${esc(p.nom)}</div><div class="meta">${esc([p.metier,p.entreprise,p.tel].filter(Boolean).join(' · '))}</div></div><span class="pill p-acc">Ajouter</span></div>`).join('')}`:`<p class="note" style="margin-top:12px">${PROS.length?'Tous les professionnels de votre carnet sont déjà sur ce chantier.':'Votre carnet est vide : créez la fiche du professionnel, elle servira pour vos prochains chantiers.'}</p>`}
+  <h2>Client</h2><button class="btn full" onclick="inviteClient()">Inviter le client (lecture seule)</button>`);
 }
-async function saveInvite(){
-  const b=$('#iBtn'); b.disabled=true; const client = $('#rC').classList.contains('on');
-  try{ const r = await rpc('cc_inviter',{p_token:S.token,p_nom:$('#iNom').value,p_lot:client?null:$('#iLot').value,p_tel:$('#iTel').value,p_entreprise:client?null:$('#iEnt').value,p_role:client?'client':'artisan'});
-    await loadChantier(false); render(); showInvite(r.id); }catch(e){ fail(e); b.disabled=false; }
+async function inviterPro(proId){
+  try{ const r = await rpc('cc_inviter_pro',{p_token:S.token,p_pro:proId,p_lot:null}); await loadChantier(false); render(); showInvite(r.id, true); }catch(e){ fail(e); }
 }
-function showInvite(id){
+function inviteClient(){
+  sheet(`<h1 style="font-size:19px">Inviter le client</h1><p class="sub">Il voit l’avancement, les messages du fil général, les photos et les documents « tout le monde ».</p>
+  <label class="lb">Nom</label><input class="inp" id="iNom" placeholder="M. et Mme Le Dantec">
+  <label class="lb">Téléphone portable</label><input class="inp" id="iTel" type="tel">
+  <div class="btns"><button class="btn" onclick="closeSheet()">Annuler</button><button class="btn pri" id="iBtn" onclick="saveClient()">Créer l’accès</button></div>`);
+}
+async function saveClient(){
+  const b=$('#iBtn'); b.disabled=true;
+  try{ const r = await rpc('cc_inviter',{p_token:S.token,p_nom:$('#iNom').value,p_lot:null,p_tel:$('#iTel').value,p_entreprise:null,p_role:'client'}); await loadChantier(false); render(); showInvite(r.id, true); }catch(e){ fail(e); b.disabled=false; }
+}
+function showInvite(id, nouveau){
   const x = D().membres.find(z=>z.id===id); if(!x||!x.token) return;
   const url = linkFor(x.token), c = D().chantier;
   const txt = `Bonjour ${x.nom.split(' ')[0]}, voici votre accès au chantier « ${c.nom} » sur Contact Chantier (photos, problèmes, plans, messages). Aucun compte à créer, ouvrez simplement : ${url}`;
-  sheet(`<div class="row" style="gap:12px">${vignette(x.lot||'Autre',52,x.role)}<div><h1 style="font-size:19px">Lien de ${esc(x.nom)}</h1><p class="sub" style="margin-top:2px">Personnel : il donne accès au chantier.</p></div></div>
+  sheet(`<div class="row" style="gap:12px">${vignette(x.lot||'Autre',52,x.role)}<div><h1 style="font-size:19px">${nouveau?esc(x.nom)+' est ajouté ✓':'Lien de '+esc(x.nom)}</h1><p class="sub" style="margin-top:2px">${nouveau?'Dernière étape : envoyez-lui son lien par SMS.':'Lien personnel : il donne accès à sa partie du chantier.'}</p></div></div>
   <div class="linkbox">${esc(url)}</div>
   <div class="btns" style="flex-direction:column">
     <a class="btn pri" href="sms:${esc(x.tel||'')}?&body=${encodeURIComponent(txt)}">Envoyer par SMS</a>
