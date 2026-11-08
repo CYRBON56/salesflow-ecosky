@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Contact Chantier — le suivi de chantier entre artisans</title>
+<meta name="description" content="Photos, problèmes, vidéos, plans et discussions de tous les corps de métier d'un chantier, visibles par l'architecte ou le maître d'œuvre.">
+<meta name="theme-color" content="#1E2328">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Contact Chantier">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F1EC; --card:#FFFFFF; --ink:#1E2328; --mute:#6B7178; --line:#E3DED6;
+  --acc:#E8590C; --acc-soft:#FDEBDD; --ok:#2F8F5B; --ok-soft:#E1F2E8;
+  --warn:#C98A00; --warn-soft:#FBF0D3; --bad:#C8372D; --bad-soft:#F9E0DE;
+  --blue:#2C5D8F; --blue-soft:#E1EAF4; --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:Manrope,system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+a{color:inherit}
+.app{max-width:760px;margin:0 auto;min-height:100vh;padding-bottom:110px}
+header{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top));display:flex;align-items:center;gap:10px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:18px;letter-spacing:-.3px;text-decoration:none;color:#fff}
+.logo-mark{width:30px;height:30px;border-radius:8px;background:var(--acc);display:grid;place-items:center;flex:none}
+.hright{margin-left:auto;display:flex;gap:8px;align-items:center}
+.hbtn{color:#fff;background:#2E353C;border:1px solid #3B444C;border-radius:10px;padding:7px 11px;font-size:13px;font-weight:600}
+.back{color:#fff;text-decoration:none;font-size:26px;padding:0 6px 0 0;line-height:1}
+main{padding:16px}
+h1{font-size:22px;font-weight:800;letter-spacing:-.4px;line-height:1.2}
+h2{font-size:16px;font-weight:700;margin:22px 0 10px}
+.sub{color:var(--mute);font-size:13.5px;margin-top:4px;line-height:1.4}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.tap{transition:transform .08s;cursor:pointer}.tap:active{transform:scale(.985)}
+.row{display:flex;align-items:center;gap:10px}
+.between{justify-content:space-between}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 9px;border-radius:99px;white-space:nowrap}
+.p-bad{background:var(--bad-soft);color:var(--bad)}.p-warn{background:var(--warn-soft);color:#8A5E00}
+.p-ok{background:var(--ok-soft);color:var(--ok)}.p-blue{background:var(--blue-soft);color:var(--blue)}
+.p-mute{background:#EEEAE4;color:var(--mute)}.p-acc{background:var(--acc-soft);color:#A6430A}
+.bar{height:7px;background:#EEEAE4;border-radius:9px;overflow:hidden;margin-top:10px}
+.bar>i{display:block;height:100%;background:var(--acc);border-radius:9px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.stat{background:#F8F6F2;border-radius:10px;padding:9px 10px}
+.stat b{font-size:20px;display:block}.stat span{font-size:12px;color:var(--mute)}
+.tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;position:sticky;top:calc(54px + env(safe-area-inset-top));background:var(--bg);z-index:10;margin:0 -16px;padding:4px 16px 12px}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:8px 13px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-weight:600;font-size:13.5px;white-space:nowrap;position:relative}
+.tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tab .dot{position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;border-radius:9px;background:var(--acc);color:#fff;font-size:11px;display:grid;place-items:center;padding:0 4px}
+.prob{display:flex;gap:12px}
+.thumb{width:62px;height:62px;border-radius:10px;flex:none;overflow:hidden;background:#E9E4DC;display:grid;place-items:center;position:relative;color:var(--mute)}
+.thumb img,.thumb video{width:100%;height:100%;object-fit:cover}
+.thumb .play{position:absolute;inset:0;display:grid;place-items:center}
+.ptitle{font-weight:700;line-height:1.3;word-break:break-word}
+.meta{font-size:12.5px;color:var(--mute);margin-top:4px}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{padding:6px 11px;border-radius:99px;border:1px solid var(--line);background:var(--card);font-size:13px;font-weight:600}
+.chip.on{border-color:var(--acc);background:var(--acc-soft);color:#A6430A}
+.fab{position:fixed;bottom:calc(22px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--acc);color:#fff;font-weight:800;padding:15px 26px;border-radius:99px;box-shadow:0 8px 24px rgba(232,89,12,.35);display:flex;align-items:center;gap:8px;z-index:30;font-size:15.5px;white-space:nowrap}
+.empty{text-align:center;color:var(--mute);padding:30px 10px;font-size:14px;line-height:1.5}
+.veil{position:fixed;inset:0;background:rgba(20,22,25,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:760px;max-height:94vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:8px 16px calc(28px + env(safe-area-inset-bottom));animation:up .2s ease}
+@keyframes up{from{transform:translateY(40px);opacity:.4}}
+.grab{width:42px;height:5px;background:#CFC8BD;border-radius:9px;margin:4px auto 12px}
+label.lb{display:block;font-size:13px;font-weight:700;margin:14px 0 6px}
+.inp{width:100%;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 12px;outline:none;font-size:16px}
+.inp:focus{border-color:var(--acc)}
+textarea.inp{min-height:76px;resize:vertical}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:12px 16px;border-radius:12px;font-weight:700;background:var(--card);border:1px solid var(--line);text-decoration:none;position:relative}
+.btn.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+.btn.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
+.btn.bad{color:var(--bad)}
+.btn.full{width:100%}
+.btn[disabled]{opacity:.55}
+.btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.btns .btn{flex:1}
+.media-pick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.mp{background:var(--card);border:1.5px dashed #CFC8BD;border-radius:12px;padding:13px 4px;text-align:center;font-size:12px;font-weight:700;color:var(--mute);position:relative;cursor:pointer}
+.mp input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.mp svg{display:block;margin:0 auto 5px}
+.mp.rec{border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}
+.previews{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.previews .thumb{width:74px;height:74px}
+.previews .x{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border-radius:50%;width:22px;height:22px;font-size:13px;display:grid;place-items:center}
+.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.gallery .thumb{width:100%;height:auto;aspect-ratio:1}
+.big-media{width:100%;border-radius:12px;max-height:380px;object-fit:contain;background:#222;display:block}
+audio{width:100%;max-width:280px;height:40px;margin-top:4px}
+.timeline{border-left:2px solid var(--line);margin:6px 0 0 8px;padding-left:14px}
+.tl{position:relative;padding-bottom:14px}
+.tl:before{content:"";position:absolute;left:-20px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--card);border:2px solid var(--acc)}
+.tl .who{font-weight:700;font-size:13.5px}.tl .when{font-size:12px;color:var(--mute)}
+.tl p{margin-top:3px;font-size:14px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.tl .big-media{margin-top:6px;max-height:240px}
+.msg{display:flex;flex-direction:column;margin-bottom:10px;max-width:86%}
+.msg.me{margin-left:auto;align-items:flex-end}
+.bubble{background:var(--card);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:9px 12px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.msg.me .bubble{background:var(--ink);color:#fff;border-color:var(--ink);border-radius:14px 14px 4px 14px}
+.msg.sys{max-width:100%;align-items:center}
+.msg.sys .bubble{background:#EAE5DD;border-color:#E0DAD0;color:#4A4F55;font-weight:600;font-size:13px;border-radius:12px;text-align:center}
+.msg.sys.alert .bubble{background:var(--bad-soft);border-color:#F1C4C0;color:var(--bad)}
+.mwho{font-size:11.5px;color:var(--mute);margin:0 4px 3px;font-weight:600}
+.mention{background:var(--acc-soft);color:#A6430A;border-radius:5px;padding:0 4px;font-weight:700}
+.msg.me .mention{background:#4A3426;color:#FFB98C}
+.bubble img,.bubble video{max-width:240px;width:100%;border-radius:10px;display:block;margin-top:6px}
+.bubble a.file{display:flex;gap:6px;align-items:center;margin-top:4px;font-weight:700}
+.composer{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:760px;background:var(--bg);border-top:1px solid var(--line);padding:10px 12px calc(14px + env(safe-area-inset-bottom));display:flex;gap:8px;align-items:center;z-index:30}
+.composer .inp{border-radius:99px;padding:11px 15px}
+.icon-btn{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:1px solid var(--line);flex:none;position:relative;cursor:pointer}
+.icon-btn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.icon-btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.icon-btn.rec{background:var(--bad);border-color:var(--bad);color:#fff;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.6}}
+.quick{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px}
+.doc{display:flex;gap:12px;align-items:center}
+.dicon{width:42px;height:48px;border-radius:8px;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;font-size:10.5px;font-weight:800;flex:none;text-transform:uppercase}
+.person{display:flex;align-items:center;gap:12px}
+.av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#fff;flex:none;font-size:14px}
+.toast{position:fixed;top:calc(70px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-weight:600;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.2);animation:up .2s ease;max-width:92%;text-align:center}
+.toast.err{background:var(--bad)}
+.cr{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;font-size:14px;line-height:1.5}
+.cr h3{font-size:15px;margin:16px 0 6px}.cr table{width:100%;border-collapse:collapse;font-size:13px}
+.cr td,.cr th{border-bottom:1px solid var(--line);padding:6px 4px;text-align:left;vertical-align:top}
+.cr .crimgs{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.cr .crimgs img{width:70px;height:70px;object-fit:cover;border-radius:6px}
+.note{font-size:12.5px;color:var(--mute);margin-top:8px;line-height:1.45}
+.seg{display:flex;background:#EAE5DD;border-radius:11px;padding:3px;gap:3px}
+.seg button{flex:1;padding:9px 6px;border-radius:9px;font-weight:700;font-size:13px;color:var(--mute)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.seg button.on.u-bad{color:var(--bad)}.seg button.on.u-warn{color:#8A5E00}.seg button.on.u-blue{color:var(--blue)}
+.hero{padding:26px 4px 6px}
+.hero h1{font-size:30px;line-height:1.12}
+.hero p{font-size:16px;color:#3F454B;margin-top:12px;line-height:1.5}
+.feat{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px}
+.feat div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:13.5px;line-height:1.35}
+.feat b{display:block;font-size:14px;margin-bottom:3px}
+.linkbox{background:#F8F6F2;border:1px dashed #CFC8BD;border-radius:10px;padding:10px;font-size:12.5px;word-break:break-all;margin-top:8px;user-select:all}
+.range{width:100%;accent-color:var(--acc)}
+.spinner{width:22px;height:22px;border:3px solid #D9D2C7;border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite;margin:40px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+footer{text-align:center;font-size:12px;color:var(--mute);padding:30px 16px 10px;line-height:1.5}
+@media print{
+  header,.tabs,.fab,.btns,.no-print,footer{display:none!important}
+  body{background:#fff}.app{padding:0;max-width:none}main{padding:0}
+  .cr{border:none;padding:0}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app"><div class="spinner"></div></div>
+<div id="layer"></div>
+
+<script>
+/* ====================== CONFIG ====================== */
+const SB = 'https://wklddwumirkdjkbxvzyj.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrbGRkd3VtaXJrZGprYnh2enlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTMzNDksImV4cCI6MjA5ODc4OTM0OX0._2cVv3rmhHb-7VLTCqiMRq0F2S30NMnD8qRhTiBM7nc';
+const BUCKET = 'cc-medias';
+const LOTS_COURANTS = ['Terrassement','VRD','Maçonnerie','Charpente','Couverture','Menuiserie','Plomberie','Électricité','Chauffage / Clim','Plâtrerie','Isolation','Carrelage','Sols / Résine','Peinture','Cuisine','Paysagiste','Autre'];
+
+/* ====================== API ====================== */
+async function rpc(fn, args){
+  const r = await fetch(`${SB}/rest/v1/rpc/${fn}`, {method:'POST', headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'}, body:JSON.stringify(args||{})});
+  const t = await r.text(); let j = null; try{ j = t ? JSON.parse(t) : null; }catch(e){}
+  if(!r.ok) throw new Error((j && (j.message||j.hint)) || 'Erreur réseau, réessayez');
+  return j;
+}
+function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36)+Math.random().toString(36).slice(2))); }
+async function compressImage(file){
+  if(!file.type.startsWith('image/') || file.type==='image/gif' || file.size < 400e3) return file;
+  try{
+    const bmp = await createImageBitmap(file);
+    const max = 1800, s = Math.min(1, max/Math.max(bmp.width,bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width*s); c.height = Math.round(bmp.height*s);
+    c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+    const blob = await new Promise(res=>c.toBlob(res,'image/jpeg',0.82));
+    return blob ? new File([blob], file.name.replace(/\.\w+$/,'')+'.jpg', {type:'image/jpeg'}) : file;
+  }catch(e){ return file; }
+}
+async function upload(file, chantierId){
+  if(file.size > 100e6) throw new Error('Fichier trop lourd (100 Mo max)');
+  const f = await compressImage(file);
+  const ext = (f.name && f.name.includes('.')) ? f.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g,'') : (f.type.split('/')[1]||'bin').split(';')[0];
+  const path = `c/${chantierId}/${uid()}.${ext}`;
+  const r = await fetch(`${SB}/storage/v1/object/${BUCKET}/${path}`, {method:'POST', headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':f.type||'application/octet-stream','x-upsert':'false'}, body:f});
+  if(!r.ok){ let m=''; try{ m=(await r.json()).message; }catch(e){} throw new Error('Envoi du fichier impossible'+(m?' : '+m:'')); }
+  const t = f.type||'';
+  return {url:`${SB}/storage/v1/object/public/${BUCKET}/${path}`, type: t.startsWith('image')?'img':t.startsWith('video')?'vid':t.startsWith('audio')?'aud':'doc', nom:file.name||''};
+}
+
+/* ====================== STORAGE ====================== */
+const LS = {
+  get(k,d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+function rememberLink(token, nom, role){
+  const l = LS.get('cc_liens', []).filter(x=>x.token!==token);
+  l.unshift({token, nom, role, d:Date.now()}); LS.set('cc_liens', l.slice(0,30));
+}
+
+/* ====================== ICONS ====================== */
+const I = {
+  tri:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16L12 5z"/></svg>',
+  cam:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  vid:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>',
+  img:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
+  mic:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/></svg>',
+  clip:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>',
+  send:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
+  plus:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+  doc:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+  play:'<svg width="26" height="26" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,.45)"/><polygon points="10 8 16 12 10 16" fill="#fff"/></svg>',
+  stop:'<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>'
+};
+
+/* ====================== HELPERS ====================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ago = t => { if(!t) return ''; const m = Math.round((Date.now()-new Date(t))/60e3); if(m<1) return 'à l’instant'; if(m<60) return `il y a ${m} min`; const h=Math.round(m/60); if(h<24) return `il y a ${h} h`; const d=Math.round(h/24); if(d<30) return `il y a ${d} j`; return new Date(t).toLocaleDateString('fr-FR'); };
+const dateFr = d => d ? new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}) : '';
+const URG = {bloq:['Bloquant','p-bad'],corr:['À corriger','p-warn'],info:['Info','p-blue']};
+const ST = {'ouvert':['Ouvert','p-acc'],'en cours':['En cours','p-blue'],'résolu':['Résolu','p-ok'],'validé':['Validé','p-mute']};
+const LST = {'terminé':'p-ok','en cours':'p-blue','à venir':'p-mute'};
+const PAL = ['#8D6E63','#2C5D8F','#C98A00','#7E57C2','#2F8F5B','#D84E7A','#00838F','#6D4C41','#5C6BC0','#AD1457','#558B2F','#EF6C00'];
+const colorOf = s => { let h=0; for(const c of String(s||'')) h=(h*31+c.charCodeAt(0))>>>0; return PAL[h%PAL.length]; };
+const lotPill = l => l ? `<span class="pill" style="background:${colorOf(l)}1F;color:${colorOf(l)}">${esc(l)}</span>` : '';
+const initials = n => String(n||'?').split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase();
+const mentions = t => esc(t).replace(/@([A-Za-zÀ-ÿ\/-]+)/g,'<span class="mention">@$1</span>');
+function toast(t, err){ document.querySelectorAll('.toast').forEach(x=>x.remove()); const el=document.createElement('div'); el.className='toast'+(err?' err':''); el.textContent=t; document.body.appendChild(el); setTimeout(()=>el.remove(), err?4000:2600); }
+function fail(e){ console.error(e); toast(e.message||String(e), true); }
+function linkFor(token){ return `${location.origin}/#/c/${token}`; }
+function phoneIntl(t){ const d = String(t||'').replace(/\D/g,''); if(d.startsWith('0') && d.length===10) return '33'+d.slice(1); return d; }
+async function copyText(t){ try{ await navigator.clipboard.writeText(t); toast('Copié'); }catch(e){ toast('Copie impossible, sélectionnez le texte à la main', true); } }
+function mediaHtml(md, cls){
+  if(md.type==='img') return `<a href="${esc(md.url)}" target="_blank" rel="noopener"><img class="${cls||''}" src="${esc(md.url)}" alt="" loading="lazy"></a>`;
+  if(md.type==='vid') return `<video class="${cls||''}" src="${esc(md.url)}" controls playsinline preload="metadata"></video>`;
+  if(md.type==='aud') return `<audio src="${esc(md.url)}" controls preload="none"></audio>`;
+  return `<a class="file" href="${esc(md.url)}" target="_blank" rel="noopener">${I.doc} ${esc(md.nom||'Fichier')}</a>`;
+}
+function thumb(md){
+  if(!md) return `<div class="thumb">${I.cam}</div>`;
+  if(md.type==='img') return `<div class="thumb"><img src="${esc(md.url||md.preview)}" alt="" loading="lazy"></div>`;
+  if(md.type==='vid') return `<div class="thumb">${md.url||md.preview?`<video src="${esc(md.url||md.preview)}#t=0.5" muted playsinline preload="metadata"></video>`:''}<span class="play">${I.play}</span></div>`;
+  if(md.type==='aud') return `<div class="thumb" style="color:var(--acc)">${I.mic}</div>`;
+  return `<div class="thumb" style="color:var(--blue)">${I.doc}</div>`;
+}
+
+/* ====================== AUDIO RECORDER ====================== */
+const REC = {mr:null, chunks:[], onDone:null, t0:0};
+async function startRec(onDone){
+  if(!navigator.mediaDevices || !window.MediaRecorder){ toast('Enregistrement vocal non disponible sur ce téléphone', true); return false; }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    const type = ['audio/mp4','audio/webm;codecs=opus','audio/webm'].find(t=>MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+    REC.mr = new MediaRecorder(stream, type?{mimeType:type}:undefined); REC.chunks=[]; REC.onDone=onDone; REC.t0=Date.now();
+    REC.mr.ondataavailable = e => e.data.size && REC.chunks.push(e.data);
+    REC.mr.onstop = () => { stream.getTracks().forEach(t=>t.stop()); const mt = REC.mr.mimeType || 'audio/webm';
+      const blob = new Blob(REC.chunks, {type:mt}); const ext = mt.includes('mp4')?'m4a':'webm';
+      const f = new File([blob], `vocal-${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.${ext}`, {type:mt.split(';')[0]});
+      REC.mr = null; if(Date.now()-REC.t0 > 700) REC.onDone && REC.onDone(f); };
+    REC.mr.start(); return true;
+  }catch(e){ toast('Micro refusé : autorisez-le dans les réglages du navigateur', true); return false; }
+}
+function stopRec(){ if(REC.mr && REC.mr.state!=='inactive') REC.mr.stop(); }
+
+/* ====================== STATE & ROUTER ====================== */
+let S = { route:'', tab:'prob', filtre:'ouverts', data:null, espace:null, busy:false };
+let poll = null;
+function compteToken(){ return LS.get('cc_compte', null); }
+window.addEventListener('hashchange', route);
+async function route(){
+  const h = location.hash || '#/';
+  clearInterval(poll); poll = null; closeSheet();
+  const m = h.match(/^#\/c\/([0-9a-f-]{36})/i);
+  if(m){ S.route='chantier'; S.token=m[1]; S.data=null; S.tab = S.lastTok===m[1] ? S.tab : 'prob'; S.lastTok=m[1]; renderLoading(); await loadChantier(true); poll = setInterval(()=>{ if(document.visibilityState==='visible' && !$('#layer').innerHTML && !REC.mr) loadChantier(false); }, 15000); return; }
+  if(h.startsWith('#/espace') && compteToken()){ S.route='espace'; renderLoading(); return loadEspace(); }
+  if(h.startsWith('#/connexion')){ S.route='auth'; S.authMode = h.includes('inscription') ? 'up' : 'in'; return render(); }
+  if(compteToken()){ location.hash = '#/espace'; return; }
+  S.route='home'; render();
+}
+function renderLoading(){ $('#app').innerHTML = headerHtml() + '<div class="spinner"></div>'; }
+async function loadEspace(){
+  try{ S.espace = await rpc('cc_mon_espace', {p_token: compteToken()}); render(); }
+  catch(e){ if(/Session/.test(e.message)){ LS.del('cc_compte'); location.hash='#/connexion'; } else { fail(e); render(); } }
+}
+async function loadChantier(first){
+  try{
+    const d = await rpc('cc_chantier', {p_token:S.token});
+    const changed = JSON.stringify(d) !== JSON.stringify(S.data);
+    S.data = d; rememberLink(S.token, d.chantier.nom, d.moi.role);
+    if(first || changed) render();
+  }catch(e){
+    if(first){ $('#app').innerHTML = headerHtml() + `<main><div class="empty"><b>Ce lien ne fonctionne pas.</b><br>${esc(e.message)}<br><br>Demandez un nouveau lien au pilote du chantier.</div><a class="btn full" href="#/">Accueil</a></main>`; }
+  }
+}
+
+/* ====================== RENDER ====================== */
+function headerHtml(){
+  const inCh = S.route==='chantier';
+  const back = inCh ? (compteToken() ? '#/espace' : '#/') : null;
+  return `<header>${back?`<a class="back" href="${back}" aria-label="Retour">‹</a>`:''}
+    <a class="logo" href="#/"><span class="logo-mark">${I.tri}</span>Contact Chantier</a>
+    <div class="hright">${S.route==='espace'?`<button class="hbtn" onclick="logout()">Déconnexion</button>`:''}
+    ${S.route==='home'?`<a class="hbtn" href="#/connexion">Connexion</a>`:''}</div></header>`;
+}
+function render(){
+  let h = headerHtml() + '<main>';
+  if(S.route==='home') h += homeView();
+  else if(S.route==='auth') h += authView();
+  else if(S.route==='espace') h += espaceView();
+  else if(S.route==='chantier' && S.data) h += chantierView();
+  h += '</main>';
+  if(S.route==='chantier' && S.data && S.tab!=='fil' && S.tab!=='cr' && S.data.moi.role!=='client') h += `<button class="fab tap" onclick="newProb()">${I.cam} Signaler un problème</button>`;
+  const keep = $('#msgIn') ? $('#msgIn').value : '';
+  $('#app').innerHTML = h;
+  if($('#msgIn') && keep) $('#msgIn').value = keep;
+  if(S.route==='chantier' && S.tab==='fil' && S.scrollFil!==false){ window.scrollTo(0, document.body.scrollHeight); }
+}
+
+/* ---------- HOME ---------- */
+function homeView(){
+  const liens = LS.get('cc_liens', []);
+  return `<div class="hero"><h1>Tous les corps de métier d’un chantier, au même endroit.</h1>
+  <p>Photos, problèmes, vidéos, plans et discussions entre artisans — visibles en direct par l’architecte ou le maître d’œuvre. Fini les infos perdues dans les SMS.</p></div>
+  <div class="feat">
+    <div><b>📸 Signaler en 3 gestes</b>Photo ou vidéo, lot concerné, urgence.</div>
+    <div><b>🔁 Suivi des problèmes</b>Ouvert → en cours → résolu avec preuve → validé.</div>
+    <div><b>💬 Discussion de chantier</b>Messages, vocaux, @lot pour prévenir un artisan.</div>
+    <div><b>📐 Plans à jour</b>Nouvel indice signalé à tous, accusés de lecture.</div>
+    <div><b>🆓 Artisans gratuits</b>Un lien par SMS, sans compte ni mot de passe.</div>
+    <div><b>📄 Compte rendu</b>Généré en un clic, prêt à imprimer en PDF.</div>
+  </div>
+  ${liens.length?`<h2>Vos chantiers sur ce téléphone</h2>${liens.map(l=>`<a class="card tap row between" style="text-decoration:none" href="#/c/${l.token}"><div><div class="ptitle">${esc(l.nom)}</div><div class="meta">${l.role==='moe'?'Pilote':l.role==='client'?'Client':'Intervenant'} · ouvert ${ago(l.d)}</div></div><span style="font-size:22px;color:var(--mute)">›</span></a>`).join('')}`:''}
+  <div class="btns" style="margin-top:22px"><a class="btn pri" href="#/connexion/inscription">Créer mon espace pilote</a><a class="btn" href="#/connexion">J’ai déjà un compte</a></div>
+  <p class="note" style="text-align:center">Vous êtes artisan et avez reçu un lien ? Ouvrez-le simplement : aucun compte n’est nécessaire.</p>
+  <footer>Contact Chantier · édité par RMS — Résine Marbre Sol, 56400 Brech · SIRET 939 997 870 00018<br>Contact : infos@ecosky.fr · 06 45 68 83 94</footer>`;
+}
+
+/* ---------- AUTH ---------- */
+function authView(){
+  const up = S.authMode==='up';
+  return `<h1 style="margin-top:6px">${up?'Créer mon espace pilote':'Connexion'}</h1>
+  <p class="sub">${up?'Pour l’architecte, le maître d’œuvre ou l’entreprise qui pilote ses chantiers. Gratuit pendant la phase de lancement.':'Accédez à vos chantiers.'}</p>
+  <form onsubmit="event.preventDefault();doAuth()">
+    ${up?`<label class="lb">Votre nom</label><input class="inp" id="aNom" autocomplete="name" required>
+    <label class="lb">Entreprise / cabinet</label><input class="inp" id="aEnt" autocomplete="organization">
+    <label class="lb">Téléphone</label><input class="inp" id="aTel" type="tel" autocomplete="tel">`:''}
+    <label class="lb">E-mail</label><input class="inp" id="aMail" type="email" autocomplete="email" required>
+    <label class="lb">Mot de passe</label><input class="inp" id="aMdp" type="password" autocomplete="${up?'new-password':'current-password'}" minlength="6" required>
+    <div class="btns"><button class="btn pri full" id="aBtn" type="submit">${up?'Créer mon espace':'Se connecter'}</button></div>
+  </form>
+  <p class="note" style="text-align:center;margin-top:16px">${up?'Déjà inscrit ? <a href="#/connexion">Se connecter</a>':'Pas encore de compte ? <a href="#/connexion/inscription">Créer mon espace</a>'}</p>
+  ${!up?'<p class="note" style="text-align:center">Mot de passe oublié : écrivez à infos@ecosky.fr.</p>':''}`;
+}
+async function doAuth(){
+  const b = $('#aBtn'); b.disabled = true;
+  try{
+    const up = S.authMode==='up';
+    const r = up ? await rpc('cc_inscription', {p_email:$('#aMail').value, p_mdp:$('#aMdp').value, p_nom:$('#aNom').value, p_entreprise:$('#aEnt').value, p_tel:$('#aTel').value})
+                 : await rpc('cc_connexion', {p_email:$('#aMail').value, p_mdp:$('#aMdp').value});
+    LS.set('cc_compte', r.token); toast(up?'Espace créé, bienvenue !':'Bonjour '+r.nom.split(' ')[0]); location.hash = '#/espace';
+  }catch(e){ fail(e); b.disabled = false; }
+}
+function logout(){ LS.del('cc_compte'); location.hash = '#/'; }
+
+/* ---------- ESPACE PILOTE ---------- */
+function espaceView(){
+  const e = S.espace; if(!e) return '';
+  const act = e.chantiers.filter(c=>!c.archive), arch = e.chantiers.filter(c=>c.archive);
+  const card = c => `<a class="card tap" style="display:block;text-decoration:none" href="#/c/${c.token}">
+      <div class="row between"><div style="min-width:0"><div class="ptitle" style="font-size:16.5px">${esc(c.nom)}</div><div class="meta">${esc(c.adresse||'')}</div></div>
+      ${c.bloquants?`<span class="pill p-bad">${c.bloquants} bloquant${c.bloquants>1?'s':''}</span>`:c.a_valider?`<span class="pill p-ok">${c.a_valider} à valider</span>`:`<span class="pill p-mute">RAS</span>`}</div>
+      <div class="bar"><i style="width:${c.avancement}%"></i></div>
+      <div class="stats"><div class="stat"><b>${c.avancement}%</b><span>avancement</span></div><div class="stat"><b>${c.ouverts}</b><span>problèmes ouverts</span></div><div class="stat"><b>${c.membres}</b><span>intervenants</span></div></div></a>`;
+  return `<h1>Bonjour ${esc(e.compte.nom.split(' ')[0])}</h1><p class="sub">${esc(e.compte.entreprise||'')} · espace pilote</p>
+  <button class="btn pri full" style="margin-top:16px" onclick="newChantier()">${I.plus} Nouveau chantier</button>
+  <h2>Chantiers en cours (${act.length})</h2>
+  ${act.map(card).join('') || '<div class="empty">Aucun chantier pour l’instant.<br>Créez le premier, puis invitez vos artisans par SMS.</div>'}
+  ${arch.length?`<h2>Archivés</h2>${arch.map(card).join('')}`:''}
+  <footer>Contact Chantier · offre ${esc(e.compte.offre)} · ${esc(e.compte.email)}</footer>`;
+}
+function lotsPicker(sel){
+  return `<div class="filters" id="lotsPick">${LOTS_COURANTS.map(l=>`<button type="button" class="chip ${sel.includes(l)?'on':''}" onclick="this.classList.toggle('on')">${esc(l)}</button>`).join('')}</div>`;
+}
+function pickedLots(){ return [...document.querySelectorAll('#lotsPick .chip.on')].map(b=>b.textContent); }
+function newChantier(){
+  sheet(`<h1 style="font-size:19px">Nouveau chantier</h1>
+  <label class="lb">Nom du chantier</label><input class="inp" id="cNom" placeholder="Ex. : Maison Le Dantec">
+  <label class="lb">Adresse</label><input class="inp" id="cAdr" placeholder="12 rue des Chênes, Carnac">
+  <label class="lb">Client / maître d’ouvrage</label><input class="inp" id="cCli">
+  <div class="row"><div style="flex:1"><label class="lb">Début</label><input class="inp" id="cDeb" placeholder="Nov. 2026"></div><div style="flex:1"><label class="lb">Fin prévue</label><input class="inp" id="cFin" placeholder="Mars 2027"></div></div>
+  <label class="lb">Lots du chantier</label>${lotsPicker([])}
+  <div class="btns"><button class="btn" onclick="closeSheet()">Annuler</button><button class="btn pri" id="cBtn" onclick="saveChantier()">Créer le chantier</button></div>`);
+}
+async function saveChantier(){
+  const b=$('#cBtn'); b.disabled=true;
+  try{
+    const r = await rpc('cc_creer_chantier', {p_token:compteToken(), p_nom:$('#cNom').value, p_adresse:$('#cAdr').value, p_client:$('#cCli').value, p_debut:$('#cDeb').value, p_fin:$('#cFin').value, p_lots:pickedLots()});
+    closeSheet(); S.tab='equipe'; location.hash = '#/c/'+r.token; toast('Chantier créé · invitez maintenant vos artisans');
+  }catch(e){ fail(e); b.disabled=false; }
+}
+
+/* ---------- CHANTIER ---------- */
+const D = () => S.data;
+const me = () => D().moi;
+const isMoe = () => me().role==='moe';
+const M = id => D().membres.find(x=>x.id===id) || {nom:'Ancien membre'};
+const mediasOf = (k,v) => D().medias.filter(x=>x[k]===v);
+function unreadDocs(){ return D().documents.filter(d=>!d.lus.includes(me().id)).length; }
+function chantierView(){
+  const c = D().chantier, m = me();
+  const nbOuv = D().problemes.filter(p=>p.statut==='ouvert'||p.statut==='en cours').length;
+  const tabs = [['prob','Problèmes',nbOuv],['fil','Discussion',0],['photos','Photos',0],['docs','Documents',unreadDocs()],['equipe','Équipe',0]];
+  if(m.role!=='artisan') tabs.push(['cr','Compte rendu',0]);
+  let h = `<div class="row between" style="align-items:flex-start"><div style="min-width:0"><h1>${esc(c.nom)}</h1><p class="sub">${esc(c.adresse||'')}${c.debut||c.fin?` · ${esc(c.debut||'?')} → ${esc(c.fin||'?')}`:''}</p></div>
+    <span class="pill p-mute" style="margin-top:4px">${m.role==='moe'?'Pilote':m.role==='client'?'Client':esc(m.lot||'Intervenant')}</span></div>
+    <div class="bar" style="margin:10px 0 12px"><i style="width:${c.avancement}%"></i></div>
+  <div class="tabs">${tabs.map(([k,l,n])=>`<button class="tab ${S.tab===k?'on':''}" onclick="setTab('${k}')">${l}${n?`<span class="dot">${n}</span>`:''}</button>`).join('')}</div>`;
+  if(S.tab==='prob') h += probList();
+  if(S.tab==='fil') h += filView();
+  if(S.tab==='photos') h += photosView();
+  if(S.tab==='docs') h += docsView();
+  if(S.tab==='equipe') h += equipeView();
+  if(S.tab==='cr') h += crView();
+  return h;
+}
+function setTab(t){ S.tab=t; S.scrollFil = true; render(); if(t!=='fil') window.scrollTo(0,0); }
+function allLots(){ const s = new Set(D().chantier.lots||[]); D().membres.forEach(x=>x.lot&&s.add(x.lot)); return [...s]; }
+
+function probList(){
+  const F = {ouverts:p=>p.statut==='ouvert'||p.statut==='en cours', bloq:p=>p.urgence==='bloq'&&(p.statut==='ouvert'||p.statut==='en cours'), valider:p=>p.statut==='résolu', clos:p=>p.statut==='validé', tous:()=>true};
+  const ps = D().problemes.filter(F[S.filtre]);
+  const nb = k => D().problemes.filter(F[k]).length;
+  let h = `<div class="filters">${[['ouverts','À traiter'],['bloq','Bloquants'],['valider','À valider'],['clos','Clos'],['tous','Tous']].map(([k,l])=>`<button class="chip ${S.filtre===k?'on':''}" onclick="S.filtre='${k}';render()">${l} · ${nb(k)}</button>`).join('')}</div>`;
+  if(me().role==='artisan') h += `<p class="note" style="margin:-2px 0 10px">Vous voyez les problèmes de votre lot (${esc(me().lot||'—')}) et ceux que vous avez signalés.</p>`;
+  if(!ps.length) h += `<div class="empty">${S.filtre==='ouverts'?'Aucun problème à traiter. 👍<br>Le bouton orange permet d’en signaler un.':'Rien ici.'}</div>`;
+  ps.forEach(p=>{
+    const md = mediasOf('probleme_id',p.id).find(x=>x.type==='img'||x.type==='vid') || mediasOf('probleme_id',p.id)[0];
+    const nbm = D().messages.filter(x=>x.probleme_id===p.id).length;
+    const retard = p.echeance && new Date(p.echeance) < new Date(new Date().toDateString()) && (p.statut==='ouvert'||p.statut==='en cours');
+    h += `<div class="card tap prob" onclick="openProb('${p.id}')">${thumb(md)}
+      <div style="flex:1;min-width:0"><div class="ptitle">${esc(p.titre)}</div>
+      <div class="meta">${p.zone?esc(p.zone)+' · ':''}${esc(M(p.auteur_id).nom.split(' ')[0])} · ${ago(p.created_at)}${p.echeance?` · <span style="${retard?'color:var(--bad);font-weight:700':''}">échéance ${dateFr(p.echeance)}${retard?' (en retard)':''}</span>`:''}</div>
+      <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${lotPill(p.lot)}<span class="pill ${URG[p.urgence][1]}">${URG[p.urgence][0]}</span><span class="pill ${ST[p.statut][1]}">${ST[p.statut][0]}</span>${nbm?`<span class="pill p-mute">💬 ${nbm}</span>`:''}</div></div></div>`;
+  });
+  return h;
+}
+
+/* ---------- NEW PROBLEM ---------- */
+let draft = null;
+function newProb(prefill){
+  const lots = allLots();
+  draft = Object.assign({files:[], urgence:'corr', lot: me().role==='artisan' ? (lots.find(l=>l!==me().lot)||'') : (lots[0]||''), titre:'', zone:'', descr:'', echeance:''}, prefill||{});
+  drawNew();
+}
+function drawNew(){
+  const lots = allLots();
+  sheet(`<h1 style="font-size:19px">${draft.demande?'Demander à un autre lot':'Signaler un problème'}</h1><p class="sub">${draft.demande?'Crée une tâche assignée au lot et le prévient.':'Une photo ou une vidéo, le lot, l’urgence.'}</p>
+  <label class="lb">Montrer</label>
+  <div class="media-pick">
+    <div class="mp">${I.cam}Photo<input type="file" accept="image/*" capture="environment" onchange="addFiles(this)"></div>
+    <div class="mp">${I.vid}Vidéo<input type="file" accept="video/*" capture="environment" onchange="addFiles(this)"></div>
+    <div class="mp">${I.img}Galerie<input type="file" accept="image/*,video/*" multiple onchange="addFiles(this)"></div>
+    <div class="mp ${REC.mr?'rec':''}" onclick="recDraft()">${REC.mr?I.stop+'Stop':I.mic+'Vocal'}</div>
+  </div>
+  <div class="previews">${draft.files.map((f,i)=>`<div style="position:relative">${thumb(f)}<button class="x" onclick="draft.files.splice(${i},1);drawNew()">✕</button></div>`).join('')}</div>
+  <label class="lb">Lot concerné</label>
+  <select class="inp" onchange="draft.lot=this.value"><option value="">— Non défini —</option>${lots.map(l=>`<option ${draft.lot===l?'selected':''}>${esc(l)}</option>`).join('')}</select>
+  <label class="lb">Urgence</label>
+  <div class="seg">${[['bloq','Bloquant','u-bad'],['corr','À corriger','u-warn'],['info','Info','u-blue']].map(([k,l,cl])=>`<button class="${draft.urgence===k?'on '+cl:''}" onclick="draft.urgence='${k}';drawNew()">${l}</button>`).join('')}</div>
+  <label class="lb">Titre</label><input class="inp" placeholder="${draft.demande?'Ex. : réservation Ø 40 côté gauche':'Ex. : gaine écrasée derrière la cloison'}" value="${esc(draft.titre)}" oninput="draft.titre=this.value">
+  <div class="row"><div style="flex:1.4"><label class="lb">Où ?</label><input class="inp" placeholder="Cuisine, SDB étage…" value="${esc(draft.zone)}" oninput="draft.zone=this.value"></div>
+  <div style="flex:1"><label class="lb">Échéance</label><input class="inp" type="date" value="${esc(draft.echeance)}" onchange="draft.echeance=this.value"></div></div>
+  <label class="lb">Détail (facultatif)</label><textarea class="inp" oninput="draft.descr=this.value">${esc(draft.descr)}</textarea>
+  <div class="btns"><button class="btn" onclick="cancelDraft()">Annuler</button><button class="btn pri" id="pBtn" onclick="saveProb()">Envoyer${draft.lot?' au lot '+esc(draft.lot):''}</button></div>`);
+}
+function addFiles(inp){ [...inp.files].forEach(f=>draft.files.push({file:f, type:f.type.startsWith('video')?'vid':f.type.startsWith('image')?'img':f.type.startsWith('audio')?'aud':'doc', preview:URL.createObjectURL(f)})); drawNew(); }
+async function recDraft(){
+  if(REC.mr){ stopRec(); return; }
+  const ok = await startRec(f=>{ draft.files.push({file:f, type:'aud'}); drawNew(); });
+  if(ok){ drawNew(); toast('Enregistrement… touchez Stop pour terminer'); }
+}
+function cancelDraft(){ stopRec(); REC.onDone=null; closeSheet(); }
+async function uploadAll(files, btn){
+  const out = [];
+  for(let i=0;i<files.length;i++){ if(btn) btn.textContent = `Envoi ${i+1}/${files.length}…`; out.push(await upload(files[i].file, D().chantier.id)); }
+  return out;
+}
+async function saveProb(){
+  if(!draft.titre.trim()){ toast('Ajoutez un titre court', true); return; }
+  const b = $('#pBtn'); b.disabled = true;
+  try{
+    const medias = await uploadAll(draft.files, b);
+    b.textContent = 'Enregistrement…';
+    await rpc('cc_signaler', {p_token:S.token, p_titre:draft.titre, p_descr:draft.descr, p_lot:draft.lot, p_zone:draft.zone, p_urgence:draft.urgence, p_echeance:draft.echeance||null, p_medias:medias});
+    closeSheet(); S.tab='prob'; S.filtre='ouverts'; await loadChantier(true);
+    toast(draft.lot?`Envoyé · le lot ${draft.lot} et le pilote le verront`:'Problème enregistré');
+  }catch(e){ fail(e); b.disabled=false; b.textContent='Réessayer'; }
+}
+
+/* ---------- PROBLEM DETAIL ---------- */
+let reply = {files:[]};
+function openProb(id){ reply = {files:[], pid:id}; drawProb(); }
+function drawProb(){
+  const id = reply.pid, p = D().problemes.find(x=>x.id===id); if(!p){ closeSheet(); return; }
+  const m = me(), monLot = m.role==='artisan' && m.lot && m.lot===p.lot, act = p.statut==='ouvert'||p.statut==='en cours';
+  let actions = '';
+  if(monLot && p.statut==='ouvert') actions += `<button class="btn dark" onclick="setStatut('${id}','en cours')">Je m’en occupe</button>`;
+  if((monLot||isMoe()) && act) actions += `<label class="btn ok">${I.cam} Résolu + photo<input type="file" accept="image/*,video/*" capture="environment" onchange="resolve('${id}',this)"></label>`;
+  if(isMoe() && p.statut==='résolu') actions = `<button class="btn" onclick="setStatut('${id}','ouvert')">Rouvrir</button><button class="btn ok" onclick="setStatut('${id}','validé')">Valider la levée</button>`;
+  if(isMoe() && act){ const who = D().membres.find(x=>x.lot===p.lot && x.tel); if(who) actions += `<a class="btn" href="sms:${esc(who.tel)}?&body=${encodeURIComponent(`Bonjour, relance Contact Chantier « ${p.titre} » : ${linkFor(who.token)}`)}">Relancer par SMS</a>`; }
+  if(isMoe() && p.statut==='validé') actions = `<button class="btn" onclick="setStatut('${id}','ouvert')">Rouvrir</button>`;
+  const medias = mediasOf('probleme_id',id).filter(x=>!x.message_id);
+  const fil = D().messages.filter(x=>x.probleme_id===id);
+  sheet(`<div class="row" style="gap:6px;flex-wrap:wrap">${lotPill(p.lot)}<span class="pill ${URG[p.urgence][1]}">${URG[p.urgence][0]}</span><span class="pill ${ST[p.statut][1]}">${ST[p.statut][0]}</span></div>
+  <h1 style="font-size:19px;margin-top:10px">${esc(p.titre)}</h1>
+  <p class="sub">${p.zone?esc(p.zone)+' · ':''}signalé par ${esc(M(p.auteur_id).nom)} · ${ago(p.created_at)}${p.echeance?' · échéance '+dateFr(p.echeance):''}</p>
+  ${p.descr?`<p style="margin-top:10px;line-height:1.5;white-space:pre-wrap">${esc(p.descr)}</p>`:''}
+  ${medias.length?`<div style="margin-top:12px;display:grid;gap:8px">${medias.map(x=>mediaHtml(x,'big-media')).join('')}</div>`:''}
+  ${actions?`<div class="btns">${actions}</div>`:''}
+  <h2>Échanges</h2>
+  <div class="timeline">${fil.map(f=>`<div class="tl"><span class="who">${esc(M(f.auteur_id).nom)}</span> <span class="when">· ${ago(f.created_at)}</span>${f.texte?`<p>${mentions(f.texte)}</p>`:''}${mediasOf('message_id',f.id).map(x=>mediaHtml(x,'big-media')).join('')}</div>`).join('')||'<p class="note">Pas encore d’échange.</p>'}</div>
+  <div class="previews">${reply.files.map((f,i)=>`<div style="position:relative">${thumb(f)}<button class="x" onclick="reply.files.splice(${i},1);drawProb()">✕</button></div>`).join('')}</div>
+  <div class="row" style="margin-top:10px"><label class="icon-btn">${I.clip}<input type="file" accept="image/*,video/*,application/pdf" multiple onchange="addReply(this)"></label>
+  <input class="inp" id="cIn" placeholder="Répondre…" style="border-radius:99px" onkeydown="if(event.key==='Enter')sendReply()">
+  <button class="icon-btn ${REC.mr?'rec':''}" onclick="recReply()">${REC.mr?I.stop:I.mic}</button><button class="icon-btn pri" id="rBtn" onclick="sendReply()">${I.send}</button></div>`);
+}
+function addReply(inp){ const v=$('#cIn').value; [...inp.files].forEach(f=>reply.files.push({file:f,type:f.type.startsWith('video')?'vid':f.type.startsWith('image')?'img':'doc',preview:URL.createObjectURL(f)})); drawProb(); $('#cIn').value=v; }
+async function recReply(){ if(REC.mr){ stopRec(); return; } const ok = await startRec(f=>{ reply.files.push({file:f,type:'aud'}); drawProb(); }); if(ok) drawProb(); }
+async function sendReply(){
+  const t = $('#cIn').value.trim(); if(!t && !reply.files.length) return;
+  const b=$('#rBtn'); b.disabled=true;
+  try{ const medias = await uploadAll(reply.files); await rpc('cc_ecrire', {p_token:S.token, p_probleme:reply.pid, p_texte:t, p_medias:medias}); reply.files=[]; await loadChantier(false); drawProb(); }
+  catch(e){ fail(e); b.disabled=false; }
+}
+async function setStatut(id, st, medias, texte){
+  try{
+    await rpc('cc_statut', {p_token:S.token, p_probleme:id, p_statut:st, p_texte:texte||'', p_medias:medias||[]});
+    await loadChantier(false); render(); reply.pid=id; drawProb();
+    toast({'en cours':'Le pilote voit que vous vous en occupez','résolu':'Marqué résolu · en attente de validation','validé':'Levée validée','ouvert':'Problème rouvert'}[st]);
+  }catch(e){ fail(e); }
+}
+async function resolve(id, inp){
+  const f = inp.files[0]; if(!f) return;
+  toast('Envoi de la preuve…');
+  try{ const md = await upload(f, D().chantier.id); await setStatut(id, 'résolu', [md], 'Corrigé, voir la preuve.'); }catch(e){ fail(e); }
+}
+
+/* ---------- DISCUSSION ---------- */
+let chatFiles = [];
+function filView(){
+  const m = me();
+  const msgs = D().messages.filter(x=>!x.probleme_id);
+  let h = `<div class="quick no-print">`;
+  if(m.role==='artisan'){
+    const st = (D().membres.find(x=>x.id===m.id)||{}).statut_lot;
+    if(st!=='en cours' && st!=='terminé') h += `<button class="chip" onclick="lotStatut('en cours')">▶️ Je démarre mon lot</button>`;
+    if(st!=='terminé') h += `<button class="chip" onclick="lotStatut('terminé')">✅ J’ai terminé mon lot</button>`;
+  }
+  if(m.role!=='client') h += `<button class="chip" onclick="newProb({demande:true})">🙋 Demander à un lot</button>`;
+  h += `</div>`;
+  if(!msgs.length) h += `<div class="empty">Pas encore de message.</div>`;
+  msgs.forEach(x=>{
+    if(x.systeme){ h += `<div class="msg sys ${/BLOQUANT/.test(x.texte)?'alert':''}"><div class="bubble">${esc(x.texte)}</div><div class="mwho" style="margin-top:3px">${ago(x.created_at)}</div></div>`; return; }
+    const u = M(x.auteur_id), mine = x.auteur_id===m.id;
+    const md = mediasOf('message_id', x.id);
+    h += `<div class="msg ${mine?'me':''}"><div class="mwho">${mine?'':esc(u.nom)+(u.role==='moe'?' · Pilote':u.lot?' · '+esc(u.lot):'')+' · '}${ago(x.created_at)}</div><div class="bubble">${x.texte?mentions(x.texte):''}${md.map(z=>mediaHtml(z)).join('')}</div></div>`;
+  });
+  h += `<div style="height:${chatFiles.length?150:76}px"></div>
+  <div class="composer" style="flex-wrap:wrap">
+    ${chatFiles.length?`<div class="previews" style="width:100%;margin:0 0 6px">${chatFiles.map((f,i)=>`<div style="position:relative">${thumb(f)}<button class="x" onclick="chatFiles.splice(${i},1);render()">✕</button></div>`).join('')}</div>`:''}
+    <label class="icon-btn" title="Photo, vidéo ou document">${I.clip}<input type="file" accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.dwg" multiple onchange="addChat(this)"></label>
+    <input class="inp" id="msgIn" style="flex:1;min-width:0" placeholder="Message… (@Plomberie pour un lot)" onkeydown="if(event.key==='Enter')sendMsg()">
+    <button class="icon-btn ${REC.mr?'rec':''}" onclick="recChat()" title="Message vocal">${REC.mr?I.stop:I.mic}</button>
+    <button class="icon-btn pri" id="sBtn" onclick="sendMsg()">${I.send}</button>
+  </div>`;
+  return h;
+}
+function addChat(inp){ [...inp.files].forEach(f=>chatFiles.push({file:f,type:f.type.startsWith('video')?'vid':f.type.startsWith('image')?'img':'doc',preview:URL.createObjectURL(f)})); render(); }
+async function recChat(){
+  if(REC.mr){ stopRec(); return; }
+  const ok = await startRec(async f=>{ chatFiles.push({file:f,type:'aud'}); await sendMsg(); });
+  if(ok){ render(); toast('Enregistrement… touchez ■ pour envoyer'); }
+}
+async function sendMsg(){
+  const inp = $('#msgIn'); const t = inp ? inp.value.trim() : '';
+  if(!t && !chatFiles.length){ render(); return; }
+  const b = $('#sBtn'); if(b) b.disabled = true;
+  try{
+    const docs = chatFiles.filter(f=>f.type==='doc'), others = chatFiles.filter(f=>f.type!=='doc');
+    const medias = await uploadAll(others);
+    for(const d of docs){ const md = await upload(d.file, D().chantier.id); await rpc('cc_ajouter_doc', {p_token:S.token, p_nom:(d.file.name||'Document').replace(/\.[^.]+$/,''), p_url:md.url}); }
+    if(t || medias.length) await rpc('cc_ecrire', {p_token:S.token, p_probleme:null, p_texte:t, p_medias:medias});
+    chatFiles = []; if(inp) inp.value=''; S.scrollFil = true;
+    await loadChantier(true);
+    if(docs.length) toast('Document rangé dans l’onglet Documents');
+  }catch(e){ fail(e); if(b) b.disabled=false; }
+}
+async function lotStatut(st, membre){
+  try{ await rpc('cc_statut_lot', {p_token:S.token, p_membre:membre||null, p_statut:st}); await loadChantier(true); toast(st==='terminé'?'Les autres lots et le pilote sont prévenus':'Statut du lot mis à jour'); }catch(e){ fail(e); }
+}
+
+/* ---------- PHOTOS ---------- */
+function photosView(){
+  const all = D().medias.filter(x=>x.type==='img'||x.type==='vid').slice().reverse();
+  if(!all.length) return `<div class="empty">Aucune photo pour l’instant.</div>`;
+  return `<p class="note" style="margin:0 0 10px">${all.length} photo${all.length>1?'s':''} et vidéo${all.length>1?'s':''}, datées automatiquement.</p><div class="gallery">${all.map(x=>`<div class="tap" onclick="${x.probleme_id?`openProb('${x.probleme_id}')`:`window.open('${esc(x.url)}','_blank')`}">${thumb(x)}<div class="meta" style="font-size:11px;margin-top:2px">${esc(M(x.auteur_id).nom.split(' ')[0])} · ${dateFr(x.created_at)}</div></div>`).join('')}</div>`;
+}
+
+/* ---------- DOCUMENTS ---------- */
+function docsView(){
+  const team = D().membres.length;
+  let h = `<label class="btn full" style="margin-bottom:12px">${I.plus} Ajouter un document ou un nouveau plan<input type="file" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.dwg" onchange="addDoc(this)"></label>
+  <p class="note" style="margin:-4px 0 12px">Pour une nouvelle version d’un plan, gardez le même nom de fichier : l’indice passe à la lettre suivante et tout le monde est prévenu.</p>`;
+  if(!D().documents.length) h += `<div class="empty">Aucun document. Déposez les plans, le CCTP, les fiches techniques…</div>`;
+  D().documents.forEach(d=>{
+    const lu = d.lus.includes(me().id), ext = (d.url.split('.').pop()||'doc').slice(0,4);
+    const nonLus = D().membres.filter(x=>!d.lus.includes(x.id)).map(x=>x.nom.split(' ')[0]);
+    h += `<div class="card tap doc" onclick="openDoc('${d.id}')"><div class="dicon">${esc(ext)}</div>
+      <div style="flex:1;min-width:0"><div class="ptitle">${esc(d.nom)} <span class="pill p-mute">indice ${esc(d.indice)}</span></div>
+      <div class="meta">${esc(M(d.auteur_id).nom.split(' ')[0])} · ${ago(d.created_at)}${isMoe()?` · lu par ${d.lus.length}/${team}${nonLus.length&&nonLus.length<5?' (pas encore : '+esc(nonLus.join(', '))+')':''}`:''}</div></div>
+      ${!lu?`<span class="pill p-acc">Nouveau</span>`:''}</div>`;
+  });
+  return h;
+}
+async function addDoc(inp){
+  const f = inp.files[0]; if(!f) return; toast('Envoi du document…');
+  try{ const md = await upload(f, D().chantier.id); const r = await rpc('cc_ajouter_doc', {p_token:S.token, p_nom:f.name.replace(/\.[^.]+$/,''), p_url:md.url}); await loadChantier(true); toast(r.indice!=='A'?`Nouvel indice ${r.indice} · tout le monde est prévenu`:'Document ajouté'); }catch(e){ fail(e); }
+}
+function openDoc(id){ const d = D().documents.find(x=>x.id===id); window.open(d.url,'_blank'); rpc('cc_lire_doc',{p_token:S.token,p_doc:id}).then(()=>loadChantier(false)).catch(()=>{}); }
+
+/* ---------- EQUIPE ---------- */
+function equipeView(){
+  const c = D().chantier;
+  let h = '';
+  if(isMoe()){
+    h += `<div class="card"><div class="row between"><b>Avancement global</b><b id="avV">${c.avancement}%</b></div>
+      <input class="range" type="range" min="0" max="100" step="5" value="${c.avancement}" oninput="$('#avV').textContent=this.value+'%'" onchange="setAvancement(this.value)">
+      <div class="btns" style="margin-top:8px"><button class="btn" onclick="editChantier()">Modifier le chantier</button></div></div>
+      <button class="btn pri full" style="margin-bottom:12px" onclick="invite()">${I.plus} Inviter un artisan ou le client</button>`;
+  }
+  D().membres.forEach(x=>{
+    const role = x.role==='moe'?'Pilote':x.role==='client'?'Client':(x.lot||'Intervenant');
+    h += `<div class="card"><div class="person"><div class="av" style="background:${x.role==='moe'?'#1E2328':colorOf(x.lot||x.nom)}">${esc(initials(x.nom))}</div>
+      <div style="flex:1;min-width:0"><div class="ptitle">${esc(x.nom)}${x.id===me().id?' (vous)':''}</div><div class="meta">${esc(role)}${x.entreprise?' · '+esc(x.entreprise):''}${x.last_seen?' · vu '+ago(x.last_seen):' · pas encore connecté'}</div></div>
+      ${x.role==='artisan'?(isMoe()?`<select class="pill ${LST[x.statut_lot]||'p-mute'}" style="border:none" onchange="lotStatut(this.value,'${x.id}')">${['à venir','en cours','terminé'].map(s=>`<option ${x.statut_lot===s?'selected':''}>${s}</option>`).join('')}</select>`:`<span class="pill ${LST[x.statut_lot]||'p-mute'}">${esc(x.statut_lot)}</span>`):''}</div>
+      ${x.tel||(isMoe()&&x.role!=='moe')?`<div class="btns" style="margin-top:10px">${x.tel?`<a class="btn" href="tel:${esc(x.tel)}">📞 ${esc(x.tel)}</a>`:''}${isMoe()&&x.role!=='moe'?`<button class="btn" onclick="showInvite('${x.id}')">Renvoyer le lien</button>`:''}</div>`:''}</div>`;
+  });
+  return h;
+}
+async function setAvancement(v){ try{ await rpc('cc_modifier_chantier',{p_token:S.token,p_nom:null,p_adresse:null,p_client:null,p_debut:null,p_fin:null,p_lots:null,p_avancement:+v,p_archive:null}); await loadChantier(true); toast('Avancement enregistré'); }catch(e){ fail(e); } }
+function editChantier(){
+  const c = D().chantier;
+  sheet(`<h1 style="font-size:19px">Modifier le chantier</h1>
+  <label class="lb">Nom</label><input class="inp" id="eNom" value="${esc(c.nom)}">
+  <label class="lb">Adresse</label><input class="inp" id="eAdr" value="${esc(c.adresse||'')}">
+  <label class="lb">Client</label><input class="inp" id="eCli" value="${esc(c.client||'')}">
+  <div class="row"><div style="flex:1"><label class="lb">Début</label><input class="inp" id="eDeb" value="${esc(c.debut||'')}"></div><div style="flex:1"><label class="lb">Fin</label><input class="inp" id="eFin" value="${esc(c.fin||'')}"></div></div>
+  <label class="lb">Lots</label>${lotsPicker(c.lots||[])}
+  <div class="btns"><button class="btn bad" onclick="archiver(${!c.archive})">${c.archive?'Désarchiver':'Archiver'}</button><button class="btn pri" onclick="saveEdit()">Enregistrer</button></div>`);
+}
+async function saveEdit(){
+  const extra = (D().chantier.lots||[]).filter(l=>!LOTS_COURANTS.includes(l));
+  try{ await rpc('cc_modifier_chantier',{p_token:S.token,p_nom:$('#eNom').value,p_adresse:$('#eAdr').value,p_client:$('#eCli').value,p_debut:$('#eDeb').value,p_fin:$('#eFin').value,p_lots:[...pickedLots(),...extra],p_avancement:null,p_archive:null}); closeSheet(); await loadChantier(true); toast('Chantier mis à jour'); }catch(e){ fail(e); }
+}
+async function archiver(v){ try{ await rpc('cc_modifier_chantier',{p_token:S.token,p_nom:null,p_adresse:null,p_client:null,p_debut:null,p_fin:null,p_lots:null,p_avancement:null,p_archive:v}); closeSheet(); await loadChantier(true); toast(v?'Chantier archivé':'Chantier réactivé'); }catch(e){ fail(e); } }
+function invite(){
+  const lots = allLots();
+  sheet(`<h1 style="font-size:19px">Inviter sur le chantier</h1><p class="sub">Il recevra un lien : pas de compte, pas de mot de passe, gratuit pour lui.</p>
+  <div class="seg" style="margin-top:12px"><button class="on" id="rA" onclick="this.classList.add('on');$('#rC').classList.remove('on');$('#lotZone').style.display=''">Artisan</button><button id="rC" onclick="this.classList.add('on');$('#rA').classList.remove('on');$('#lotZone').style.display='none'">Client</button></div>
+  <label class="lb">Nom</label><input class="inp" id="iNom" placeholder="Karim Benali">
+  <label class="lb">Téléphone portable</label><input class="inp" id="iTel" type="tel" placeholder="06 12 34 56 78">
+  <div id="lotZone"><label class="lb">Lot</label><input class="inp" id="iLot" list="lotsList" placeholder="Plomberie" value="${esc(lots[0]||'')}"><datalist id="lotsList">${[...new Set([...lots,...LOTS_COURANTS])].map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
+  <label class="lb">Entreprise (facultatif)</label><input class="inp" id="iEnt"></div>
+  <div class="btns"><button class="btn" onclick="closeSheet()">Annuler</button><button class="btn pri" id="iBtn" onclick="saveInvite()">Créer l’invitation</button></div>`);
+}
+async function saveInvite(){
+  const b=$('#iBtn'); b.disabled=true; const client = $('#rC').classList.contains('on');
+  try{ const r = await rpc('cc_inviter',{p_token:S.token,p_nom:$('#iNom').value,p_lot:client?null:$('#iLot').value,p_tel:$('#iTel').value,p_entreprise:client?null:$('#iEnt').value,p_role:client?'client':'artisan'});
+    await loadChantier(false); render(); showInvite(r.id); }catch(e){ fail(e); b.disabled=false; }
+}
+function showInvite(id){
+  const x = D().membres.find(z=>z.id===id); if(!x||!x.token) return;
+  const url = linkFor(x.token), c = D().chantier;
+  const txt = `Bonjour ${x.nom.split(' ')[0]}, voici votre accès au chantier « ${c.nom} » sur Contact Chantier (photos, problèmes, plans, discussion). Aucun compte à créer, ouvrez simplement : ${url}`;
+  sheet(`<h1 style="font-size:19px">Lien de ${esc(x.nom)}</h1><p class="sub">Envoyez-le par SMS ou WhatsApp. Ce lien est personnel : il donne accès au chantier.</p>
+  <div class="linkbox">${esc(url)}</div>
+  <div class="btns" style="flex-direction:column">
+    <a class="btn pri" href="sms:${esc(x.tel||'')}?&body=${encodeURIComponent(txt)}">Envoyer par SMS</a>
+    <a class="btn" href="https://wa.me/${phoneIntl(x.tel)}?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener">Envoyer par WhatsApp</a>
+    <button class="btn" onclick="copyText(${esc(JSON.stringify(txt))})">Copier le message</button>
+    ${x.role!=='moe'?`<button class="btn bad" onclick="retirer('${x.id}')">Retirer du chantier</button>`:''}
+  </div>`);
+}
+async function retirer(id){
+  if(!$('#confRet')){ const b = document.createElement('p'); b.id='confRet'; b.className='note'; b.style.color='var(--bad)'; b.textContent='Touchez encore « Retirer » pour confirmer : son lien ne marchera plus.'; $('.sheet').appendChild(b); return; }
+  try{ await rpc('cc_retirer',{p_token:S.token,p_membre:id}); closeSheet(); await loadChantier(true); toast('Retiré du chantier'); }catch(e){ fail(e); }
+}
+
+/* ---------- COMPTE RENDU ---------- */
+function crView(){
+  const c = D().chantier, ps = D().problemes;
+  const open = ps.filter(p=>p.statut==='ouvert'||p.statut==='en cours').sort((a,b)=>(a.lot||'').localeCompare(b.lot||''));
+  const res = ps.filter(p=>p.statut==='résolu');
+  const since = Date.now()-7*864e5, done = ps.filter(p=>p.statut==='validé' && new Date(p.updated_at)>since);
+  const d = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const imgs = p => mediasOf('probleme_id',p.id).filter(x=>x.type==='img').slice(0,3).map(x=>`<img src="${esc(x.url)}">`).join('');
+  return `<div class="cr" id="crBox"><b style="font-size:18px">Compte rendu de chantier — ${esc(c.nom)}</b>
+  <div class="meta">${d}${c.adresse?' · '+esc(c.adresse):''}${c.client?' · client : '+esc(c.client):''} · avancement ${c.avancement}%</div>
+  <h3>Intervenants et avancement des lots</h3><table>${D().membres.filter(x=>x.role==='artisan').map(x=>`<tr><td>${esc(x.lot||'—')}</td><td>${esc(x.nom)}${x.entreprise?' ('+esc(x.entreprise)+')':''}</td><td>${esc(x.statut_lot)}</td></tr>`).join('')||'<tr><td>Aucun intervenant invité</td></tr>'}</table>
+  <h3>Problèmes à traiter (${open.length})</h3><table><tr><th>Lot</th><th>Problème</th><th>Urgence</th><th>Échéance</th></tr>${open.map(p=>`<tr><td>${esc(p.lot||'—')}</td><td>${esc(p.titre)}${p.zone?`<br><span class="meta">${esc(p.zone)}</span>`:''}<div class="crimgs">${imgs(p)}</div></td><td>${URG[p.urgence][0]}</td><td>${p.echeance?dateFr(p.echeance):'—'}</td></tr>`).join('')||'<tr><td colspan="4">Aucun</td></tr>'}</table>
+  <h3>Résolus, en attente de validation (${res.length})</h3><table>${res.map(p=>`<tr><td>${esc(p.lot||'—')}</td><td>${esc(p.titre)}</td></tr>`).join('')||'<tr><td>Aucun</td></tr>'}</table>
+  <h3>Levés cette semaine (${done.length})</h3><table>${done.map(p=>`<tr><td>${esc(p.lot||'—')}</td><td>${esc(p.titre)}</td></tr>`).join('')||'<tr><td>Aucun</td></tr>'}</table>
+  <p class="note">Établi avec Contact Chantier.</p></div>
+  <div class="btns no-print"><button class="btn dark" onclick="window.print()">Imprimer / PDF</button><button class="btn" onclick="copyText($('#crBox').innerText)">Copier le texte</button>${navigator.share?`<button class="btn pri" onclick="navigator.share({title:'Compte rendu ${esc(c.nom).replace(/'/g,'')}',text:$('#crBox').innerText}).catch(()=>{})">Partager</button>`:''}</div>
+  <p class="note">« Imprimer / PDF » permet d’enregistrer le compte rendu en PDF, puis de l’envoyer par mail.</p>`;
+}
+
+/* ====================== SHEET ====================== */
+function sheet(html){ $('#layer').innerHTML = `<div class="veil" onclick="if(event.target===this){stopRec();closeSheet()}"><div class="sheet"><div class="grab"></div>${html}</div></div>`; }
+function closeSheet(){ $('#layer').innerHTML=''; }
+
+/* ====================== START ====================== */
+if('serviceWorker' in navigator){ window.addEventListener('load', ()=>navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
+route();
+</script>
+</body>
+</html>
