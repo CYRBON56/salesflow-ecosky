@@ -319,7 +319,7 @@ async function route(){
   const h = location.hash || '#/';
   clearInterval(poll); poll = null; closeSheet();
   const m = h.match(/^#\/c\/([0-9a-f-]{36})/i);
-  if(m){ S.route='chantier'; S.token=m[1]; S.data=null; S.tab = S.lastTok===m[1] ? S.tab : 'prob'; S.lastTok=m[1]; renderLoading(); await loadChantier(true); poll = setInterval(()=>{ if(document.visibilityState==='visible' && !$('#layer').innerHTML && !REC.mr) loadChantier(false); }, 15000); return; }
+  if(m){ S.route='chantier'; S.token=m[1]; S.data=null; if(S.lastTok!==m[1]){ S.tab=''; S.conv=null; } S.lastTok=m[1]; renderLoading(); await loadChantier(true); poll = setInterval(()=>{ if(document.visibilityState==='visible' && !$('#layer').innerHTML && !REC.mr) loadChantier(false); }, 15000); return; }
   if(h.startsWith('#/espace') && compteToken()){ S.route='espace'; renderLoading(); return loadEspace(); }
   if(h.startsWith('#/connexion')){ S.route='auth'; S.authMode = h.includes('inscription') ? 'up' : 'in'; return render(); }
   if(compteToken()){ location.hash = '#/espace'; return; }
@@ -357,11 +357,11 @@ function render(){
   else if(S.route==='espace') h += espaceView();
   else if(S.route==='chantier' && S.data) h += chantierView();
   h += '</main>';
-  if(S.route==='chantier' && S.data && S.tab!=='fil' && S.tab!=='cr' && S.data.moi.role!=='client') h += `<button class="fab tap" onclick="newProb()">${I.cam} Signaler un problème</button>`;
+  if(S.route==='chantier' && S.data && ['prob','photos','taches'].includes(S.tab) && S.data.moi.role!=='client') h += `<button class="fab tap" onclick="newProb()">${I.cam} Signaler un problème</button>`;
   const keep = $('#msgIn') ? $('#msgIn').value : '';
   $('#app').innerHTML = h;
   if($('#msgIn') && keep) $('#msgIn').value = keep;
-  if(S.route==='chantier' && S.tab==='fil' && S.scrollFil!==false){ window.scrollTo(0, document.body.scrollHeight); }
+  
 }
 
 /* ---------- HOME ---------- */
@@ -418,7 +418,8 @@ function espaceView(){
   const act = e.chantiers.filter(c=>!c.archive), arch = e.chantiers.filter(c=>c.archive);
   const card = c => `<a class="card tap" style="display:block;text-decoration:none" href="#/c/${c.token}">
       <div class="row between"><div style="min-width:0"><div class="ptitle" style="font-size:16.5px">${esc(c.nom)}</div><div class="meta">${esc(c.adresse||'')}</div></div>
-      ${c.bloquants?`<span class="pill p-bad">${c.bloquants} bloquant${c.bloquants>1?'s':''}</span>`:c.a_valider?`<span class="pill p-ok">${c.a_valider} à valider</span>`:`<span class="pill p-mute">RAS</span>`}</div>
+      ${c.bloquants?`<span class="pill p-bad">${c.bloquants} bloquant${c.bloquants>1?'s':''}</span>`:(c.a_verifier||c.a_valider)?`<span class="pill p-acc">${(c.a_verifier||0)+(c.a_valider||0)} à vérifier</span>`:`<span class="pill p-mute">RAS</span>`}</div>
+      ${(c.lots||[]).length?`<div class="row" style="gap:4px;margin-top:10px;flex-wrap:wrap">${c.lots.slice(0,8).map(l=>vignette(l,34)).join('')}${c.lots.length>8?`<span class="meta">+${c.lots.length-8}</span>`:''}</div>`:''}
       <div class="bar"><i style="width:${c.avancement}%"></i></div>
       <div class="stats"><div class="stat"><b>${c.avancement}%</b><span>avancement</span></div><div class="stat"><b>${c.ouverts}</b><span>problèmes ouverts</span></div><div class="stat"><b>${c.membres}</b><span>intervenants</span></div></div></a>`;
   return `<h1>Bonjour ${esc(e.compte.nom.split(' ')[0])}</h1><p class="sub">${esc(e.compte.entreprise||'')} · espace pilote</p>
@@ -445,7 +446,7 @@ async function saveChantier(){
   const b=$('#cBtn'); b.disabled=true;
   try{
     const r = await rpc('cc_creer_chantier', {p_token:compteToken(), p_nom:$('#cNom').value, p_adresse:$('#cAdr').value, p_client:$('#cCli').value, p_debut:$('#cDeb').value, p_fin:$('#cFin').value, p_lots:pickedLots()});
-    closeSheet(); S.tab='equipe'; location.hash = '#/c/'+r.token; toast('Chantier créé · invitez maintenant vos artisans');
+    closeSheet(); S.tab='equipe'; location.hash = '#/c/'+r.token; toast('Chantier créé avec sa liste d’étapes · invitez vos artisans');
   }catch(e){ fail(e); b.disabled=false; }
 }
 
@@ -453,44 +454,150 @@ async function saveChantier(){
 const D = () => S.data;
 const me = () => D().moi;
 const isMoe = () => me().role==='moe';
+const isArt = () => me().role==='artisan';
 const M = id => D().membres.find(x=>x.id===id) || {nom:'Ancien membre'};
 const mediasOf = (k,v) => D().medias.filter(x=>x[k]===v);
+const lotKey = t => norm(t).replace(/œ/g,'oe').slice(0,5);
+const sameLot = (a,b) => !!a && !!b && lotKey(a)===lotKey(b);
+const lotsOf = p => (p.lots && p.lots.length) ? p.lots : (p.lot ? [p.lot] : []);
 function unreadDocs(){ return D().documents.filter(d=>!d.lus.includes(me().id)).length; }
+function defaultTab(){ return isMoe() ? 'avancement' : isArt() ? 'taches' : 'msg'; }
 function chantierView(){
   const c = D().chantier, m = me();
   const nbOuv = D().problemes.filter(p=>p.statut==='ouvert'||p.statut==='en cours').length;
-  const tabs = [['prob','Problèmes',nbOuv],['fil','Discussion',0],['photos','Photos',0],['docs','Documents',unreadDocs()],['equipe','Équipe',0]];
-  if(m.role!=='artisan') tabs.push(['cr','Compte rendu',0]);
-  let h = `<div class="row between" style="align-items:flex-start"><div style="min-width:0"><h1>${esc(c.nom)}</h1><p class="sub">${esc(c.adresse||'')}${c.debut||c.fin?` · ${esc(c.debut||'?')} → ${esc(c.fin||'?')}`:''}</p></div>
-    <span class="pill p-mute" style="margin-top:4px">${m.role==='moe'?'Pilote':m.role==='client'?'Client':esc(m.lot||'Intervenant')}</span></div>
-    <div class="bar" style="margin:10px 0 12px"><i style="width:${c.avancement}%"></i></div>
+  const et = D().etapes||[];
+  const tabs = [];
+  if(isMoe()) tabs.push(['avancement','Avancement', et.filter(e=>e.statut==='déclaré').length]);
+  if(isArt()) tabs.push(['taches','Mes tâches', et.filter(e=>e.statut==='à faire'||e.statut==='en cours').length]);
+  if(m.role!=='client') tabs.push(['prob','Problèmes',nbOuv]);
+  tabs.push(['msg','Messages',0],['photos','Photos',0],['docs','Documents',unreadDocs()],['equipe','Équipe',0]);
+  if(isMoe()) tabs.push(['cr','Compte rendu',0]);
+  if(!tabs.find(t=>t[0]===S.tab)) S.tab = defaultTab();
+  let h = `<div class="row" style="align-items:flex-start;gap:12px">${isArt()?vignette(m.lot||'Autre',58):vignette('',58,m.role)}
+    <div style="min-width:0;flex:1"><h1>${esc(c.nom)}</h1><p class="sub">${esc(c.adresse||'')}${c.debut||c.fin?` · ${esc(c.debut||'?')} → ${esc(c.fin||'?')}`:''}</p>
+    <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><span class="pill p-mute">${isMoe()?'Architecte · administrateur':m.role==='client'?'Client':'Votre lot : '+esc(m.lot||'—')}</span></div></div></div>
+    ${c.avancement!==null && c.avancement!==undefined?`<div class="row between" style="margin-top:12px"><span class="meta" style="margin:0">Avancement</span><b style="font-size:13px">${c.avancement}%</b></div><div class="bar" style="margin:4px 0 12px"><i style="width:${c.avancement}%"></i></div>`:'<div style="height:12px"></div>'}
   <div class="tabs">${tabs.map(([k,l,n])=>`<button class="tab ${S.tab===k?'on':''}" onclick="setTab('${k}')">${l}${n?`<span class="dot">${n}</span>`:''}</button>`).join('')}</div>`;
+  if(S.tab==='avancement') h += avancementView();
+  if(S.tab==='taches') h += tachesView();
   if(S.tab==='prob') h += probList();
-  if(S.tab==='fil') h += filView();
+  if(S.tab==='msg') h += msgView();
   if(S.tab==='photos') h += photosView();
   if(S.tab==='docs') h += docsView();
   if(S.tab==='equipe') h += equipeView();
   if(S.tab==='cr') h += crView();
   return h;
 }
-function setTab(t){ S.tab=t; S.scrollFil = true; render(); if(t!=='fil') window.scrollTo(0,0); }
+function setTab(t){ S.tab=t; if(t==='msg') S.conv=null; render(); if(t!=='msg') window.scrollTo(0,0); }
 function allLots(){ const s = new Set(D().chantier.lots||[]); D().membres.forEach(x=>x.lot&&s.add(x.lot)); return [...s]; }
+const ET = {'à faire':['À faire','p-mute'],'en cours':['En cours','p-blue'],'déclaré':['À vérifier','p-acc'],'validé':['Fait ✓','p-ok'],'sans objet':['Sans objet','p-mute']};
 
+/* ---------- AVANCEMENT (architecte) ---------- */
+function avancementView(){
+  const et = D().etapes||[];
+  const actifs = et.filter(e=>e.statut!=='sans objet'), ok = actifs.filter(e=>e.statut==='validé').length, decl = et.filter(e=>e.statut==='déclaré').length, enc = et.filter(e=>e.statut==='en cours').length;
+  const F = {toutes:()=>true, verifier:e=>e.statut==='déclaré', cours:e=>e.statut==='en cours', faire:e=>e.statut==='à faire', faites:e=>e.statut==='validé'};
+  if(!F[S.efiltre]) S.efiltre = 'toutes';
+  const list = et.filter(F[S.efiltre]);
+  let h = `<div class="card"><div class="row between"><div><div class="meta" style="margin:0">Étapes validées</div><b style="font-size:24px">${ok}<span style="font-size:15px;color:var(--mute)"> / ${actifs.length}</span></b></div>
+    <div style="text-align:right"><div class="meta" style="margin:0">À vérifier</div><b style="font-size:24px;color:${decl?'var(--acc)':'var(--ink)'}">${decl}</b></div></div>
+    <p class="note">Les artisans voient seulement leurs propres étapes. Quand l’un d’eux coche « c’est fait », l’étape passe en « à vérifier » : à vous de valider.</p></div>
+  <div class="filters">${[['toutes','Toutes'],['verifier','À vérifier · '+decl],['cours','En cours · '+enc],['faire','À faire'],['faites','Faites']].map(([k,l])=>`<button class="chip ${S.efiltre===k?'on':''}" onclick="S.efiltre='${k}';render()">${l}</button>`).join('')}</div>`;
+  if(!list.length) h += `<div class="empty">Aucune étape ici.</div>`;
+  const phases = [...new Set(list.map(e=>e.phase))];
+  phases.forEach(ph=>{
+    const all = et.filter(e=>e.phase===ph && e.statut!=='sans objet'), okp = all.filter(e=>e.statut==='validé').length;
+    h += `<div class="row between" style="margin:18px 0 8px"><b style="font-size:15.5px">${esc(ph)}</b><span class="pill ${okp===all.length&&all.length?'p-ok':'p-mute'}">${okp}/${all.length}</span></div>`;
+    list.filter(e=>e.phase===ph).forEach(e=> h += etapeRow(e, true));
+  });
+  h += `<button class="btn full" style="margin-top:16px" onclick="addEtape()">${I.plus} Ajouter une étape</button>`;
+  return h;
+}
+function etapeRow(e, moe){
+  const st = ET[e.statut]||ET['à faire'], done = e.statut==='validé', na = e.statut==='sans objet';
+  return `<div class="card tap row" style="gap:12px;padding:10px 12px;${na?'opacity:.5':''}" onclick="${moe?`openEtape('${e.id}')`:''}">
+    ${e.lot?vignette(e.lot,44):`<div class="lv" style="width:44px;height:44px;background:${done?'var(--ok)':'#B9B2A7'}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4M4 4h12l-2 4 2 4H4"/></svg></div>`}
+    <div style="flex:1;min-width:0"><div class="ptitle" style="${done?'text-decoration:line-through;color:var(--mute)':''}">${esc(e.nom)}</div>
+    <div class="meta">${e.lot?esc(e.lot):'Jalon / sans lot'}${e.statut==='déclaré'&&e.declare_par?' · déclaré par '+esc(M(e.declare_par).nom.split(' ')[0])+' '+ago(e.declare_le):''}${e.note?' · '+esc(e.note):''}</div></div>
+    <span class="pill ${st[1]}">${st[0]}</span></div>`;
+}
+function openEtape(id){
+  const e = D().etapes.find(x=>x.id===id); if(!e) return;
+  const who = D().membres.filter(x=>x.role==='artisan' && sameLot(x.lot, e.lot));
+  const lots = [...new Set([...allLots(), ...LOTS_COURANTS])];
+  sheet(`<div class="row" style="gap:12px">${e.lot?vignette(e.lot,56):''}<div><div class="meta" style="margin:0">${esc(e.phase)}</div><h1 style="font-size:19px">${esc(e.nom)}</h1></div></div>
+  ${e.statut==='déclaré'?`<div class="card" style="margin-top:14px;background:var(--acc-soft);border-color:#F6C9A8"><b>${esc(M(e.declare_par).nom)} déclare cette étape terminée</b> <span class="meta">(${ago(e.declare_le)})</span><p class="note" style="color:#8A3A0A">Vérifiez sur place ou sur les photos, puis validez ou refusez.</p>
+    <div class="btns"><button class="btn" onclick="refuserEtape('${id}')">Pas fait</button><button class="btn ok" onclick="majEtape('${id}','validé')">Valider ✓</button></div></div>`:''}
+  <label class="lb">Statut</label>
+  <div class="seg">${[['à faire','À faire'],['en cours','En cours'],['validé','Fait ✓'],['sans objet','Sans objet']].map(([k,l])=>`<button class="${e.statut===k?'on':''}" onclick="majEtape('${id}','${k}')">${l}</button>`).join('')}</div>
+  <label class="lb">Corps de métier responsable</label>
+  <select class="inp" onchange="majEtape('${id}',null,this.value)"><option value="">— Jalon, sans lot —</option>${lots.map(l=>`<option ${e.lot===l?'selected':''}>${esc(l)}</option>`).join('')}</select>
+  <label class="lb">Note</label><input class="inp" id="eNote" value="${esc(e.note||'')}" placeholder="Ex. : à reprendre côté nord" onchange="majEtape('${id}',null,null,this.value)">
+  ${who.length?`<label class="lb">Demander à l’artisan</label><div class="btns" style="margin-top:0;flex-direction:column">${who.map(x=>`<button class="btn" onclick="demanderEtape('${id}','${x.id}')">💬 Demander à ${esc(x.nom)} si c’est fait</button>`).join('')}</div>`:e.lot?`<p class="note">Aucun artisan « ${esc(e.lot)} » invité sur ce chantier pour l’instant.</p>`:''}
+  <div class="btns"><button class="btn" onclick="closeSheet()">Fermer</button></div>`);
+}
+async function majEtape(id, statut, lot, note){
+  try{ await rpc('cc_etape_maj',{p_token:S.token,p_etape:id,p_statut:statut||null,p_lot:lot===undefined?null:lot,p_note:note===undefined?null:note}); await loadChantier(false); render(); if(statut){ closeSheet(); toast(statut==='validé'?'Étape validée ✓':'Étape mise à jour'); } else { openEtape(id); } }catch(e){ fail(e); }
+}
+async function refuserEtape(id){
+  const n = ($('#eNote')&&$('#eNote').value) || 'Vérifié : pas terminé';
+  try{ await rpc('cc_etape_maj',{p_token:S.token,p_etape:id,p_statut:'en cours',p_lot:null,p_note:n}); await loadChantier(false); render(); closeSheet(); toast('Renvoyé à l’artisan avec votre note'); }catch(e){ fail(e); }
+}
+async function demanderEtape(id, membreId){
+  const e = D().etapes.find(x=>x.id===id);
+  try{
+    if(e.statut==='à faire') await rpc('cc_etape_maj',{p_token:S.token,p_etape:id,p_statut:'en cours',p_lot:null,p_note:null});
+    const conv = await convAvec([membreId]);
+    await rpc('cc_ecrire2',{p_token:S.token,p_probleme:null,p_conversation:conv,p_texte:`L’étape « ${e.nom} » est-elle terminée ? Si oui, cochez-la dans « Mes tâches ».`,p_medias:[]});
+    closeSheet(); await loadChantier(false); S.tab='msg'; S.conv=conv; render(); toast('Question envoyée en privé');
+  }catch(err){ fail(err); }
+}
+function addEtape(){
+  const phases = [...new Set((D().etapes||[]).map(e=>e.phase))];
+  const lots = [...new Set([...allLots(), ...LOTS_COURANTS])];
+  sheet(`<h1 style="font-size:19px">Ajouter une étape</h1>
+  <label class="lb">Phase</label><select class="inp" id="aPh">${phases.map(p=>`<option>${esc(p)}</option>`).join('')}<option>Autres</option></select>
+  <label class="lb">Étape</label><input class="inp" id="aNom" placeholder="Ex. : pose du bac à douche">
+  <label class="lb">Corps de métier</label><select class="inp" id="aLot"><option value="">— Jalon, sans lot —</option>${lots.map(l=>`<option>${esc(l)}</option>`).join('')}</select>
+  <div class="btns"><button class="btn" onclick="closeSheet()">Annuler</button><button class="btn pri" onclick="saveEtape()">Ajouter</button></div>`);
+}
+async function saveEtape(){ try{ await rpc('cc_etape_ajouter',{p_token:S.token,p_phase:$('#aPh').value,p_nom:$('#aNom').value,p_lot:$('#aLot').value}); closeSheet(); await loadChantier(true); toast('Étape ajoutée'); }catch(e){ fail(e); } }
+
+/* ---------- MES TÂCHES (artisan) ---------- */
+function tachesView(){
+  const et = D().etapes||[], m = me(), st = (D().membres.find(x=>x.id===m.id)||{}).statut_lot;
+  let h = `<div class="card row" style="gap:12px">${vignette(m.lot||'Autre',52)}<div style="flex:1"><b>Lot ${esc(m.lot||'—')}</b><div class="meta">Statut de votre lot : ${esc(st||'à venir')}</div></div></div>
+  <div class="quick">${st!=='en cours'&&st!=='terminé'?`<button class="chip" onclick="lotStatut('en cours')">▶️ Je démarre mon lot</button>`:''}${st!=='terminé'?`<button class="chip" onclick="lotStatut('terminé')">✅ J’ai terminé mon lot</button>`:''}</div>`;
+  if(!et.length) return h + `<div class="empty">Aucune étape attribuée à votre lot pour l’instant.</div>`;
+  h += `<p class="note" style="margin:0 0 10px">Cochez « C’est fait » quand une étape est terminée : l’architecte vérifiera et validera.</p>`;
+  [...new Set(et.map(e=>e.phase))].forEach(ph=>{
+    h += `<h2>${esc(ph)}</h2>`;
+    et.filter(e=>e.phase===ph).forEach(e=>{
+      const s = ET[e.statut]||ET['à faire'];
+      h += `<div class="card"><div class="row" style="gap:12px">${vignette(e.lot||'Autre',44)}<div style="flex:1;min-width:0"><div class="ptitle">${esc(e.nom)}</div>${e.note?`<div class="meta" style="color:var(--bad)">Note de l’architecte : ${esc(e.note)}</div>`:''}</div><span class="pill ${s[1]}">${e.statut==='déclaré'?'En vérification':s[0]}</span></div>
+      ${e.statut==='à faire'||e.statut==='en cours'?`<div class="btns" style="margin-top:10px">${e.statut==='à faire'?`<button class="btn" onclick="tache('${e.id}','en cours')">Je commence</button>`:''}<button class="btn ok" onclick="tache('${e.id}','déclaré')">✅ C’est fait</button></div>`:''}</div>`;
+    });
+  });
+  return h;
+}
+async function tache(id, st){ try{ await rpc('cc_etape_maj',{p_token:S.token,p_etape:id,p_statut:st,p_lot:null,p_note:null}); await loadChantier(true); toast(st==='déclaré'?'Envoyé à l’architecte pour vérification':'Étape en cours'); }catch(e){ fail(e); } }
+
+/* ---------- PROBLEMES ---------- */
 function probList(){
   const F = {ouverts:p=>p.statut==='ouvert'||p.statut==='en cours', bloq:p=>p.urgence==='bloq'&&(p.statut==='ouvert'||p.statut==='en cours'), valider:p=>p.statut==='résolu', clos:p=>p.statut==='validé', tous:()=>true};
   const ps = D().problemes.filter(F[S.filtre]);
   const nb = k => D().problemes.filter(F[k]).length;
   let h = `<div class="filters">${[['ouverts','À traiter'],['bloq','Bloquants'],['valider','À valider'],['clos','Clos'],['tous','Tous']].map(([k,l])=>`<button class="chip ${S.filtre===k?'on':''}" onclick="S.filtre='${k}';render()">${l} · ${nb(k)}</button>`).join('')}</div>`;
-  if(me().role==='artisan') h += `<p class="note" style="margin:-2px 0 10px">Vous voyez les problèmes de votre lot (${esc(me().lot||'—')}) et ceux que vous avez signalés.</p>`;
+  if(isArt()) h += `<p class="note" style="margin:-2px 0 10px">Vous voyez les problèmes adressés à votre lot et ceux que vous avez signalés.</p>`;
   if(!ps.length) h += `<div class="empty">${S.filtre==='ouverts'?'Aucun problème à traiter. 👍<br>Le bouton orange permet d’en signaler un.':'Rien ici.'}</div>`;
   ps.forEach(p=>{
     const md = mediasOf('probleme_id',p.id).find(x=>x.type==='img'||x.type==='vid') || mediasOf('probleme_id',p.id)[0];
     const nbm = D().messages.filter(x=>x.probleme_id===p.id).length;
     const retard = p.echeance && new Date(p.echeance) < new Date(new Date().toDateString()) && (p.statut==='ouvert'||p.statut==='en cours');
-    h += `<div class="card tap prob" onclick="openProb('${p.id}')">${thumb(md, p.lot||'Autre')}
+    h += `<div class="card tap prob" onclick="openProb('${p.id}')">${thumb(md, lotsOf(p)[0]||'Autre')}
       <div style="flex:1;min-width:0"><div class="ptitle">${esc(p.titre)}</div>
       <div class="meta">${p.zone?esc(p.zone)+' · ':''}${esc(M(p.auteur_id).nom.split(' ')[0])} · ${ago(p.created_at)}${p.echeance?` · <span style="${retard?'color:var(--bad);font-weight:700':''}">échéance ${dateFr(p.echeance)}${retard?' (en retard)':''}</span>`:''}</div>
-      <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${lotPill(p.lot)}<span class="pill ${URG[p.urgence][1]}">${URG[p.urgence][0]}</span><span class="pill ${ST[p.statut][1]}">${ST[p.statut][0]}</span>${nbm?`<span class="pill p-mute">💬 ${nbm}</span>`:''}</div></div></div>`;
+      <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${lotsOf(p).map(lotPill).join('')}<span class="pill ${URG[p.urgence][1]}">${URG[p.urgence][0]}</span><span class="pill ${ST[p.statut][1]}">${ST[p.statut][0]}</span>${nbm?`<span class="pill p-mute">💬 ${nbm}</span>`:''}</div></div></div>`;
   });
   return h;
 }
@@ -498,13 +605,12 @@ function probList(){
 /* ---------- NEW PROBLEM ---------- */
 let draft = null;
 function newProb(prefill){
-  const lots = allLots();
-  draft = Object.assign({files:[], urgence:'corr', lot: me().role==='artisan' ? (lots.find(l=>l!==me().lot)||'') : (lots[0]||''), titre:'', zone:'', descr:'', echeance:''}, prefill||{});
+  draft = Object.assign({files:[], urgence:'corr', lots:[], titre:'', zone:'', descr:'', echeance:''}, prefill||{});
   drawNew();
 }
 function drawNew(){
   const lots = allLots();
-  sheet(`<h1 style="font-size:19px">${draft.demande?'Demander à un autre lot':'Signaler un problème'}</h1><p class="sub">${draft.demande?'Crée une tâche assignée au lot et le prévient.':'Une photo ou une vidéo, le lot, l’urgence.'}</p>
+  sheet(`<h1 style="font-size:19px">${draft.demande?'Demander à un autre lot':'Signaler un problème'}</h1><p class="sub">Une photo ou une vidéo, le ou les corps de métier concernés, l’urgence.</p>
   <label class="lb">Montrer</label>
   <div class="media-pick">
     <div class="mp">${I.cam}Photo<input type="file" accept="image/*" capture="environment" onchange="addFiles(this)"></div>
@@ -513,16 +619,17 @@ function drawNew(){
     <div class="mp ${REC.mr?'rec':''}" onclick="recDraft()">${REC.mr?I.stop+'Stop':I.mic+'Vocal'}</div>
   </div>
   <div class="previews">${draft.files.map((f,i)=>`<div style="position:relative">${thumb(f)}<button class="x" onclick="draft.files.splice(${i},1);drawNew()">✕</button></div>`).join('')}</div>
-  <label class="lb">Lot concerné</label>
-  <select class="inp" onchange="draft.lot=this.value"><option value="">— Non défini —</option>${lots.map(l=>`<option ${draft.lot===l?'selected':''}>${esc(l)}</option>`).join('')}</select>
+  <label class="lb">Corps de métier concernés <span class="meta">(un ou plusieurs)</span></label>
+  <div class="filters">${lots.map(l=>`<button type="button" class="chip ${draft.lots.includes(l)?'on':''}" onclick="toggleLot(${esc(JSON.stringify(l))})">${vignette(l,24)}${esc(l)}</button>`).join('')||'<span class="note">Aucun lot sur ce chantier.</span>'}</div>
   <label class="lb">Urgence</label>
   <div class="seg">${[['bloq','Bloquant','u-bad'],['corr','À corriger','u-warn'],['info','Info','u-blue']].map(([k,l,cl])=>`<button class="${draft.urgence===k?'on '+cl:''}" onclick="draft.urgence='${k}';drawNew()">${l}</button>`).join('')}</div>
-  <label class="lb">Titre</label><input class="inp" placeholder="${draft.demande?'Ex. : réservation Ø 40 côté gauche':'Ex. : gaine écrasée derrière la cloison'}" value="${esc(draft.titre)}" oninput="draft.titre=this.value">
+  <label class="lb">Titre</label><input class="inp" placeholder="Ex. : réservation oubliée dans la dalle" value="${esc(draft.titre)}" oninput="draft.titre=this.value">
   <div class="row"><div style="flex:1.4"><label class="lb">Où ?</label><input class="inp" placeholder="Cuisine, SDB étage…" value="${esc(draft.zone)}" oninput="draft.zone=this.value"></div>
   <div style="flex:1"><label class="lb">Échéance</label><input class="inp" type="date" value="${esc(draft.echeance)}" onchange="draft.echeance=this.value"></div></div>
   <label class="lb">Détail (facultatif)</label><textarea class="inp" oninput="draft.descr=this.value">${esc(draft.descr)}</textarea>
-  <div class="btns"><button class="btn" onclick="cancelDraft()">Annuler</button><button class="btn pri" id="pBtn" onclick="saveProb()">Envoyer${draft.lot?' au lot '+esc(draft.lot):''}</button></div>`);
+  <div class="btns"><button class="btn" onclick="cancelDraft()">Annuler</button><button class="btn pri" id="pBtn" onclick="saveProb()">Envoyer${draft.lots.length?' à '+draft.lots.length+' lot'+(draft.lots.length>1?'s':''):''}</button></div>`);
 }
+function toggleLot(l){ const i = draft.lots.indexOf(l); if(i<0) draft.lots.push(l); else draft.lots.splice(i,1); drawNew(); }
 function addFiles(inp){ [...inp.files].forEach(f=>draft.files.push({file:f, type:f.type.startsWith('video')?'vid':f.type.startsWith('image')?'img':f.type.startsWith('audio')?'aud':'doc', preview:URL.createObjectURL(f)})); drawNew(); }
 async function recDraft(){
   if(REC.mr){ stopRec(); return; }
@@ -541,9 +648,9 @@ async function saveProb(){
   try{
     const medias = await uploadAll(draft.files, b);
     b.textContent = 'Enregistrement…';
-    await rpc('cc_signaler', {p_token:S.token, p_titre:draft.titre, p_descr:draft.descr, p_lot:draft.lot, p_zone:draft.zone, p_urgence:draft.urgence, p_echeance:draft.echeance||null, p_medias:medias});
+    await rpc('cc_signaler2', {p_token:S.token, p_titre:draft.titre, p_descr:draft.descr, p_lots:draft.lots, p_zone:draft.zone, p_urgence:draft.urgence, p_echeance:draft.echeance||null, p_medias:medias});
     closeSheet(); S.tab='prob'; S.filtre='ouverts'; await loadChantier(true);
-    toast(draft.lot?`Envoyé · le lot ${draft.lot} et le pilote le verront`:'Problème enregistré');
+    toast(draft.lots.length?`Envoyé à ${draft.lots.join(', ')} · l’architecte le voit aussi`:'Problème enregistré');
   }catch(e){ fail(e); b.disabled=false; b.textContent='Réessayer'; }
 }
 
@@ -552,22 +659,22 @@ let reply = {files:[]};
 function openProb(id){ reply = {files:[], pid:id}; drawProb(); }
 function drawProb(){
   const id = reply.pid, p = D().problemes.find(x=>x.id===id); if(!p){ closeSheet(); return; }
-  const m = me(), monLot = m.role==='artisan' && m.lot && m.lot===p.lot, act = p.statut==='ouvert'||p.statut==='en cours';
+  const m = me(), monLot = isArt() && lotsOf(p).some(l=>sameLot(l, m.lot)), act = p.statut==='ouvert'||p.statut==='en cours';
   let actions = '';
   if(monLot && p.statut==='ouvert') actions += `<button class="btn dark" onclick="setStatut('${id}','en cours')">Je m’en occupe</button>`;
   if((monLot||isMoe()) && act) actions += `<label class="btn ok">${I.cam} Résolu + photo<input type="file" accept="image/*,video/*" capture="environment" onchange="resolve('${id}',this)"></label>`;
   if(isMoe() && p.statut==='résolu') actions = `<button class="btn" onclick="setStatut('${id}','ouvert')">Rouvrir</button><button class="btn ok" onclick="setStatut('${id}','validé')">Valider la levée</button>`;
-  if(isMoe() && act){ const who = D().membres.find(x=>x.lot===p.lot && x.tel); if(who) actions += `<a class="btn" href="sms:${esc(who.tel)}?&body=${encodeURIComponent(`Bonjour, relance Contact Chantier « ${p.titre} » : ${linkFor(who.token)}`)}">Relancer par SMS</a>`; }
+  if(isMoe() && act){ D().membres.filter(x=>x.role==='artisan' && x.tel && lotsOf(p).some(l=>sameLot(l,x.lot))).forEach(who=>{ actions += `<a class="btn" href="sms:${esc(who.tel)}?&body=${encodeURIComponent(`Bonjour, relance Contact Chantier « ${p.titre} » : ${linkFor(who.token)}`)}">Relancer ${esc(who.nom.split(' ')[0])}</a>`; }); }
   if(isMoe() && p.statut==='validé') actions = `<button class="btn" onclick="setStatut('${id}','ouvert')">Rouvrir</button>`;
   const medias = mediasOf('probleme_id',id).filter(x=>!x.message_id);
   const fil = D().messages.filter(x=>x.probleme_id===id);
-  sheet(`<div class="row" style="gap:6px;flex-wrap:wrap">${lotPill(p.lot)}<span class="pill ${URG[p.urgence][1]}">${URG[p.urgence][0]}</span><span class="pill ${ST[p.statut][1]}">${ST[p.statut][0]}</span></div>
+  sheet(`<div class="row" style="gap:6px;flex-wrap:wrap">${lotsOf(p).map(lotPill).join('')}<span class="pill ${URG[p.urgence][1]}">${URG[p.urgence][0]}</span><span class="pill ${ST[p.statut][1]}">${ST[p.statut][0]}</span></div>
   <h1 style="font-size:19px;margin-top:10px">${esc(p.titre)}</h1>
   <p class="sub">${p.zone?esc(p.zone)+' · ':''}signalé par ${esc(M(p.auteur_id).nom)} · ${ago(p.created_at)}${p.echeance?' · échéance '+dateFr(p.echeance):''}</p>
   ${p.descr?`<p style="margin-top:10px;line-height:1.5;white-space:pre-wrap">${esc(p.descr)}</p>`:''}
   ${medias.length?`<div style="margin-top:12px;display:grid;gap:8px">${medias.map(x=>mediaHtml(x,'big-media')).join('')}</div>`:''}
   ${actions?`<div class="btns">${actions}</div>`:''}
-  <h2>Échanges</h2>
+  <h2>Échanges <span class="meta">(lots concernés + architecte)</span></h2>
   <div class="timeline">${fil.map(f=>`<div class="tl"><span class="who">${esc(M(f.auteur_id).nom)}</span> <span class="when">· ${ago(f.created_at)}</span>${f.texte?`<p>${mentions(f.texte)}</p>`:''}${mediasOf('message_id',f.id).map(x=>mediaHtml(x,'big-media')).join('')}</div>`).join('')||'<p class="note">Pas encore d’échange.</p>'}</div>
   <div class="previews">${reply.files.map((f,i)=>`<div style="position:relative">${thumb(f)}<button class="x" onclick="reply.files.splice(${i},1);drawProb()">✕</button></div>`).join('')}</div>
   <div class="row" style="margin-top:10px"><label class="icon-btn">${I.clip}<input type="file" accept="image/*,video/*,application/pdf" multiple onchange="addReply(this)"></label>
@@ -579,14 +686,14 @@ async function recReply(){ if(REC.mr){ stopRec(); return; } const ok = await sta
 async function sendReply(){
   const t = $('#cIn').value.trim(); if(!t && !reply.files.length) return;
   const b=$('#rBtn'); b.disabled=true;
-  try{ const medias = await uploadAll(reply.files); await rpc('cc_ecrire', {p_token:S.token, p_probleme:reply.pid, p_texte:t, p_medias:medias}); reply.files=[]; await loadChantier(false); drawProb(); }
+  try{ const medias = await uploadAll(reply.files); await rpc('cc_ecrire2', {p_token:S.token, p_probleme:reply.pid, p_conversation:null, p_texte:t, p_medias:medias}); reply.files=[]; await loadChantier(false); drawProb(); }
   catch(e){ fail(e); b.disabled=false; }
 }
 async function setStatut(id, st, medias, texte){
   try{
     await rpc('cc_statut', {p_token:S.token, p_probleme:id, p_statut:st, p_texte:texte||'', p_medias:medias||[]});
     await loadChantier(false); render(); reply.pid=id; drawProb();
-    toast({'en cours':'Le pilote voit que vous vous en occupez','résolu':'Marqué résolu · en attente de validation','validé':'Levée validée','ouvert':'Problème rouvert'}[st]);
+    toast({'en cours':'L’architecte voit que vous vous en occupez','résolu':'Marqué résolu · en attente de validation','validé':'Levée validée','ouvert':'Problème rouvert'}[st]);
   }catch(e){ fail(e); }
 }
 async function resolve(id, inp){
@@ -595,36 +702,77 @@ async function resolve(id, inp){
   try{ const md = await upload(f, D().chantier.id); await setStatut(id, 'résolu', [md], 'Corrigé, voir la preuve.'); }catch(e){ fail(e); }
 }
 
-/* ---------- DISCUSSION ---------- */
+/* ---------- MESSAGES ---------- */
 let chatFiles = [];
-function filView(){
-  const m = me();
-  const msgs = D().messages.filter(x=>!x.probleme_id);
-  let h = `<div class="quick no-print">`;
-  if(m.role==='artisan'){
-    const st = (D().membres.find(x=>x.id===m.id)||{}).statut_lot;
-    if(st!=='en cours' && st!=='terminé') h += `<button class="chip" onclick="lotStatut('en cours')">▶️ Je démarre mon lot</button>`;
-    if(st!=='terminé') h += `<button class="chip" onclick="lotStatut('terminé')">✅ J’ai terminé mon lot</button>`;
-  }
-  if(m.role!=='client') h += `<button class="chip" onclick="newProb({demande:true})">🙋 Demander à un lot</button>`;
-  h += `</div>`;
+function convName(c){
+  if(c.titre) return c.titre;
+  const others = c.membres.filter(x=>x!==me().id).map(M);
+  return others.map(x=>x.role==='moe'?'Architecte':(x.lot||x.nom.split(' ')[0])).join(' ↔ ') || 'Conversation';
+}
+function lastMsg(filter){ const l = D().messages.filter(filter); return l[l.length-1]; }
+function msgView(){
+  if(S.conv) return chatView(S.conv);
+  const convs = D().conversations||[];
+  const lg = lastMsg(x=>!x.probleme_id && !x.conversation_id);
+  let h = `<p class="note" style="margin:0 0 10px">${isMoe()?'Vous voyez toutes les conversations du chantier, y compris les échanges privés entre artisans.':'Vos conversations privées ne sont visibles que par leurs participants et l’architecte.'}</p>
+  <div class="card tap row" style="gap:12px" onclick="openConv('general')">${vignette('',48,'moe')}<div style="flex:1;min-width:0"><div class="ptitle">📢 Fil général du chantier</div><div class="meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lg?esc((lg.auteur_id?M(lg.auteur_id).nom.split(' ')[0]+' : ':'')+(lg.texte||'📎 pièce jointe')):'Tous les intervenants'}</div></div></div>`;
+  if(convs.length) h += `<h2>Conversations privées</h2>`;
+  convs.slice().sort((a,b)=>{ const la = lastMsg(x=>x.conversation_id===a.id), lb = lastMsg(x=>x.conversation_id===b.id); return new Date(lb?lb.created_at:b.created_at) - new Date(la?la.created_at:a.created_at); }).forEach(c=>{
+    const l = lastMsg(x=>x.conversation_id===c.id), mine = c.membres.includes(me().id);
+    const faces = c.membres.filter(x=>x!==me().id).slice(0,3).map(id=>{ const x=M(id); return vignette(x.lot||'Autre',30,x.role); }).join('');
+    h += `<div class="card tap row" style="gap:12px" onclick="openConv('${c.id}')"><div class="row" style="gap:3px;flex:none">${faces||vignette('Autre',30)}</div>
+      <div style="flex:1;min-width:0"><div class="ptitle">🔒 ${esc(convName(c))}</div><div class="meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l?esc(M(l.auteur_id).nom.split(' ')[0]+' : '+(l.texte||'📎 pièce jointe')):'Pas encore de message'}</div></div>
+      ${isMoe()&&!mine?'<span class="pill p-mute">👁 supervision</span>':''}</div>`;
+  });
+  if(me().role!=='client') h += `<button class="btn pri full" style="margin-top:12px" onclick="newConv()">${I.plus} Nouvelle conversation privée</button>`;
+  return h;
+}
+function openConv(id){ S.conv = id; chatFiles = []; render(); window.scrollTo(0, document.body.scrollHeight); }
+function chatView(cid){
+  const m = me(), general = cid==='general', c = general ? null : (D().conversations||[]).find(x=>x.id===cid);
+  if(!general && !c){ S.conv=null; return msgView(); }
+  const msgs = D().messages.filter(x=>!x.probleme_id && (general ? !x.conversation_id : x.conversation_id===cid));
+  let h = `<button class="chip" style="margin-bottom:10px" onclick="S.conv=null;render()">‹ Conversations</button>
+  <div class="row" style="gap:8px;margin-bottom:12px"><b style="font-size:16px">${general?'📢 Fil général du chantier':'🔒 '+esc(convName(c))}</b></div>
+  ${!general?`<div class="filters">${c.membres.map(id=>{ const x=M(id); return `<span class="chip">${vignette(x.lot||'Autre',22,x.role)}${esc(x.nom.split(' ')[0])}</span>`; }).join('')}${!c.membres.includes(D().membres.find(x=>x.role==='moe').id)?`<span class="chip">${vignette('',22,'moe')}Architecte (supervision)</span>`:''}</div>`:''}`;
   if(!msgs.length) h += `<div class="empty">Pas encore de message.</div>`;
   msgs.forEach(x=>{
-    if(x.systeme){ h += `<div class="msg sys ${/BLOQUANT/.test(x.texte)?'alert':''}"><div class="bubble">${esc(x.texte)}</div><div class="mwho" style="margin-top:3px">${ago(x.created_at)}</div></div>`; return; }
+    if(x.systeme){ h += `<div class="msg sys ${/BLOQUANT/.test(x.texte)?'alert':''}"><div class="bubble">${x.prive_moe?'🔒 ':''}${esc(x.texte)}</div><div class="mwho" style="margin-top:3px">${x.prive_moe?'visible par vous seul · ':''}${ago(x.created_at)}</div></div>`; return; }
     const u = M(x.auteur_id), mine = x.auteur_id===m.id;
     const md = mediasOf('message_id', x.id);
-    h += `<div class="msg ${mine?'me':''}"><div class="mwho">${mine?'':esc(u.nom)+(u.role==='moe'?' · Pilote':u.lot?' · '+esc(u.lot):'')+' · '}${ago(x.created_at)}</div><div class="bubble">${x.texte?mentions(x.texte):''}${md.map(z=>mediaHtml(z)).join('')}</div></div>`;
+    h += `<div class="msg ${mine?'me':''}"><div class="mwho">${mine?'':esc(u.nom)+(u.role==='moe'?' · Architecte':u.lot?' · '+esc(u.lot):'')+' · '}${ago(x.created_at)}</div><div class="bubble">${x.texte?mentions(x.texte):''}${md.map(z=>mediaHtml(z)).join('')}</div></div>`;
   });
+  if(m.role==='client' && !general) return h;
   h += `<div style="height:${chatFiles.length?150:76}px"></div>
   <div class="composer" style="flex-wrap:wrap">
     ${chatFiles.length?`<div class="previews" style="width:100%;margin:0 0 6px">${chatFiles.map((f,i)=>`<div style="position:relative">${thumb(f)}<button class="x" onclick="chatFiles.splice(${i},1);render()">✕</button></div>`).join('')}</div>`:''}
     <label class="icon-btn" title="Photo, vidéo ou document">${I.clip}<input type="file" accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.dwg" multiple onchange="addChat(this)"></label>
-    <input class="inp" id="msgIn" style="flex:1;min-width:0" placeholder="Message… (@Plomberie pour un lot)" onkeydown="if(event.key==='Enter')sendMsg()">
+    <input class="inp" id="msgIn" style="flex:1;min-width:0" placeholder="${general?'Message à tout le chantier…':'Message privé…'}" onkeydown="if(event.key==='Enter')sendMsg()">
     <button class="icon-btn ${REC.mr?'rec':''}" onclick="recChat()" title="Message vocal">${REC.mr?I.stop:I.mic}</button>
     <button class="icon-btn pri" id="sBtn" onclick="sendMsg()">${I.send}</button>
   </div>`;
   return h;
 }
+function newConv(){
+  const others = D().membres.filter(x=>x.id!==me().id && x.role!=='client');
+  sheet(`<h1 style="font-size:19px">Nouvelle conversation privée</h1><p class="sub">Seuls les participants la voient${isMoe()?'':' — et l’architecte, qui supervise tout le chantier'}.</p>
+  <label class="lb">Avec qui ?</label>
+  <div id="cvPick">${others.map(x=>`<label class="card row" style="gap:12px;padding:10px 12px;cursor:pointer"><input type="checkbox" value="${x.id}" style="width:20px;height:20px;accent-color:var(--acc)">${vignette(x.lot||'Autre',36,x.role)}<div><div class="ptitle">${esc(x.nom)}</div><div class="meta">${x.role==='moe'?'Architecte':esc(x.lot||'')}</div></div></label>`).join('')||'<p class="note">Personne d’autre sur ce chantier pour l’instant.</p>'}</div>
+  <label class="lb">Sujet (facultatif)</label><input class="inp" id="cvT" placeholder="Ex. : réservations dalle">
+  <div class="btns"><button class="btn" onclick="closeSheet()">Annuler</button><button class="btn pri" onclick="saveConv()">Créer</button></div>`);
+}
+async function saveConv(){
+  const ids = [...document.querySelectorAll('#cvPick input:checked')].map(i=>i.value);
+  if(!ids.length){ toast('Choisissez au moins une personne', true); return; }
+  try{ const r = await rpc('cc_conv_creer',{p_token:S.token,p_titre:$('#cvT').value,p_membres:ids}); closeSheet(); await loadChantier(false); S.tab='msg'; openConv(r.id); }catch(e){ fail(e); }
+}
+async function convAvec(ids){
+  const want = [...new Set([me().id, ...ids])].sort().join(',');
+  const ex = (D().conversations||[]).find(c=>!c.titre && c.membres.slice().sort().join(',')===want);
+  if(ex) return ex.id;
+  const r = await rpc('cc_conv_creer',{p_token:S.token,p_titre:null,p_membres:ids}); return r.id;
+}
+async function ecrireA(id){ try{ const c = await convAvec([id]); await loadChantier(false); S.tab='msg'; openConv(c); }catch(e){ fail(e); } }
 function addChat(inp){ [...inp.files].forEach(f=>chatFiles.push({file:f,type:f.type.startsWith('video')?'vid':f.type.startsWith('image')?'img':'doc',preview:URL.createObjectURL(f)})); render(); }
 async function recChat(){
   if(REC.mr){ stopRec(); return; }
@@ -635,18 +783,19 @@ async function sendMsg(){
   const inp = $('#msgIn'); const t = inp ? inp.value.trim() : '';
   if(!t && !chatFiles.length){ render(); return; }
   const b = $('#sBtn'); if(b) b.disabled = true;
+  const conv = S.conv==='general' ? null : S.conv;
   try{
     const docs = chatFiles.filter(f=>f.type==='doc'), others = chatFiles.filter(f=>f.type!=='doc');
     const medias = await uploadAll(others);
-    for(const d of docs){ const md = await upload(d.file, D().chantier.id); await rpc('cc_ajouter_doc', {p_token:S.token, p_nom:(d.file.name||'Document').replace(/\.[^.]+$/,''), p_url:md.url}); }
-    if(t || medias.length) await rpc('cc_ecrire', {p_token:S.token, p_probleme:null, p_texte:t, p_medias:medias});
-    chatFiles = []; if(inp) inp.value=''; S.scrollFil = true;
-    await loadChantier(true);
-    if(docs.length) toast('Document rangé dans l’onglet Documents');
+    for(const d of docs){ const md = await upload(d.file, D().chantier.id); medias.push(md); if(!conv) await rpc('cc_ajouter_doc', {p_token:S.token, p_nom:(d.file.name||'Document').replace(/\.[^.]+$/,''), p_url:md.url}); }
+    if(t || medias.length) await rpc('cc_ecrire2', {p_token:S.token, p_probleme:null, p_conversation:conv, p_texte:t, p_medias:medias});
+    chatFiles = []; if(inp) inp.value='';
+    await loadChantier(true); window.scrollTo(0, document.body.scrollHeight);
+    if(docs.length && !conv) toast('Document aussi rangé dans l’onglet Documents');
   }catch(e){ fail(e); if(b) b.disabled=false; }
 }
 async function lotStatut(st, membre){
-  try{ await rpc('cc_statut_lot', {p_token:S.token, p_membre:membre||null, p_statut:st}); await loadChantier(true); toast(st==='terminé'?'Les autres lots et le pilote sont prévenus':'Statut du lot mis à jour'); }catch(e){ fail(e); }
+  try{ await rpc('cc_statut_lot', {p_token:S.token, p_membre:membre||null, p_statut:st}); await loadChantier(true); toast(st==='terminé'?'Les autres lots et l’architecte sont prévenus':'Statut du lot mis à jour'); }catch(e){ fail(e); }
 }
 
 /* ---------- PHOTOS ---------- */
@@ -678,35 +827,33 @@ async function addDoc(inp){
 }
 function openDoc(id){ const d = D().documents.find(x=>x.id===id); window.open(d.url,'_blank'); rpc('cc_lire_doc',{p_token:S.token,p_doc:id}).then(()=>loadChantier(false)).catch(()=>{}); }
 
+
+
 /* ---------- EQUIPE ---------- */
 function lotsGrid(){
   const lots = allLots(); if(!lots.length) return '';
-  return `<h2 style="margin-top:4px">Les lots du chantier</h2><div class="lgrid">${lots.map(l=>{
-    const who = D().membres.filter(x=>x.lot===l), st = who[0] ? who[0].statut_lot : '';
-    const ouv = D().problemes.filter(p=>p.lot===l && (p.statut==='ouvert'||p.statut==='en cours')).length;
-    return `<div class="lcell">${vignette(l,52)}<div class="ptitle" style="font-size:13.5px;margin-top:6px">${esc(l)}</div><div class="meta" style="margin-top:2px">${who.length?esc(who.map(x=>x.nom.split(' ')[0]).join(', ')):'à inviter'}</div><div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;justify-content:center">${st?`<span class="pill ${LST[st]||'p-mute'}">${esc(st)}</span>`:''}${ouv?`<span class="pill p-acc">${ouv} pb</span>`:''}</div></div>`;
+  return `<h2 style="margin-top:4px">Les corps de métier du chantier</h2><div class="lgrid">${lots.map(l=>{
+    const who = D().membres.filter(x=>x.role==='artisan' && sameLot(x.lot,l)), st = who[0] ? who[0].statut_lot : '';
+    const ouv = D().problemes.filter(p=>lotsOf(p).some(x=>sameLot(x,l)) && (p.statut==='ouvert'||p.statut==='en cours')).length;
+    return `<div class="lcell">${vignette(l,72)}<div class="ptitle" style="font-size:13.5px;margin-top:6px">${esc(l)}</div><div class="meta" style="margin-top:2px">${who.length?esc(who.map(x=>x.nom.split(' ')[0]).join(', ')):'à inviter'}</div><div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;justify-content:center">${st?`<span class="pill ${LST[st]||'p-mute'}">${esc(st)}</span>`:''}${ouv?`<span class="pill p-acc">${ouv} pb</span>`:''}</div></div>`;
   }).join('')}</div><h2>Intervenants</h2>`;
 }
 function equipeView(){
-  const c = D().chantier;
   let h = '';
   if(isMoe()){
-    h += `<div class="card"><div class="row between"><b>Avancement global</b><b id="avV">${c.avancement}%</b></div>
-      <input class="range" type="range" min="0" max="100" step="5" value="${c.avancement}" oninput="$('#avV').textContent=this.value+'%'" onchange="setAvancement(this.value)">
-      <div class="btns" style="margin-top:8px"><button class="btn" onclick="editChantier()">Modifier le chantier</button></div></div>
-      <button class="btn pri full" style="margin-bottom:12px" onclick="invite()">${I.plus} Inviter un artisan ou le client</button>`;
+    h += `<div class="btns" style="margin:0 0 12px"><button class="btn pri" onclick="invite()">${I.plus} Inviter</button><button class="btn" onclick="editChantier()">Modifier le chantier</button></div>`;
   }
   h += lotsGrid();
   D().membres.forEach(x=>{
-    const role = x.role==='moe'?'Pilote':x.role==='client'?'Client':(x.lot||'Intervenant');
-    h += `<div class="card"><div class="person">${vignette(x.lot||'Autre', 44, x.role)}
+    const role = x.role==='moe'?'Architecte · administrateur':x.role==='client'?'Client':(x.lot||'Intervenant');
+    const canMsg = x.id!==me().id && me().role!=='client' && x.role!=='client';
+    h += `<div class="card"><div class="person">${vignette(x.lot||'Autre', 48, x.role)}
       <div style="flex:1;min-width:0"><div class="ptitle">${esc(x.nom)}${x.id===me().id?' (vous)':''}</div><div class="meta">${esc(role)}${x.entreprise?' · '+esc(x.entreprise):''}${x.last_seen?' · vu '+ago(x.last_seen):' · pas encore connecté'}</div></div>
       ${x.role==='artisan'?(isMoe()?`<select class="pill ${LST[x.statut_lot]||'p-mute'}" style="border:none" onchange="lotStatut(this.value,'${x.id}')">${['à venir','en cours','terminé'].map(s=>`<option ${x.statut_lot===s?'selected':''}>${s}</option>`).join('')}</select>`:`<span class="pill ${LST[x.statut_lot]||'p-mute'}">${esc(x.statut_lot)}</span>`):''}</div>
-      ${x.tel||(isMoe()&&x.role!=='moe')?`<div class="btns" style="margin-top:10px">${x.tel?`<a class="btn" href="tel:${esc(x.tel)}">📞 ${esc(x.tel)}</a>`:''}${isMoe()&&x.role!=='moe'?`<button class="btn" onclick="showInvite('${x.id}')">Renvoyer le lien</button>`:''}</div>`:''}</div>`;
+      ${x.tel||canMsg||(isMoe()&&x.role!=='moe')?`<div class="btns" style="margin-top:10px">${canMsg?`<button class="btn" onclick="ecrireA('${x.id}')">💬 Message</button>`:''}${x.tel?`<a class="btn" href="tel:${esc(x.tel)}">📞 Appeler</a>`:''}${isMoe()&&x.role!=='moe'?`<button class="btn" onclick="showInvite('${x.id}')">Lien</button>`:''}</div>`:''}</div>`;
   });
   return h;
 }
-async function setAvancement(v){ try{ await rpc('cc_modifier_chantier',{p_token:S.token,p_nom:null,p_adresse:null,p_client:null,p_debut:null,p_fin:null,p_lots:null,p_avancement:+v,p_archive:null}); await loadChantier(true); toast('Avancement enregistré'); }catch(e){ fail(e); } }
 function editChantier(){
   const c = D().chantier;
   sheet(`<h1 style="font-size:19px">Modifier le chantier</h1>
@@ -714,7 +861,8 @@ function editChantier(){
   <label class="lb">Adresse</label><input class="inp" id="eAdr" value="${esc(c.adresse||'')}">
   <label class="lb">Client</label><input class="inp" id="eCli" value="${esc(c.client||'')}">
   <div class="row"><div style="flex:1"><label class="lb">Début</label><input class="inp" id="eDeb" value="${esc(c.debut||'')}"></div><div style="flex:1"><label class="lb">Fin</label><input class="inp" id="eFin" value="${esc(c.fin||'')}"></div></div>
-  <label class="lb">Lots</label>${lotsPicker(c.lots||[])}
+  <label class="lb">Corps de métier</label>${lotsPicker(c.lots||[])}
+  <p class="note">L’avancement se calcule tout seul à partir des étapes que vous validez.</p>
   <div class="btns"><button class="btn bad" onclick="archiver(${!c.archive})">${c.archive?'Désarchiver':'Archiver'}</button><button class="btn pri" onclick="saveEdit()">Enregistrer</button></div>`);
 }
 async function saveEdit(){
@@ -728,7 +876,7 @@ function invite(){
   <div class="seg" style="margin-top:12px"><button class="on" id="rA" onclick="this.classList.add('on');$('#rC').classList.remove('on');$('#lotZone').style.display=''">Artisan</button><button id="rC" onclick="this.classList.add('on');$('#rA').classList.remove('on');$('#lotZone').style.display='none'">Client</button></div>
   <label class="lb">Nom</label><input class="inp" id="iNom" placeholder="Karim Benali">
   <label class="lb">Téléphone portable</label><input class="inp" id="iTel" type="tel" placeholder="06 12 34 56 78">
-  <div id="lotZone"><label class="lb">Lot</label><div class="row"><span id="iVig">${vignette(lots[0]||'Autre',46)}</span><input class="inp" id="iLot" list="lotsList" placeholder="Plomberie" value="${esc(lots[0]||'')}" oninput="$('#iVig').innerHTML=vignette(this.value||'Autre',46)"></div><datalist id="lotsList">${[...new Set([...lots,...LOTS_COURANTS])].map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
+  <div id="lotZone"><label class="lb">Corps de métier</label><div class="row"><span id="iVig">${vignette(lots[0]||'Autre',46)}</span><input class="inp" id="iLot" list="lotsList" placeholder="Plomberie" value="${esc(lots[0]||'')}" oninput="$('#iVig').innerHTML=vignette(this.value||'Autre',46)"></div><datalist id="lotsList">${[...new Set([...lots,...LOTS_COURANTS])].map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
   <label class="lb">Entreprise (facultatif)</label><input class="inp" id="iEnt"></div>
   <div class="btns"><button class="btn" onclick="closeSheet()">Annuler</button><button class="btn pri" id="iBtn" onclick="saveInvite()">Créer l’invitation</button></div>`);
 }
@@ -740,8 +888,8 @@ async function saveInvite(){
 function showInvite(id){
   const x = D().membres.find(z=>z.id===id); if(!x||!x.token) return;
   const url = linkFor(x.token), c = D().chantier;
-  const txt = `Bonjour ${x.nom.split(' ')[0]}, voici votre accès au chantier « ${c.nom} » sur Contact Chantier (photos, problèmes, plans, discussion). Aucun compte à créer, ouvrez simplement : ${url}`;
-  sheet(`<h1 style="font-size:19px">Lien de ${esc(x.nom)}</h1><p class="sub">Envoyez-le par SMS ou WhatsApp. Ce lien est personnel : il donne accès au chantier.</p>
+  const txt = `Bonjour ${x.nom.split(' ')[0]}, voici votre accès au chantier « ${c.nom} » sur Contact Chantier (photos, problèmes, plans, messages). Aucun compte à créer, ouvrez simplement : ${url}`;
+  sheet(`<div class="row" style="gap:12px">${vignette(x.lot||'Autre',52,x.role)}<div><h1 style="font-size:19px">Lien de ${esc(x.nom)}</h1><p class="sub" style="margin-top:2px">Personnel : il donne accès au chantier.</p></div></div>
   <div class="linkbox">${esc(url)}</div>
   <div class="btns" style="flex-direction:column">
     <a class="btn pri" href="sms:${esc(x.tel||'')}?&body=${encodeURIComponent(txt)}">Envoyer par SMS</a>
@@ -757,20 +905,24 @@ async function retirer(id){
 
 /* ---------- COMPTE RENDU ---------- */
 function crView(){
-  const c = D().chantier, ps = D().problemes;
-  const open = ps.filter(p=>p.statut==='ouvert'||p.statut==='en cours').sort((a,b)=>(a.lot||'').localeCompare(b.lot||''));
+  const c = D().chantier, ps = D().problemes, et = D().etapes||[];
+  const open = ps.filter(p=>p.statut==='ouvert'||p.statut==='en cours');
   const res = ps.filter(p=>p.statut==='résolu');
   const since = Date.now()-7*864e5, done = ps.filter(p=>p.statut==='validé' && new Date(p.updated_at)>since);
   const d = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const imgs = p => mediasOf('probleme_id',p.id).filter(x=>x.type==='img').slice(0,3).map(x=>`<img src="${esc(x.url)}">`).join('');
+  const phases = [...new Set(et.map(e=>e.phase))];
+  const enCours = et.filter(e=>e.statut==='en cours'||e.statut==='déclaré');
   return `<div class="cr" id="crBox"><b style="font-size:18px">Compte rendu de chantier — ${esc(c.nom)}</b>
   <div class="meta">${d}${c.adresse?' · '+esc(c.adresse):''}${c.client?' · client : '+esc(c.client):''} · avancement ${c.avancement}%</div>
-  <h3>Intervenants et avancement des lots</h3><table>${D().membres.filter(x=>x.role==='artisan').map(x=>`<tr><td>${esc(x.lot||'—')}</td><td>${esc(x.nom)}${x.entreprise?' ('+esc(x.entreprise)+')':''}</td><td>${esc(x.statut_lot)}</td></tr>`).join('')||'<tr><td>Aucun intervenant invité</td></tr>'}</table>
-  <h3>Problèmes à traiter (${open.length})</h3><table><tr><th>Lot</th><th>Problème</th><th>Urgence</th><th>Échéance</th></tr>${open.map(p=>`<tr><td>${esc(p.lot||'—')}</td><td>${esc(p.titre)}${p.zone?`<br><span class="meta">${esc(p.zone)}</span>`:''}<div class="crimgs">${imgs(p)}</div></td><td>${URG[p.urgence][0]}</td><td>${p.echeance?dateFr(p.echeance):'—'}</td></tr>`).join('')||'<tr><td colspan="4">Aucun</td></tr>'}</table>
-  <h3>Résolus, en attente de validation (${res.length})</h3><table>${res.map(p=>`<tr><td>${esc(p.lot||'—')}</td><td>${esc(p.titre)}</td></tr>`).join('')||'<tr><td>Aucun</td></tr>'}</table>
-  <h3>Levés cette semaine (${done.length})</h3><table>${done.map(p=>`<tr><td>${esc(p.lot||'—')}</td><td>${esc(p.titre)}</td></tr>`).join('')||'<tr><td>Aucun</td></tr>'}</table>
+  <h3>Avancement par phase</h3><table>${phases.map(ph=>{ const a = et.filter(e=>e.phase===ph && e.statut!=='sans objet'); const o = a.filter(e=>e.statut==='validé').length; return `<tr><td>${esc(ph)}</td><td>${o} / ${a.length} étapes</td><td>${a.length&&o===a.length?'✓ terminé':o?'en cours':'à venir'}</td></tr>`; }).join('')}</table>
+  <h3>Étapes en cours (${enCours.length})</h3><table>${enCours.map(e=>`<tr><td>${esc(e.lot||'—')}</td><td>${esc(e.nom)}</td><td>${e.statut==='déclaré'?'déclarée faite, à vérifier':'en cours'}</td></tr>`).join('')||'<tr><td>Aucune</td></tr>'}</table>
+  <h3>Intervenants</h3><table>${D().membres.filter(x=>x.role==='artisan').map(x=>`<tr><td>${esc(x.lot||'—')}</td><td>${esc(x.nom)}${x.entreprise?' ('+esc(x.entreprise)+')':''}</td><td>${esc(x.statut_lot)}</td></tr>`).join('')||'<tr><td>Aucun intervenant invité</td></tr>'}</table>
+  <h3>Problèmes à traiter (${open.length})</h3><table><tr><th>Lots</th><th>Problème</th><th>Urgence</th><th>Échéance</th></tr>${open.map(p=>`<tr><td>${esc(lotsOf(p).join(', ')||'—')}</td><td>${esc(p.titre)}${p.zone?`<br><span class="meta">${esc(p.zone)}</span>`:''}<div class="crimgs">${imgs(p)}</div></td><td>${URG[p.urgence][0]}</td><td>${p.echeance?dateFr(p.echeance):'—'}</td></tr>`).join('')||'<tr><td colspan="4">Aucun</td></tr>'}</table>
+  <h3>Résolus, en attente de validation (${res.length})</h3><table>${res.map(p=>`<tr><td>${esc(lotsOf(p).join(', ')||'—')}</td><td>${esc(p.titre)}</td></tr>`).join('')||'<tr><td>Aucun</td></tr>'}</table>
+  <h3>Levés cette semaine (${done.length})</h3><table>${done.map(p=>`<tr><td>${esc(lotsOf(p).join(', ')||'—')}</td><td>${esc(p.titre)}</td></tr>`).join('')||'<tr><td>Aucun</td></tr>'}</table>
   <p class="note">Établi avec Contact Chantier.</p></div>
-  <div class="btns no-print"><button class="btn dark" onclick="window.print()">Imprimer / PDF</button><button class="btn" onclick="copyText($('#crBox').innerText)">Copier le texte</button>${navigator.share?`<button class="btn pri" onclick="navigator.share({title:'Compte rendu ${esc(c.nom).replace(/'/g,'')}',text:$('#crBox').innerText}).catch(()=>{})">Partager</button>`:''}</div>
+  <div class="btns no-print"><button class="btn dark" onclick="window.print()">Imprimer / PDF</button><button class="btn" onclick="copyText($('#crBox').innerText)">Copier le texte</button>${navigator.share?`<button class="btn pri" onclick="navigator.share({title:'Compte rendu',text:$('#crBox').innerText}).catch(()=>{})">Partager</button>`:''}</div>
   <p class="note">« Imprimer / PDF » permet d’enregistrer le compte rendu en PDF, puis de l’envoyer par mail.</p>`;
 }
 
