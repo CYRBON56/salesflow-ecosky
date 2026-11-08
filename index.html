@@ -124,6 +124,11 @@ audio{width:100%;max-width:280px;height:40px;margin-top:4px}
 .doc{display:flex;gap:12px;align-items:center}
 .dicon{width:42px;height:48px;border-radius:8px;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;font-size:10.5px;font-weight:800;flex:none;text-transform:uppercase}
 .person{display:flex;align-items:center;gap:12px}
+.lv{border-radius:12px;display:grid;place-items:center;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+.lgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.lcell{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 6px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.chip svg,.pill svg{flex:none}
+.chip{display:inline-flex;align-items:center;gap:6px}
 .av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#fff;flex:none;font-size:14px}
 .toast{position:fixed;top:calc(70px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-weight:600;font-size:14px;z-index:90;box-shadow:0 8px 24px rgba(0,0,0,.2);animation:up .2s ease;max-width:92%;text-align:center}
 .toast.err{background:var(--bad)}
@@ -230,8 +235,38 @@ const URG = {bloq:['Bloquant','p-bad'],corr:['À corriger','p-warn'],info:['Info
 const ST = {'ouvert':['Ouvert','p-acc'],'en cours':['En cours','p-blue'],'résolu':['Résolu','p-ok'],'validé':['Validé','p-mute']};
 const LST = {'terminé':'p-ok','en cours':'p-blue','à venir':'p-mute'};
 const PAL = ['#8D6E63','#2C5D8F','#C98A00','#7E57C2','#2F8F5B','#D84E7A','#00838F','#6D4C41','#5C6BC0','#AD1457','#558B2F','#EF6C00'];
-const colorOf = s => { let h=0; for(const c of String(s||'')) h=(h*31+c.charCodeAt(0))>>>0; return PAL[h%PAL.length]; };
-const lotPill = l => l ? `<span class="pill" style="background:${colorOf(l)}1F;color:${colorOf(l)}">${esc(l)}</span>` : '';
+/* Vignette illustrée par corps de métier : [mots-clés, couleur, pictogramme] */
+const METIERS = [
+  [['terrass','excav'], '#8D6E63', '<path d="M2 19h13"/><rect x="3" y="12" width="9" height="4" rx="1"/><path d="M6 12V9h4l2 3"/><path d="M12 13l5-6 4 3"/><path d="M21 10l-1 4h-3"/>'],
+  [['vrd','voirie','enrob','assain','anc'], '#546E7A', '<path d="M5 21L9 3M19 21L15 3M12 5v3M12 11v3M12 17v3"/>'],
+  [['macon','gros oeuvre','beton'], '#B5651D', '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 10h18M3 14.5h18M9 5v5M15 10v4.5M9 14.5V19"/>'],
+  [['charp','ossature'], '#6D4C41', '<path d="M2 18L12 5l10 13H2z"/><path d="M12 5v13M7 18l5-6 5 6"/>'],
+  [['couv','toit','zinc'], '#C0392B', '<path d="M3 11l9-7 9 7"/><path d="M5 10v9h14v-9"/><path d="M5 14h14M9 10v4M15 10v4"/>'],
+  [['menuis','fenet','porte','portail'], '#2F8F5B', '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M12 3v18M4 12h16"/>'],
+  [['plomb','sanit'], '#2C5D8F', '<path d="M3 8h8a4 4 0 0 1 4 4v2"/><path d="M6 5h4M8 5v3"/><path d="M15 18.5c0 1.1-.9 2-2 2s-2-.9-2-2c0-1.5 2-4 2-4s2 2.5 2 4z"/>'],
+  [['electr','courant'], '#E0A800', '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'],
+  [['chauff','pac','pompe','poele'], '#E8590C', '<path d="M12 22c4 0 7-3 7-7 0-5-5-7-5-12-3 2-5 5-4 9-2-1-3-3-3-3-1 2-2 4-2 6 0 4 3 7 7 7z"/>'],
+  [['clim','ventil','vmc'], '#00838F', '<path d="M12 2v20M4 6l16 12M20 6L4 18"/>'],
+  [['platr','placo','plaqu','cloison'], '#7E57C2', '<path d="M3 4h10v16H3z"/><path d="M14 14l6-6 1.5 1.5-6 6z"/><path d="M13 15l2 2"/>'],
+  [['isol'], '#D84E7A', '<path d="M3 6c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0M3 18c3-2 6 2 9 0s6-2 9 0"/>'],
+  [['carrel','faience'], '#00897B', '<rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/>'],
+  [['sol','resin','parquet','chape'], '#5C6BC0', '<path d="M3 20h18"/><path d="M6 16h12v-3H6z"/><path d="M12 13V4"/>'],
+  [['peint','facade','enduit'], '#AD1457', '<rect x="3" y="3" width="15" height="6" rx="1"/><path d="M18 6h3v5h-9v3"/><rect x="10" y="14" width="4" height="7" rx="1"/>'],
+  [['cuisin','agenc'], '#795548', '<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="9" cy="8" r="2"/><circle cx="15" cy="8" r="2"/><path d="M4 13h16"/>'],
+  [['paysag','jardin','espaces verts','clotur'], '#558B2F', '<path d="M12 22v-6"/><path d="M12 2a6 6 0 0 0-6 6c0 4 3 6 6 8 3-2 6-4 6-8a6 6 0 0 0-6-6z"/>']
+];
+const ICO_AUTRE = ['#6B7178','<path d="M15 4l5 5-3 3-5-5z"/><path d="M12 7L3 16l3 3 9-9"/>'];
+const ICO_MOE = ['#1E2328','<path d="M3 18h18"/><path d="M5 18v-3a7 7 0 0 1 14 0v3"/><path d="M10 8V5h4v3"/>'];
+const ICO_CLIENT = ['#2C5D8F','<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>'];
+const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+function metier(lot){ const n = norm(lot); const m = METIERS.find(([k])=>k.some(w=>n.includes(w))); return m ? [m[1], m[2]] : ICO_AUTRE; }
+const colorOf = s => metier(s)[0];
+function vignette(lot, size, kind){
+  const [c, ico] = kind==='moe' ? ICO_MOE : kind==='client' ? ICO_CLIENT : metier(lot); const s = size||40;
+  return `<div class="lv" style="width:${s}px;height:${s}px;background:${c}" title="${esc(lot||'')}"><svg width="${Math.round(s*0.56)}" height="${Math.round(s*0.56)}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ico}</svg></div>`;
+}
+const miniIco = l => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${metier(l)[1]}</svg>`;
+const lotPill = l => l ? `<span class="pill" style="background:${colorOf(l)}1F;color:${colorOf(l)}">${miniIco(l)}${esc(l)}</span>` : '';
 const initials = n => String(n||'?').split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase();
 const mentions = t => esc(t).replace(/@([A-Za-zÀ-ÿ\/-]+)/g,'<span class="mention">@$1</span>');
 function toast(t, err){ document.querySelectorAll('.toast').forEach(x=>x.remove()); const el=document.createElement('div'); el.className='toast'+(err?' err':''); el.textContent=t; document.body.appendChild(el); setTimeout(()=>el.remove(), err?4000:2600); }
@@ -245,8 +280,8 @@ function mediaHtml(md, cls){
   if(md.type==='aud') return `<audio src="${esc(md.url)}" controls preload="none"></audio>`;
   return `<a class="file" href="${esc(md.url)}" target="_blank" rel="noopener">${I.doc} ${esc(md.nom||'Fichier')}</a>`;
 }
-function thumb(md){
-  if(!md) return `<div class="thumb">${I.cam}</div>`;
+function thumb(md, lot){
+  if(!md) return lot ? `<div class="thumb" style="background:none">${vignette(lot,62)}</div>` : `<div class="thumb">${I.cam}</div>`;
   if(md.type==='img') return `<div class="thumb"><img src="${esc(md.url||md.preview)}" alt="" loading="lazy"></div>`;
   if(md.type==='vid') return `<div class="thumb">${md.url||md.preview?`<video src="${esc(md.url||md.preview)}#t=0.5" muted playsinline preload="metadata"></video>`:''}<span class="play">${I.play}</span></div>`;
   if(md.type==='aud') return `<div class="thumb" style="color:var(--acc)">${I.mic}</div>`;
@@ -388,9 +423,9 @@ function espaceView(){
   <footer>Contact Chantier · offre ${esc(e.compte.offre)} · ${esc(e.compte.email)}</footer>`;
 }
 function lotsPicker(sel){
-  return `<div class="filters" id="lotsPick">${LOTS_COURANTS.map(l=>`<button type="button" class="chip ${sel.includes(l)?'on':''}" onclick="this.classList.toggle('on')">${esc(l)}</button>`).join('')}</div>`;
+  return `<div class="filters" id="lotsPick">${LOTS_COURANTS.map(l=>`<button type="button" class="chip ${sel.includes(l)?'on':''}" data-lot="${esc(l)}" onclick="this.classList.toggle('on')">${vignette(l,22)}${esc(l)}</button>`).join('')}</div>`;
 }
-function pickedLots(){ return [...document.querySelectorAll('#lotsPick .chip.on')].map(b=>b.textContent); }
+function pickedLots(){ return [...document.querySelectorAll('#lotsPick .chip.on')].map(b=>b.dataset.lot); }
 function newChantier(){
   sheet(`<h1 style="font-size:19px">Nouveau chantier</h1>
   <label class="lb">Nom du chantier</label><input class="inp" id="cNom" placeholder="Ex. : Maison Le Dantec">
@@ -446,7 +481,7 @@ function probList(){
     const md = mediasOf('probleme_id',p.id).find(x=>x.type==='img'||x.type==='vid') || mediasOf('probleme_id',p.id)[0];
     const nbm = D().messages.filter(x=>x.probleme_id===p.id).length;
     const retard = p.echeance && new Date(p.echeance) < new Date(new Date().toDateString()) && (p.statut==='ouvert'||p.statut==='en cours');
-    h += `<div class="card tap prob" onclick="openProb('${p.id}')">${thumb(md)}
+    h += `<div class="card tap prob" onclick="openProb('${p.id}')">${thumb(md, p.lot||'Autre')}
       <div style="flex:1;min-width:0"><div class="ptitle">${esc(p.titre)}</div>
       <div class="meta">${p.zone?esc(p.zone)+' · ':''}${esc(M(p.auteur_id).nom.split(' ')[0])} · ${ago(p.created_at)}${p.echeance?` · <span style="${retard?'color:var(--bad);font-weight:700':''}">échéance ${dateFr(p.echeance)}${retard?' (en retard)':''}</span>`:''}</div>
       <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${lotPill(p.lot)}<span class="pill ${URG[p.urgence][1]}">${URG[p.urgence][0]}</span><span class="pill ${ST[p.statut][1]}">${ST[p.statut][0]}</span>${nbm?`<span class="pill p-mute">💬 ${nbm}</span>`:''}</div></div></div>`;
@@ -638,6 +673,14 @@ async function addDoc(inp){
 function openDoc(id){ const d = D().documents.find(x=>x.id===id); window.open(d.url,'_blank'); rpc('cc_lire_doc',{p_token:S.token,p_doc:id}).then(()=>loadChantier(false)).catch(()=>{}); }
 
 /* ---------- EQUIPE ---------- */
+function lotsGrid(){
+  const lots = allLots(); if(!lots.length) return '';
+  return `<h2 style="margin-top:4px">Les lots du chantier</h2><div class="lgrid">${lots.map(l=>{
+    const who = D().membres.filter(x=>x.lot===l), st = who[0] ? who[0].statut_lot : '';
+    const ouv = D().problemes.filter(p=>p.lot===l && (p.statut==='ouvert'||p.statut==='en cours')).length;
+    return `<div class="lcell">${vignette(l,52)}<div class="ptitle" style="font-size:13.5px;margin-top:6px">${esc(l)}</div><div class="meta" style="margin-top:2px">${who.length?esc(who.map(x=>x.nom.split(' ')[0]).join(', ')):'à inviter'}</div><div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;justify-content:center">${st?`<span class="pill ${LST[st]||'p-mute'}">${esc(st)}</span>`:''}${ouv?`<span class="pill p-acc">${ouv} pb</span>`:''}</div></div>`;
+  }).join('')}</div><h2>Intervenants</h2>`;
+}
 function equipeView(){
   const c = D().chantier;
   let h = '';
@@ -647,9 +690,10 @@ function equipeView(){
       <div class="btns" style="margin-top:8px"><button class="btn" onclick="editChantier()">Modifier le chantier</button></div></div>
       <button class="btn pri full" style="margin-bottom:12px" onclick="invite()">${I.plus} Inviter un artisan ou le client</button>`;
   }
+  h += lotsGrid();
   D().membres.forEach(x=>{
     const role = x.role==='moe'?'Pilote':x.role==='client'?'Client':(x.lot||'Intervenant');
-    h += `<div class="card"><div class="person"><div class="av" style="background:${x.role==='moe'?'#1E2328':colorOf(x.lot||x.nom)}">${esc(initials(x.nom))}</div>
+    h += `<div class="card"><div class="person">${vignette(x.lot||'Autre', 44, x.role)}
       <div style="flex:1;min-width:0"><div class="ptitle">${esc(x.nom)}${x.id===me().id?' (vous)':''}</div><div class="meta">${esc(role)}${x.entreprise?' · '+esc(x.entreprise):''}${x.last_seen?' · vu '+ago(x.last_seen):' · pas encore connecté'}</div></div>
       ${x.role==='artisan'?(isMoe()?`<select class="pill ${LST[x.statut_lot]||'p-mute'}" style="border:none" onchange="lotStatut(this.value,'${x.id}')">${['à venir','en cours','terminé'].map(s=>`<option ${x.statut_lot===s?'selected':''}>${s}</option>`).join('')}</select>`:`<span class="pill ${LST[x.statut_lot]||'p-mute'}">${esc(x.statut_lot)}</span>`):''}</div>
       ${x.tel||(isMoe()&&x.role!=='moe')?`<div class="btns" style="margin-top:10px">${x.tel?`<a class="btn" href="tel:${esc(x.tel)}">📞 ${esc(x.tel)}</a>`:''}${isMoe()&&x.role!=='moe'?`<button class="btn" onclick="showInvite('${x.id}')">Renvoyer le lien</button>`:''}</div>`:''}</div>`;
@@ -678,7 +722,7 @@ function invite(){
   <div class="seg" style="margin-top:12px"><button class="on" id="rA" onclick="this.classList.add('on');$('#rC').classList.remove('on');$('#lotZone').style.display=''">Artisan</button><button id="rC" onclick="this.classList.add('on');$('#rA').classList.remove('on');$('#lotZone').style.display='none'">Client</button></div>
   <label class="lb">Nom</label><input class="inp" id="iNom" placeholder="Karim Benali">
   <label class="lb">Téléphone portable</label><input class="inp" id="iTel" type="tel" placeholder="06 12 34 56 78">
-  <div id="lotZone"><label class="lb">Lot</label><input class="inp" id="iLot" list="lotsList" placeholder="Plomberie" value="${esc(lots[0]||'')}"><datalist id="lotsList">${[...new Set([...lots,...LOTS_COURANTS])].map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
+  <div id="lotZone"><label class="lb">Lot</label><div class="row"><span id="iVig">${vignette(lots[0]||'Autre',46)}</span><input class="inp" id="iLot" list="lotsList" placeholder="Plomberie" value="${esc(lots[0]||'')}" oninput="$('#iVig').innerHTML=vignette(this.value||'Autre',46)"></div><datalist id="lotsList">${[...new Set([...lots,...LOTS_COURANTS])].map(l=>`<option value="${esc(l)}">`).join('')}</datalist>
   <label class="lb">Entreprise (facultatif)</label><input class="inp" id="iEnt"></div>
   <div class="btns"><button class="btn" onclick="closeSheet()">Annuler</button><button class="btn pri" id="iBtn" onclick="saveInvite()">Créer l’invitation</button></div>`);
 }
