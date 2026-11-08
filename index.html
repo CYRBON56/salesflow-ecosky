@@ -124,7 +124,8 @@ audio{width:100%;max-width:280px;height:40px;margin-top:4px}
 .doc{display:flex;gap:12px;align-items:center}
 .dicon{width:42px;height:48px;border-radius:8px;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;font-size:10.5px;font-weight:800;flex:none;text-transform:uppercase}
 .person{display:flex;align-items:center;gap:12px}
-.lv{border-radius:12px;display:grid;place-items:center;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+.lv img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.lv{position:relative;overflow:hidden;border-radius:12px;display:grid;place-items:center;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
 .lgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .lcell{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 6px;text-align:center;display:flex;flex-direction:column;align-items:center}
 .chip svg,.pill svg{flex:none}
@@ -237,33 +238,36 @@ const LST = {'terminé':'p-ok','en cours':'p-blue','à venir':'p-mute'};
 const PAL = ['#8D6E63','#2C5D8F','#C98A00','#7E57C2','#2F8F5B','#D84E7A','#00838F','#6D4C41','#5C6BC0','#AD1457','#558B2F','#EF6C00'];
 /* Vignette illustrée par corps de métier : [mots-clés, couleur, pictogramme] */
 const METIERS = [
-  [['terrass','excav'], '#8D6E63', '<path d="M2 19h13"/><rect x="3" y="12" width="9" height="4" rx="1"/><path d="M6 12V9h4l2 3"/><path d="M12 13l5-6 4 3"/><path d="M21 10l-1 4h-3"/>'],
-  [['vrd','voirie','enrob','assain','anc'], '#546E7A', '<path d="M5 21L9 3M19 21L15 3M12 5v3M12 11v3M12 17v3"/>'],
-  [['macon','gros oeuvre','beton'], '#B5651D', '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 10h18M3 14.5h18M9 5v5M15 10v4.5M9 14.5V19"/>'],
-  [['charp','ossature'], '#6D4C41', '<path d="M2 18L12 5l10 13H2z"/><path d="M12 5v13M7 18l5-6 5 6"/>'],
-  [['couv','toit','zinc'], '#C0392B', '<path d="M3 11l9-7 9 7"/><path d="M5 10v9h14v-9"/><path d="M5 14h14M9 10v4M15 10v4"/>'],
-  [['menuis','fenet','porte','portail'], '#2F8F5B', '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M12 3v18M4 12h16"/>'],
-  [['plomb','sanit'], '#2C5D8F', '<path d="M3 8h8a4 4 0 0 1 4 4v2"/><path d="M6 5h4M8 5v3"/><path d="M15 18.5c0 1.1-.9 2-2 2s-2-.9-2-2c0-1.5 2-4 2-4s2 2.5 2 4z"/>'],
-  [['electr','courant'], '#E0A800', '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'],
-  [['chauff','pac','pompe','poele'], '#E8590C', '<path d="M12 22c4 0 7-3 7-7 0-5-5-7-5-12-3 2-5 5-4 9-2-1-3-3-3-3-1 2-2 4-2 6 0 4 3 7 7 7z"/>'],
-  [['clim','ventil','vmc'], '#00838F', '<path d="M12 2v20M4 6l16 12M20 6L4 18"/>'],
-  [['platr','placo','plaqu','cloison'], '#7E57C2', '<path d="M3 4h10v16H3z"/><path d="M14 14l6-6 1.5 1.5-6 6z"/><path d="M13 15l2 2"/>'],
-  [['isol'], '#D84E7A', '<path d="M3 6c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0M3 18c3-2 6 2 9 0s6-2 9 0"/>'],
-  [['carrel','faience'], '#00897B', '<rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/>'],
-  [['sol','resin','parquet','chape'], '#5C6BC0', '<path d="M3 20h18"/><path d="M6 16h12v-3H6z"/><path d="M12 13V4"/>'],
-  [['peint','facade','enduit'], '#AD1457', '<rect x="3" y="3" width="15" height="6" rx="1"/><path d="M18 6h3v5h-9v3"/><rect x="10" y="14" width="4" height="7" rx="1"/>'],
-  [['cuisin','agenc'], '#795548', '<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="9" cy="8" r="2"/><circle cx="15" cy="8" r="2"/><path d="M4 13h16"/>'],
-  [['paysag','jardin','espaces verts','clotur'], '#558B2F', '<path d="M12 22v-6"/><path d="M12 2a6 6 0 0 0-6 6c0 4 3 6 6 8 3-2 6-4 6-8a6 6 0 0 0-6-6z"/>']
+  [['terrass','excav'], '#8D6E63', '<path d="M2 19h13"/><rect x="3" y="12" width="9" height="4" rx="1"/><path d="M6 12V9h4l2 3"/><path d="M12 13l5-6 4 3"/><path d="M21 10l-1 4h-3"/>', 'zcyh3BmFPzzghqnCHNOyL/3pfIphbSVAsYRCZea5c4l.jpg'],
+  [['vrd','voirie','enrob','assain','anc'], '#546E7A', '<path d="M5 21L9 3M19 21L15 3M12 5v3M12 11v3M12 17v3"/>', '4ZsLcz6Rsh058moDIcbF7/2r-mY0zq-QTYRAuoyP3WL.jpg'],
+  [['macon','gros oeuvre','beton'], '#B5651D', '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 10h18M3 14.5h18M9 5v5M15 10v4.5M9 14.5V19"/>', 'zpoRyWJhmXbjfI2xy1yu4/ZEINRF5gy2I6T97iAFPr-.jpg'],
+  [['charp','ossature'], '#6D4C41', '<path d="M2 18L12 5l10 13H2z"/><path d="M12 5v13M7 18l5-6 5 6"/>', 'TOc8hfp7GbfbWflQsrbei/dGRYU1QgVpmJ2dJ-frs6L.jpg'],
+  [['couv','toit','zinc'], '#C0392B', '<path d="M3 11l9-7 9 7"/><path d="M5 10v9h14v-9"/><path d="M5 14h14M9 10v4M15 10v4"/>', '3ukxuvM4tEpUWPVxuy77d/3XR5pzJ7mpDWd2c0e6alL.jpg'],
+  [['menuis','fenet','porte','portail'], '#2F8F5B', '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M12 3v18M4 12h16"/>', 'IhQpHb2RePTcovCG6oUX8/pIDcycRZYtCmZqA8aTjKM.jpg'],
+  [['plomb','sanit'], '#2C5D8F', '<path d="M3 8h8a4 4 0 0 1 4 4v2"/><path d="M6 5h4M8 5v3"/><path d="M15 18.5c0 1.1-.9 2-2 2s-2-.9-2-2c0-1.5 2-4 2-4s2 2.5 2 4z"/>', 'B7q8TRmNpzxuW8GoCkPYM/cue-MbHXpHEPMwJnQaEKc.jpg'],
+  [['electr','courant'], '#E0A800', '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>', 'itnFbZfp8LZg4mT27FfSY/GmVOxEZJ3SsAnO-IShGZZ.jpg'],
+  [['chauff','pac','pompe','poele'], '#E8590C', '<path d="M12 22c4 0 7-3 7-7 0-5-5-7-5-12-3 2-5 5-4 9-2-1-3-3-3-3-1 2-2 4-2 6 0 4 3 7 7 7z"/>', 'XFVDF1TLoOUqO4hFUV9lL/ZgU6HwWVVjWaHOFkfighc.jpg'],
+  [['clim','ventil','vmc'], '#00838F', '<path d="M12 2v20M4 6l16 12M20 6L4 18"/>', 'UPeelO532duUEjizQJoGS/2MZEVlajBXD3GAZllHq5d.jpg'],
+  [['platr','placo','plaqu','cloison'], '#7E57C2', '<path d="M3 4h10v16H3z"/><path d="M14 14l6-6 1.5 1.5-6 6z"/><path d="M13 15l2 2"/>', '5ig8LQxDx0QrqWQKf40rw/C-yBAJxpJ9IPAZi0o2GPh.jpg'],
+  [['isol'], '#D84E7A', '<path d="M3 6c3-2 6 2 9 0s6-2 9 0M3 12c3-2 6 2 9 0s6-2 9 0M3 18c3-2 6 2 9 0s6-2 9 0"/>', 'vc0yKvrUoHaUHsazKgMOX/nAGwA7cUPldM75cP6UE-B.jpg'],
+  [['carrel','faience'], '#00897B', '<rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/>', 'UpglFMOrI8vX4lUsBfE57/jB1yRRQ-dJsh2aJemZXZW.jpg'],
+  [['sol','resin','parquet','chape'], '#5C6BC0', '<path d="M3 20h18"/><path d="M6 16h12v-3H6z"/><path d="M12 13V4"/>', '4oJ0dLrNUpjjSDieAVpWf/RhLfeTH8ghePwNPIVeqF4.jpg'],
+  [['peint','facade','enduit'], '#AD1457', '<rect x="3" y="3" width="15" height="6" rx="1"/><path d="M18 6h3v5h-9v3"/><rect x="10" y="14" width="4" height="7" rx="1"/>', 'Eucr6iUmCiJbnhuHEZ2c4/vmBVx9mzxOKzOK-YFY3R-.jpg'],
+  [['cuisin','agenc'], '#795548', '<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="9" cy="8" r="2"/><circle cx="15" cy="8" r="2"/><path d="M4 13h16"/>', 'D43RjmTDvTyM1yI5jDf8u/kUf-1LEkzmwTuO3ObqYi9.jpg'],
+  [['paysag','jardin','espaces verts','clotur'], '#558B2F', '<path d="M12 22v-6"/><path d="M12 2a6 6 0 0 0-6 6c0 4 3 6 6 8 3-2 6-4 6-8a6 6 0 0 0-6-6z"/>', 'FLPfSiivasVegbStKatOo/k-Xd-oXQQ-gj8DEtQh8xq.jpg']
 ];
-const ICO_AUTRE = ['#6B7178','<path d="M15 4l5 5-3 3-5-5z"/><path d="M12 7L3 16l3 3 9-9"/>'];
-const ICO_MOE = ['#1E2328','<path d="M3 18h18"/><path d="M5 18v-3a7 7 0 0 1 14 0v3"/><path d="M10 8V5h4v3"/>'];
-const ICO_CLIENT = ['#2C5D8F','<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>'];
+const ICO_AUTRE = ['#6B7178',null,'<path d="M15 4l5 5-3 3-5-5z"/><path d="M12 7L3 16l3 3 9-9"/>'];
+const ICO_MOE = ['#1E2328','6Quk23MECf7VY2f6X2Z27/JhrgJUx9ShSstMmuHIQsm.jpg','<path d="M3 18h18"/><path d="M5 18v-3a7 7 0 0 1 14 0v3"/><path d="M10 8V5h4v3"/>'];
+const ICO_CLIENT = ['#2C5D8F','bweUxHvc8PfFzctXXiBlt/wcCgaQVkLcG8eqBYx7CfS.jpg','<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>'];
 const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-function metier(lot){ const n = norm(lot); const m = METIERS.find(([k])=>k.some(w=>n.includes(w))); return m ? [m[1], m[2]] : ICO_AUTRE; }
+function metier(lot){ const n = norm(lot); const m = METIERS.find(([k])=>k.some(w=>n.includes(w))); return m ? [m[1], m[2], m[3]] : [ICO_AUTRE[0], ICO_AUTRE[2], null]; }
+const GAMMA = 'https://cdn.gamma.app/dmvjr62s5cif6ew/design-anything/';
+const photoUrl = (p, w) => p ? `/_vercel/image?url=${encodeURIComponent(GAMMA+p)}&w=${w}&q=70` : null;
 const colorOf = s => metier(s)[0];
 function vignette(lot, size, kind){
-  const [c, ico] = kind==='moe' ? ICO_MOE : kind==='client' ? ICO_CLIENT : metier(lot); const s = size||40;
-  return `<div class="lv" style="width:${s}px;height:${s}px;background:${c}" title="${esc(lot||'')}"><svg width="${Math.round(s*0.56)}" height="${Math.round(s*0.56)}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ico}</svg></div>`;
+  const [c, ico, ph] = kind==='moe' ? [ICO_MOE[0],ICO_MOE[2],ICO_MOE[1]] : kind==='client' ? [ICO_CLIENT[0],ICO_CLIENT[2],ICO_CLIENT[1]] : metier(lot); const s = size||40;
+  const src = photoUrl(ph, s>64 ? 384 : s>30 ? 256 : 128);
+  return `<div class="lv" style="width:${s}px;height:${s}px;background:${c}" title="${esc(lot||'')}"><svg width="${Math.round(s*0.56)}" height="${Math.round(s*0.56)}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ico}</svg>${src?`<img src="${src}" alt="" loading="lazy" onerror="this.remove()">`:''}</div>`;
 }
 const miniIco = l => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${metier(l)[1]}</svg>`;
 const lotPill = l => l ? `<span class="pill" style="background:${colorOf(l)}1F;color:${colorOf(l)}">${miniIco(l)}${esc(l)}</span>` : '';
@@ -373,6 +377,8 @@ function homeView(){
     <div><b>🆓 Artisans gratuits</b>Un lien par SMS, sans compte ni mot de passe.</div>
     <div><b>📄 Compte rendu</b>Généré en un clic, prêt à imprimer en PDF.</div>
   </div>
+  <h2>Tous les corps de métier réunis</h2>
+  <div class="lgrid">${['Terrassement','Maçonnerie','Charpente','Couverture','Menuiserie','Plomberie','Électricité','Chauffage','Plâtrerie','Isolation','Carrelage','Sols / Résine','Peinture','Cuisine','Paysagiste'].map(l=>`<div class="lcell" style="padding:8px 6px">${vignette(l,84)}<div class="ptitle" style="font-size:12.5px;margin-top:6px">${l}</div></div>`).join('')}</div>
   ${liens.length?`<h2>Vos chantiers sur ce téléphone</h2>${liens.map(l=>`<a class="card tap row between" style="text-decoration:none" href="#/c/${l.token}"><div><div class="ptitle">${esc(l.nom)}</div><div class="meta">${l.role==='moe'?'Pilote':l.role==='client'?'Client':'Intervenant'} · ouvert ${ago(l.d)}</div></div><span style="font-size:22px;color:var(--mute)">›</span></a>`).join('')}`:''}
   <div class="btns" style="margin-top:22px"><a class="btn pri" href="#/connexion/inscription">Créer mon espace pilote</a><a class="btn" href="#/connexion">J’ai déjà un compte</a></div>
   <p class="note" style="text-align:center">Vous êtes artisan et avez reçu un lien ? Ouvrez-le simplement : aucun compte n’est nécessaire.</p>
