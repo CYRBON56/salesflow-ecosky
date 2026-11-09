@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoSky'Gum - Résine EPDM</title>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-17738090056"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'AW-17738090056');
+</script>
+<style>
+  :root {
+    --blue: #1a5f9e;
+    --blue-dark: #0d3d66;
+    --green: #4caf50;
+    --bg: #f5f8fb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #222;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+  }
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-image:
+      linear-gradient(180deg, rgba(13,61,102,0.65) 0%, rgba(13,61,102,0.55) 45%, rgba(245,248,251,0.97) 85%),
+      url('https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/8.JPG');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+  header {
+    padding: 32px 20px 20px;
+    text-align: center;
+    color: white;
+  }
+  header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  header p {
+    margin-top: 8px;
+    font-size: 0.95rem;
+    opacity: 0.9;
+  }
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 28px 20px 60px;
+    gap: 18px;
+    max-width: 480px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .intro {
+    text-align: center;
+    font-size: 1rem;
+    color: white;
+    margin: 4px 0 8px;
+    font-weight: 500;
+  }
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 18px 20px;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-decoration: none;
+    text-align: center;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: var(--green);
+    color: white;
+  }
+  .btn-secondary {
+    background: white;
+    color: var(--blue-dark);
+    border: 2px solid var(--blue);
+  }
+  .btn-icon { font-size: 1.3rem; }
+  .trust {
+    margin-top: 20px;
+    font-size: 0.85rem;
+    color: #666;
+    text-align: center;
+    line-height: 1.6;
+  }
+  .trust strong { color: var(--blue-dark); }
+  footer {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #999;
+    padding: 16px 20px 24px;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+<header>
+  <h1>Résine EPDM EcoSky'Gum</h1>
+  <p>Terrasses, tours de piscine, allées — sans joint, antidérapant</p>
+</header>
+
+<main>
+  <p class="intro">Que souhaitez-vous faire ?</p>
+
+  <button type="button" class="btn btn-primary" onclick="openModal()">
+    <span class="btn-icon">📐</span> Recevoir mon estimation
+  </button>
+
+  <a href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf" class="btn btn-secondary" target="_blank" rel="noopener" onclick="notifyCatalogueDownload()">
+    <span class="btn-icon">📄</span> Télécharger le catalogue
+  </a>
+
+  <div class="trust">
+    <strong>Sans engagement</strong> · Réponse sous 24h · Données confidentielles
+  </div>
+</main>
+</div>
+
+<footer>
+  RMS EcoSky — SASU au capital de 50 000€ — 23 Route de Corn Er Hoet, 56400 Brech — SIRET 939 997 870 00018
+</footer>
+
+<div id="modal-overlay" class="modal-overlay" onclick="if(event.target===this) closeModal()">
+  <div class="modal-box">
+    <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
+    <h2>Vos coordonnées</h2>
+    <p class="modal-sub">Pour préparer votre estimation, dites-nous qui vous êtes :</p>
+    <form id="prefill-form" onsubmit="goToEstimation(event)">
+      <input type="text" id="prenom" placeholder="Prénom" required>
+      <input type="text" id="nom" placeholder="Nom" required>
+      <input type="tel" id="telephone" placeholder="Téléphone" required>
+      <input type="email" id="email" placeholder="Email" required>
+      <button type="submit" class="btn btn-primary" style="margin-top:8px;">Continuer</button>
+    </form>
+  </div>
+</div>
+
+<style>
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: white;
+    border-radius: 16px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 380px;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+  .modal-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: none;
+    border: none;
+    font-size: 1.6rem;
+    color: #999;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .modal-box h2 {
+    font-size: 1.2rem;
+    color: var(--blue-dark);
+    margin-bottom: 6px;
+  }
+  .modal-sub {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 18px;
+  }
+  #prefill-form input {
+    width: 100%;
+    padding: 13px 14px;
+    margin-bottom: 12px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    font-size: 1rem;
+  }
+  #prefill-form input:focus {
+    outline: none;
+    border-color: var(--blue);
+  }
+</style>
+
+<script>
+  function notifyCatalogueDownload() {
+    try {
+      var qs = new URLSearchParams(window.location.search);
+      var source = qs.get('fbclid') ? 'Meta' : (qs.get('gclid') ? 'Google Ads' : (qs.get('utm_source') || null));
+      fetch('https://salesflow-ecosky.vercel.app/api/sms-catalogue-download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: source,
+          utm_campaign: qs.get('utm_campaign')
+        })
+      }).catch(function (err) {
+        console.error('sms-catalogue-download error:', err);
+      });
+    } catch (err) {
+      console.error('notifyCatalogueDownload error:', err);
+    }
+  }
+
+  function openModal() {
+    document.getElementById('modal-overlay').classList.add('open');
+  }
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+  function goToEstimation(e) {
+    e.preventDefault();
+    var prenom = document.getElementById('prenom').value.trim();
+    var nom = document.getElementById('nom').value.trim();
+    var telephone = document.getElementById('telephone').value.trim();
+    var email = document.getElementById('email').value.trim();
+    var params = new URLSearchParams({
+      full_name: prenom + ' ' + nom,
+      phone_number: telephone,
+      email: email
+    });
+    window.open('https://salesflow-ecosky.vercel.app/estimation.html?' + params.toString(), '_blank');
+    closeModal();
+  }
+
+  // Enregistre l'arrivée sur cette page (et envoie un SMS si ça vient d'une pub Meta ou Google Ads)
+  // Protégé par sessionStorage pour éviter un double envoi si la page se
+  // recharge ou est préchargée deux fois par le navigateur (ex: prerendering Chrome).
+  (function trackLandingClick() {
+    try {
+      var qs = new URLSearchParams(window.location.search);
+      var dedupeKey = qs.get('fbclid') || qs.get('gclid') || qs.get('ad_id') || 'generic';
+      var alreadyTracked = null;
+      try { alreadyTracked = sessionStorage.getItem('ecosky_pub_click_tracked_key'); } catch (e) {}
+      if (alreadyTracked === dedupeKey) return;
+      try { sessionStorage.setItem('ecosky_pub_click_tracked_key', dedupeKey); } catch (e) {}
+
+      var sessionId = 'pub_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+
+      fetch('https://salesflow-ecosky.vercel.app/api/track-click', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          fbclid: qs.get('fbclid'),
+          gclid: qs.get('gclid'),
+          ad_id: qs.get('ad_id'),
+          utm_source: qs.get('utm_source'),
+          utm_campaign: qs.get('utm_campaign'),
+          utm_medium: qs.get('utm_medium'),
+          landing_page: window.location.href,
+          referrer: document.referrer || null
+        })
+      }).catch(function (err) {
+        console.error('track-click error:', err);
+      });
+    } catch (err) {
+      console.error('trackLandingClick error:', err);
+    }
+  })();
+</script>
+
+</body>
+</html>

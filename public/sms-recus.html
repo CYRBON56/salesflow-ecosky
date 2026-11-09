@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMS &amp; demandes reçues — SalesFlow System</title>
+<style>
+  :root {
+    --vert: #14312a;
+    --vert-clair: #1e6f4c;
+    --bg: #f5f8f6;
+    --bordure: #e2e8e5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    background: var(--bg);
+    color: var(--vert);
+  }
+  header {
+    background: var(--vert);
+    color: white;
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 { font-size: 1.3rem; margin: 0; font-weight: 700; }
+  header .sous-titre { font-size: 0.85rem; opacity: 0.8; margin-top: 4px; }
+  .controles {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  select, button {
+    font-family: inherit;
+    font-size: 0.85rem;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--bordure);
+    background: white;
+    color: var(--vert);
+    cursor: pointer;
+  }
+  button.principal, a.principal {
+    background: var(--vert-clair);
+    color: white;
+    border: none;
+    font-weight: 600;
+  }
+  a.principal {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+  }
+  a.secondaire {
+    background: transparent;
+    color: white;
+    border: 1px solid rgba(255,255,255,0.5);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    font-weight: 600;
+  }
+  .onglets {
+    display: flex;
+    gap: 4px;
+    padding: 0 28px;
+    background: white;
+    border-bottom: 1px solid var(--bordure);
+  }
+  .onglet {
+    padding: 14px 18px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #7a8983;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+  }
+  .onglet.actif {
+    color: var(--vert);
+    border-bottom-color: var(--vert-clair);
+  }
+  main { padding: 20px 28px 60px; max-width: 1300px; margin: 0 auto; }
+  .vue { display: none; }
+  .vue.actif { display: block; }
+  .stats {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .stat-carte {
+    background: white;
+    border: 1px solid var(--bordure);
+    border-radius: 12px;
+    padding: 14px 18px;
+    min-width: 140px;
+  }
+  .stat-carte .valeur { font-size: 1.5rem; font-weight: 700; }
+  .stat-carte .libelle { font-size: 0.78rem; color: #5a6b64; margin-top: 2px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(20,49,42,0.08);
+  }
+  thead { background: #eef4f1; }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--bordure);
+    white-space: nowrap;
+  }
+  th { font-weight: 700; color: var(--vert); }
+  tbody tr:hover { background: #f8fbfa; }
+  tbody tr.groupe-alterne { background: #fbfaf5; }
+  tbody tr.groupe-alterne:hover { background: #f5f2e8; }
+  .badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+  .badge-ok { background: #e3f5e9; color: #1e6f4c; }
+  .badge-ko { background: #fbe6e6; color: #b3261e; }
+  .badge-type, .badge-statut { background: #eef4f1; color: var(--vert); font-weight: 600; }
+  .badge-nouveau { background: #e8f0fb; color: #1a4d8f; }
+  .badge-contacte { background: #fff4e0; color: #9a6a00; }
+  .msg-col {
+    max-width: 300px;
+    white-space: normal;
+    font-size: 0.78rem;
+    color: #4a5a54;
+  }
+  .checkbox-col { width: 30px; }
+  .btn-suppr {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+  .btn-suppr:hover { background: #fbe6e6; }
+  .barre-selection {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: #14312a;
+    color: white;
+    padding: 10px 16px;
+    border-radius: 10px;
+    margin-bottom: 14px;
+    font-size: 0.85rem;
+  }
+  .barre-selection.visible { display: flex; }
+  .barre-selection button {
+    background: #b3261e;
+    color: white;
+    border: none;
+    font-weight: 600;
+  }
+  .btn-relance {
+    background: var(--vert-clair);
+    color: white;
+    border: none;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-relance:disabled { opacity: 0.6; cursor: default; }
+  .btn-rdv {
+    display: inline-block;
+    background: #1e6f4c;
+    color: white;
+    border: none;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    white-space: nowrap;
+    margin-left: 4px;
+  }
+  .btn-rdv:disabled { opacity: 0.6; cursor: default; }
+  .btn-photos {
+    display: inline-block;
+    background: #1e6f4c;
+    color: white;
+    border: none;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    white-space: nowrap;
+    margin-left: 4px;
+  }
+  .btn-photos:disabled { opacity: 0.6; cursor: default; }
+  .btn-devis {
+    display: inline-block;
+    background: #0f5c56;
+    color: white;
+    border: none;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    white-space: nowrap;
+    margin-left: 4px;
+  }
+  .btn-devis:disabled { opacity: 0.6; cursor: default; }
+  .btn-lien {
+    display: inline-block;
+    background: white;
+    color: var(--vert);
+    border: 1px solid var(--bordure);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 7px;
+    text-decoration: none;
+    white-space: nowrap;
+    margin-left: 4px;
+  }
+  .btn-lien:hover { background: #eef4f1; }
+  .btn-lien-desactive {
+    display: inline-block;
+    background: #f5f5f3;
+    color: #b5bdb8;
+    border: 1px solid var(--bordure);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 7px;
+    white-space: nowrap;
+    margin-left: 4px;
+    cursor: default;
+  }
+  .btn-suppr-lead {
+    background: white;
+    border: 1px solid var(--bordure);
+    border-radius: 7px;
+    padding: 6px 9px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin-left: 4px;
+  }
+  .btn-suppr-lead:hover { background: #fdeaea; border-color: #e5a3a3; }
+  td.editable {
+    cursor: text;
+    border-radius: 5px;
+    outline: none;
+  }
+  td.editable:hover { background: #eef4f1; }
+  td.editable:focus { background: #fff; box-shadow: 0 0 0 2px var(--vert-clair); white-space: normal; }
+  td.editable.sauvegarde-ok { background: #e3f5e9 !important; transition: background 0.4s; }
+  td.editable.sauvegarde-erreur { background: #fbe6e6 !important; transition: background 0.4s; }
+  .vide { padding: 40px; text-align: center; color: #7a8983; }
+  .chargement { padding: 40px; text-align: center; color: #7a8983; }
+
+  /* ---- Modale envoi de devis ---- */
+  .overlay-modale {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 49, 42, 0.45);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  .overlay-modale.visible { display: flex; }
+  .modale {
+    background: white;
+    border-radius: 14px;
+    padding: 24px;
+    width: 100%;
+    max-width: 440px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .modale h2 {
+    font-size: 1.1rem;
+    margin: 0 0 4px;
+    color: var(--vert);
+  }
+  .modale .client-modale {
+    font-size: 0.82rem;
+    color: #5a6b64;
+    margin-bottom: 16px;
+  }
+  .modale label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--vert);
+    margin-bottom: 4px;
+    margin-top: 12px;
+  }
+  .modale input[type="text"],
+  .modale input[type="number"],
+  .modale input[type="file"] {
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--bordure);
+    font-size: 0.85rem;
+    font-family: inherit;
+  }
+  .modale-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+  .modale-actions button {
+    font-size: 0.82rem;
+  }
+  .btn-annuler-modale {
+    background: white;
+    border: 1px solid var(--bordure);
+    color: var(--vert);
+  }
+  .btn-charger-devis {
+    background: var(--vert-clair);
+    color: white;
+    border: none;
+    font-weight: 600;
+  }
+  .btn-charger-devis:disabled { opacity: 0.6; cursor: default; }
+  .zone-envoi-devis {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--bordure);
+    display: none;
+  }
+  .zone-envoi-devis.visible { display: block; }
+  .zone-envoi-devis .lien-pdf {
+    font-size: 0.82rem;
+    margin-bottom: 10px;
+  }
+  .boutons-envoi-devis {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .boutons-envoi-devis button {
+    background: #0f5c56;
+    color: white;
+    border: none;
+    font-weight: 600;
+    font-size: 0.8rem;
+  }
+  .boutons-envoi-devis button:disabled { opacity: 0.6; cursor: default; }
+  .statut-envoi-devis {
+    margin-top: 12px;
+    font-size: 0.82rem;
+  }
+  .statut-envoi-devis.ok { color: #1e6f4c; }
+  .statut-envoi-devis.erreur { color: #b3261e; }
+  .liste-devis-existants {
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--bordure);
+    padding-bottom: 14px;
+  }
+  .liste-devis-existants .titre-liste {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--vert);
+    margin-bottom: 8px;
+  }
+  .item-devis-existant {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--bordure);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    font-size: 0.8rem;
+  }
+  .item-devis-existant .infos-devis-existant { min-width: 0; }
+  .item-devis-existant .infos-devis-existant a { color: var(--vert); font-weight: 600; }
+  .item-devis-existant .statuts-devis-existant {
+    font-size: 0.72rem;
+    color: #5a6b64;
+    margin-top: 2px;
+  }
+  .item-devis-existant .btn-reutiliser-devis {
+    background: #eef4f1;
+    border: none;
+    color: var(--vert);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 5px 9px;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 id="titrePage">📩 SMS reçus</h1>
+    <div class="sous-titre" id="sousTitrePage">Historique des notifications SMS envoyées automatiquement</div>
+  </div>
+  <div class="controles">
+    <span id="compteurClicsPub" style="color:white; font-size:0.85rem; font-weight:600; padding:8px 12px; border:1px solid rgba(255,255,255,0.35); border-radius:8px;">🖱️ …</span>
+    <select id="filtreType"></select>
+    <a href="/devis-manuel.html" target="_blank" rel="noopener" class="secondaire" style="padding:8px 12px;border-radius:8px;font-size:0.85rem;">➕ Devis (client hors base)</a>
+    <button class="principal" id="btnActualiser">🔄 Actualiser</button>
+  </div>
+</header>
+
+<div class="onglets">
+  <div class="onglet actif" data-onglet="sms">SMS reçus</div>
+  <div class="onglet" data-onglet="leads">Demandes d'estimation</div>
+  <div class="onglet" data-onglet="tous-devis">📄 Tous les devis</div>
+  <div class="onglet" data-onglet="devis-signes">✅ Devis signés</div>
+</div>
+
+<main>
+  <div class="barre-selection" id="barreSelection">
+    <span id="texteSelection">0 sélectionné(s)</span>
+    <button id="btnSupprimerSelection">🗑️ Supprimer la sélection</button>
+    <button id="btnAnnulerSelection" style="background:transparent; border:1px solid white;">Annuler</button>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div id="conteneurTableau">
+    <div class="chargement">Chargement…</div>
+  </div>
+</main>
+
+<!-- Modale d'envoi de devis manuel -->
+<div class="overlay-modale" id="overlayDevis">
+  <div class="modale">
+    <h2>Envoyer un devis ou une facture</h2>
+    <div class="client-modale" id="clientModaleDevis">—</div>
+
+    <div id="devisExistants"></div>
+
+    <div id="etapeChargementDevis">
+      <label for="typeDocument">Type de document</label>
+      <select id="typeDocument" style="width:100%; padding:9px 10px; border-radius:8px; border:1px solid var(--bordure); font-size:0.85rem; margin-bottom:10px;">
+        <option value="devis">📄 Devis (avec lien de signature)</option>
+        <option value="facture">🧾 Facture (avec lien de paiement)</option>
+      </select>
+      <label for="fichierDevis">Fichier PDF</label>
+      <input type="file" id="fichierDevis" accept="application/pdf">
+
+      <div class="modale-actions">
+        <button class="btn-annuler-modale" id="btnFermerModaleDevis">Annuler</button>
+        <button class="btn-charger-devis" id="btnChargerDevis">Charger le devis</button>
+      </div>
+    </div>
+
+    <div class="zone-envoi-devis" id="zoneEnvoiDevis">
+      <div class="lien-pdf">Devis chargé : <a id="lienPdfDevisCharge" href="#" target="_blank" rel="noopener">voir le PDF</a></div>
+      <label for="messageDevis">Message (généré automatiquement, modifiable)</label>
+      <textarea id="messageDevis" rows="4" style="width:100%; padding:9px 10px; border-radius:8px; border:1px solid var(--bordure); font-size:0.85rem; font-family:inherit; resize:vertical;"></textarea>
+      <label style="display:flex; align-items:center; gap:8px; font-weight:500; margin-top:10px;">
+        <input type="checkbox" id="inclureRibDevis" style="width:auto;">
+        Joindre le RIB
+      </label>
+      <label for="lienPaiementDevis" style="margin-top:10px;">Lien de paiement par carte (optionnel, ex : lien Qonto)</label>
+      <input type="url" id="lienPaiementDevis" placeholder="https://pay.qonto.com/…" style="width:100%; padding:9px 10px; border-radius:8px; border:1px solid var(--bordure); font-size:0.85rem;">
+      <div class="boutons-envoi-devis" style="margin-top:12px;">
+        <button id="btnEnvoyerDevisEmail">✉️ Envoyer par email</button>
+        <button id="btnEnvoyerDevisSms">📲 Envoyer par SMS</button>
+        <button id="btnEnvoyerDevisLesDeux">Envoyer les deux</button>
+      </div>
+      <div class="modale-actions">
+        <button class="btn-annuler-modale" id="btnChargerAutreDevis">Charger un autre devis</button>
+        <button class="btn-annuler-modale" id="btnFermerModaleDevisFin">Fermer</button>
+      </div>
+    </div>
+
+    <div class="statut-envoi-devis" id="statutEnvoiDevis"></div>
+  </div>
+</div>
+
+<script>
+  const API_SMS = "/api/sms-recus";
+  const API_LEADS = "/api/leads-recus";
+  const API_UPLOAD_DEVIS = "/api/upload-devis";
+  const API_SEND_DEVIS = "/api/send-devis";
+  const API_DEVIS_LEAD = "/api/devis-lead";
+  const API_DEVIS_SIGNES = "/api/devis-signes";
+  const API_CLICS_PUB = "/api/clics-pub";
+
+  const LIBELLES_TYPE_SMS = {
+    arrivee_pub: "Arrivée pub",
+    catalogue_telecharge: "Catalogue téléchargé",
+    clic_devis: "Clic devis",
+    etude_anc_uploadee: "Étude ANC",
+    demande_rappel: "Demande de rappel",
+    nouveau_clic: "Nouveau clic",
+    relance_formulaire_incomplet: "Relance formulaire",
+  };
+
+  const LIBELLES_STATUT_LEAD = {
+    nouveau: "Nouveau",
+    "contacté": "Contacté",
+    "en cours": "En cours",
+    gagné: "Gagné",
+    perdu: "Perdu",
+  };
+
+  let ongletActif = "sms";
+  let toutesLignesSms = [];
+  let toutesLignesLeads = [];
+  let toutesLignesDevisSignes = [];
+  let selectionSms = new Set();
+
+  function formatDate(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleString("fr-FR", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  }
+
+  function formatMontant(m) {
+    if (m === null || m === undefined || m === "") return "—";
+    const n = Number(m);
+    if (Number.isNaN(n)) return "—";
+    return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+  }
+
+  function echapper(s) {
+    return (s || "").toString().replace(/</g, "&lt;");
+  }
+
+  // Extrait un identifiant de clic publicitaire (gclid, fbclid, ou "Ad ID")
+  // depuis le texte du message SMS, pour pouvoir regrouper les lignes qui
+  // viennent du même clic exact.
+  function extraireIdClic(messageBody) {
+    if (!messageBody) return null;
+    const matchGclid = messageBody.match(/gclid=([^&\s]+)/);
+    if (matchGclid) return matchGclid[1];
+    const matchFbclid = messageBody.match(/fbclid=([^&\s]+)/);
+    if (matchFbclid) return matchFbclid[1];
+    const matchAdId = messageBody.match(/Ad ID:\s*([^\n]+)/);
+    if (matchAdId) return matchAdId[1].trim();
+    return null;
+  }
+
+  // Regroupe les lignes partageant le même ID de clic (gclid/fbclid/Ad ID)
+  // côte à côte, chaque groupe restant trié du plus récent au plus ancien ;
+  // les lignes sans ID identifiable gardent leur ordre chronologique normal,
+  // mélangées à la suite des groupes.
+  function regrouperParIdClic(lignes) {
+    const groupes = new Map(); // id -> [lignes]
+    const sansId = [];
+    lignes.forEach(l => {
+      const id = extraireIdClic(l.message_body);
+      if (!id) { sansId.push(l); return; }
+      if (!groupes.has(id)) groupes.set(id, []);
+      groupes.get(id).push(l);
+    });
+    const groupesTries = Array.from(groupes.values()).sort(
+      (a, b) => new Date(b[0].created_at) - new Date(a[0].created_at)
+    );
+    const resultat = [];
+    groupesTries.forEach(groupe => {
+      groupe.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      resultat.push(...groupe);
+    });
+    resultat.push(...sansId);
+    return resultat;
+  }
+
+  function majBarreSelection() {
+    const barre = document.getElementById("barreSelection");
+    const texte = document.getElementById("texteSelection");
+    if (ongletActif !== "sms" || selectionSms.size === 0) {
+      barre.classList.remove("visible");
+      return;
+    }
+    barre.classList.add("visible");
+    texte.textContent = `${selectionSms.size} sélectionné(s)`;
+  }
+
+  async function supprimerSms(ids) {
+    if (!ids.length) return;
+    if (!confirm(`Supprimer ${ids.length} SMS ? Cette action est définitive.`)) return;
+    try {
+      const res = await fetch(`${API_SMS}?ids=${ids.join(",")}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      selectionSms.clear();
+      await chargerSms();
+    } catch (err) {
+      alert("Erreur lors de la suppression : " + err.message);
+    }
+  }
+
+  // ---------- Onglet SMS ----------
+
+  function renderStatsSms(lignes) {
+    const total = lignes.length;
+    const reussis = lignes.filter(l => l.twilio_success === true).length;
+    const echoues = lignes.filter(l => l.twilio_success === false).length;
+    document.getElementById("stats").innerHTML = `
+      <div class="stat-carte"><div class="valeur">${total}</div><div class="libelle">Total affiché</div></div>
+      <div class="stat-carte"><div class="valeur">${reussis}</div><div class="libelle">Envoyés avec succès</div></div>
+      <div class="stat-carte"><div class="valeur">${echoues}</div><div class="libelle">Échecs</div></div>
+    `;
+  }
+
+  function renderTableSms(lignes) {
+    const conteneur = document.getElementById("conteneurTableau");
+    if (!lignes.length) {
+      conteneur.innerHTML = `<div class="vide">Aucun SMS pour ce filtre.</div>`;
+      return;
+    }
+    const lignesTriees = regrouperParIdClic(lignes);
+
+    let dernierIdVu = undefined;
+    let alterne = false;
+    const lignesHtml = lignesTriees.map(l => {
+      const idClic = extraireIdClic(l.message_body);
+      if (idClic !== dernierIdVu) {
+        alterne = !alterne;
+        dernierIdVu = idClic;
+      }
+      const classeGroupe = idClic && alterne ? ' class="groupe-alterne"' : "";
+      return `
+      <tr${classeGroupe}>
+        <td class="checkbox-col"><input type="checkbox" class="case-sms" data-id="${l.id}" ${selectionSms.has(l.id) ? "checked" : ""}></td>
+        <td>${formatDate(l.created_at)}</td>
+        <td><span class="badge badge-type">${LIBELLES_TYPE_SMS[l.sms_type] || l.sms_type}</span></td>
+        <td>${echapper(l.source) || "—"}</td>
+        <td>${echapper(l.utm_campaign) || "—"}</td>
+        <td>${echapper([l.geo_city, l.geo_country].filter(Boolean).join(", ")) || "—"}</td>
+        <td>${l.twilio_success === true ? '<span class="badge badge-ok">Envoyé</span>' : l.twilio_success === false ? '<span class="badge badge-ko">Échec</span>' : "—"}</td>
+        <td class="msg-col">${echapper(l.message_body)}</td>
+        <td><button class="btn-suppr" data-id-suppr="${l.id}" title="Supprimer">🗑️</button></td>
+      </tr>
+    `;
+    }).join("");
+    conteneur.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th class="checkbox-col"><input type="checkbox" id="caseToutSms"></th>
+            <th>Date / heure</th>
+            <th>Type</th>
+            <th>Source / nom</th>
+            <th>Campagne / commune</th>
+            <th>Localisation</th>
+            <th>Statut</th>
+            <th>Message</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${lignesHtml}</tbody>
+      </table>
+    `;
+
+    document.querySelectorAll(".case-sms").forEach(cb => {
+      cb.addEventListener("change", () => {
+        const id = parseInt(cb.dataset.id, 10);
+        if (cb.checked) selectionSms.add(id); else selectionSms.delete(id);
+        majBarreSelection();
+      });
+    });
+    document.querySelectorAll(".btn-suppr").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = parseInt(btn.dataset.idSuppr, 10);
+        supprimerSms([id]);
+      });
+    });
+    const caseTout = document.getElementById("caseToutSms");
+    if (caseTout) {
+      caseTout.addEventListener("change", () => {
+        document.querySelectorAll(".case-sms").forEach(cb => {
+          cb.checked = caseTout.checked;
+          const id = parseInt(cb.dataset.id, 10);
+          if (caseTout.checked) selectionSms.add(id); else selectionSms.delete(id);
+        });
+        majBarreSelection();
+      });
+    }
+  }
+
+  function appliquerFiltreSms() {
+    const type = document.getElementById("filtreType").value;
+    const lignes = type ? toutesLignesSms.filter(l => l.sms_type === type) : toutesLignesSms;
+    renderStatsSms(lignes);
+    renderTableSms(lignes);
+    majBarreSelection();
+  }
+
+  async function chargerSms() {
+    document.getElementById("conteneurTableau").innerHTML = `<div class="chargement">Chargement…</div>`;
+    try {
+      const res = await fetch(API_SMS);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      toutesLignesSms = data.rows || [];
+      appliquerFiltreSms();
+    } catch (err) {
+      document.getElementById("conteneurTableau").innerHTML =
+        `<div class="vide">Erreur de chargement : ${err.message}</div>`;
+    }
+  }
+
+  // ---------- Onglet Demandes d'estimation ----------
+
+  function renderStatsLeads(lignes) {
+    const total = lignes.length;
+    const completes = lignes.filter(l => l.formulaire_complete === true).length;
+    const rappels = lignes.filter(l => l.callback_demande === true).length;
+    document.getElementById("stats").innerHTML = `
+      <div class="stat-carte"><div class="valeur">${total}</div><div class="libelle">Total affiché</div></div>
+      <div class="stat-carte"><div class="valeur">${completes}</div><div class="libelle">Formulaires complétés</div></div>
+      <div class="stat-carte"><div class="valeur">${rappels}</div><div class="libelle">Rappels demandés</div></div>
+    `;
+  }
+
+  function badgeStatut(statut) {
+    if (!statut) return "—";
+    const cls = statut === "nouveau" ? "badge-nouveau" : statut === "contacté" ? "badge-contacte" : "badge-statut";
+    return `<span class="badge ${cls}">${LIBELLES_STATUT_LEAD[statut] || statut}</span>`;
+  }
+
+  function renderTableLeads(lignes) {
+    const conteneur = document.getElementById("conteneurTableau");
+    if (!lignes.length) {
+      conteneur.innerHTML = `<div class="vide">Aucune demande pour ce filtre.</div>`;
+      return;
+    }
+    const lignesHtml = lignes.map(l => {
+      const nomComplet = [l.prenom, l.nom].filter(Boolean).join(" ") || "—";
+      const peutRelancer = l.formulaire_complete !== true && l.telephone;
+      const peutProposerRdv = l.formulaire_complete === true && l.telephone;
+      return `
+      <tr>
+        <td>${formatDate(l.created_at)}</td>
+        <td class="editable" data-lead-id="${l.id}" data-champ="nom" contenteditable="true" spellcheck="false">${echapper(l.nom) || ""}</td>
+        <td class="editable" data-lead-id="${l.id}" data-champ="telephone" contenteditable="true" spellcheck="false">${echapper(l.telephone) || ""}</td>
+        <td>${echapper(l.email) || "—"}</td>
+        <td>${echapper(l.type_projet) || "—"}</td>
+        <td class="editable" data-lead-id="${l.id}" data-champ="adresse_projet" contenteditable="true" spellcheck="false">${echapper(l.adresse_projet) || ""}</td>
+        <td>${echapper(l.source) || "—"}</td>
+        <td>${badgeStatut(l.statut)}</td>
+        <td>${l.formulaire_complete === true ? '<span class="badge badge-ok">Complet</span>' : '<span class="badge badge-ko">Incomplet</span>'}</td>
+        <td>${l.callback_demande === true ? "📞 Oui" : "—"}</td>
+        <td>
+          ${peutRelancer ? `<button class="btn-relance" data-lead-id="${l.id}">📲 Renvoyer SMS</button>` : ""}
+          ${peutProposerRdv ? `<button class="btn-rdv" data-lead-id="${l.id}">📅 Proposer RDV</button>` : ""}
+          ${l.telephone ? `<button class="btn-photos" data-lead-id="${l.id}">📍 Adresse & photos</button>` : ""}
+          ${l.estimation_pdf_url
+            ? `<a class="btn-lien" href="${l.estimation_pdf_url}" target="_blank" rel="noopener">📄 Devis PDF</a>`
+            : `<span class="btn-lien-desactive" title="Pas encore de PDF généré pour ce lead">📄 Devis PDF</span>`}
+          <a class="btn-lien" href="https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf" target="_blank" rel="noopener">📄 Catalogue</a>
+          <button class="btn-devis" data-lead-id="${l.id}" data-lead-nom="${echapper(nomComplet)}" data-lead-tel="${echapper(l.telephone)}" data-lead-email="${echapper(l.email)}">📄➕ Devis</button>
+          <button class="btn-suppr-lead" data-lead-id="${l.id}" title="Supprimer ce lead">🗑️</button>
+        </td>
+      </tr>
+    `;
+    }).join("");
+    conteneur.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Date / heure</th>
+            <th>Nom</th>
+            <th>Téléphone</th>
+            <th>Email</th>
+            <th>Projet</th>
+            <th>Adresse / CP</th>
+            <th>Source</th>
+            <th>Statut</th>
+            <th>Formulaire</th>
+            <th>Rappel</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>${lignesHtml}</tbody>
+      </table>
+    `;
+
+    document.querySelectorAll("td.editable").forEach(cell => {
+      cell.addEventListener("blur", () => sauvegarderChampLead(cell));
+      cell.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          cell.blur();
+        }
+      });
+    });
+    document.querySelectorAll(".btn-relance").forEach(btn => {
+      btn.addEventListener("click", () => relancerLead(btn));
+    });
+    document.querySelectorAll(".btn-rdv").forEach(btn => {
+      btn.addEventListener("click", () => proposerRdv(btn));
+    });
+    document.querySelectorAll(".btn-photos").forEach(btn => {
+      btn.addEventListener("click", () => demanderPhotos(btn));
+    });
+    document.querySelectorAll(".btn-suppr-lead").forEach(btn => {
+      btn.addEventListener("click", () => supprimerLead(btn));
+    });
+    document.querySelectorAll(".btn-devis").forEach(btn => {
+      btn.addEventListener("click", () => ouvrirModaleDevis(btn));
+    });
+  }
+
+  async function sauvegarderChampLead(cell) {
+    const leadId = cell.dataset.leadId;
+    const champ = cell.dataset.champ;
+    const nouvelleValeur = cell.textContent.trim();
+
+    const lead = toutesLignesLeads.find(l => String(l.id) === String(leadId));
+    const ancienneValeur = lead ? (lead[champ] || "") : "";
+    if (nouvelleValeur === ancienneValeur) return;
+
+    try {
+      const res = await fetch(API_LEADS, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: leadId, champ, valeur: nouvelleValeur }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      if (lead) lead[champ] = nouvelleValeur;
+      cell.classList.remove("sauvegarde-erreur");
+      cell.classList.add("sauvegarde-ok");
+      setTimeout(() => cell.classList.remove("sauvegarde-ok"), 800);
+    } catch (err) {
+      cell.classList.add("sauvegarde-erreur");
+      alert("Erreur lors de l'enregistrement : " + err.message);
+    }
+  }
+
+  async function proposerRdv(btn) {
+    const leadId = btn.dataset.leadId;
+    if (!confirm("Envoyer un SMS proposant un rendez-vous téléphonique à ce lead ?")) return;
+    btn.disabled = true;
+    btn.textContent = "Envoi…";
+    try {
+      const res = await fetch("/api/proposer-rdv-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead_id: leadId }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      btn.textContent = data.sent ? "✅ Envoyé" : "⚠️ Échec Twilio";
+    } catch (err) {
+      btn.textContent = "❌ Erreur";
+      alert("Erreur : " + err.message);
+      btn.disabled = false;
+    }
+  }
+
+  async function demanderPhotos(btn) {
+    const leadId = btn.dataset.leadId;
+    if (!confirm("Envoyer un SMS demandant l'adresse et des photos à ce lead ?")) return;
+    btn.disabled = true;
+    btn.textContent = "Envoi…";
+    try {
+      const res = await fetch("/api/request-photos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead_id: leadId }),
+      });
+      const data = await res.json();
+      if (data.success === false && data.error) throw new Error(data.error);
+      btn.textContent = data.success ? "✅ Envoyé" : "⚠️ Échec Twilio";
+    } catch (err) {
+      btn.textContent = "❌ Erreur";
+      alert("Erreur : " + err.message);
+      btn.disabled = false;
+    }
+  }
+
+  async function supprimerLead(btn) {
+    const leadId = btn.dataset.leadId;
+    if (!confirm("Supprimer définitivement ce lead ?")) return;
+    btn.disabled = true;
+    try {
+      const res = await fetch(`/api/leads-recus?id=${encodeURIComponent(leadId)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      chargerLeads();
+    } catch (err) {
+      alert("Erreur : " + err.message);
+      btn.disabled = false;
+    }
+  }
+
+  async function relancerLead(btn) {
+    const leadId = btn.dataset.leadId;
+    if (!confirm("Envoyer un SMS de relance à ce lead ?")) return;
+    btn.disabled = true;
+    btn.textContent = "Envoi…";
+    try {
+      const res = await fetch("/api/renvoyer-sms-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead_id: leadId }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      btn.textContent = data.sent ? "✅ Envoyé" : "⚠️ Échec Twilio";
+    } catch (err) {
+      btn.textContent = "❌ Erreur";
+      alert("Erreur : " + err.message);
+      btn.disabled = false;
+    }
+  }
+
+  // ---------- Onglet Tous les devis ----------
+
+  let toutesLignesTousDevis = [];
+  const LIBELLES_STATUT_DEVIS = {
+    non_envoye: "⚪ Pas encore envoyé",
+    en_attente: "🟠 Envoyé, en attente de signature",
+    signe: "🟢 Signé",
+  };
+
+  function statutDevis(l) {
+    if (l.statut === "signe") return "signe";
+    if (l.envoye_email_at || l.envoye_sms_at) return "en_attente";
+    return "non_envoye";
+  }
+
+  function renderStatsTousDevis(lignes) {
+    const compter = s => lignes.filter(l => statutDevis(l) === s).length;
+    const montantAttente = lignes
+      .filter(l => statutDevis(l) === "en_attente")
+      .reduce((somme, l) => somme + (Number(l.montant_ttc) || 0), 0);
+    document.getElementById("stats").innerHTML = `
+      <div class="stat-carte"><div class="valeur">${lignes.length}</div><div class="libelle">Devis</div></div>
+      <div class="stat-carte"><div class="valeur">${compter("en_attente")}</div><div class="libelle">En attente de signature</div></div>
+      <div class="stat-carte"><div class="valeur">${compter("signe")}</div><div class="libelle">Signés</div></div>
+      <div class="stat-carte"><div class="valeur">${compter("non_envoye")}</div><div class="libelle">Pas encore envoyés</div></div>
+      <div class="stat-carte"><div class="valeur">${formatMontant(montantAttente)}</div><div class="libelle">Montant en attente</div></div>
+    `;
+  }
+
+  function renderTableTousDevis(lignes) {
+    const conteneur = document.getElementById("conteneurTableau");
+    if (!lignes.length) {
+      conteneur.innerHTML = `<div class="vide">Aucun devis pour le moment.</div>`;
+      return;
+    }
+    const envoi = l => {
+      const parts = [];
+      if (l.envoye_sms_at) parts.push("📲 SMS " + formatDate(l.envoye_sms_at));
+      if (l.envoye_email_at) parts.push("✉️ Email " + formatDate(l.envoye_email_at));
+      return parts.length ? parts.join("<br>") : "—";
+    };
+    const lignesHtml = lignes.map(l => `
+      <tr>
+        <td>${formatDate(l.created_at)}</td>
+        <td>${echapper(l.numero) || "—"}</td>
+        <td>${echapper(l.nom_client) || "—"}</td>
+        <td>${echapper(l.type_projet) || "—"}</td>
+        <td>${l.montant_ttc ? formatMontant(l.montant_ttc) : "—"}</td>
+        <td>${LIBELLES_STATUT_DEVIS[statutDevis(l)]}${l.date_signature ? "<br><small>le " + formatDate(l.date_signature) + "</small>" : ""}</td>
+        <td>${envoi(l)}</td>
+        <td>
+          ${l.pdf_url ? `<a class="btn-lien" href="${l.pdf_url}" target="_blank" rel="noopener">📄 Devis</a>` : ""}
+          ${l.pdf_signe_url ? `<a class="btn-lien" href="${l.pdf_signe_url}" target="_blank" rel="noopener">✅ Signé</a>` : ""}
+        </td>
+      </tr>
+    `).join("");
+    conteneur.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Créé le</th>
+            <th>Numéro</th>
+            <th>Client</th>
+            <th>Projet</th>
+            <th>Montant TTC</th>
+            <th>Statut</th>
+            <th>Envoyé</th>
+            <th>PDF</th>
+          </tr>
+        </thead>
+        <tbody>${lignesHtml}</tbody>
+      </table>
+    `;
+  }
+
+  function appliquerFiltreTousDevis() {
+    const filtre = document.getElementById("filtreType").value;
+    const lignes = filtre
+      ? toutesLignesTousDevis.filter(l => statutDevis(l) === filtre)
+      : toutesLignesTousDevis;
+    renderStatsTousDevis(toutesLignesTousDevis);
+    renderTableTousDevis(lignes);
+  }
+
+  async function chargerTousDevis() {
+    document.getElementById("conteneurTableau").innerHTML = `<div class="chargement">Chargement…</div>`;
+    try {
+      const res = await fetch(API_DEVIS_SIGNES + "?tous=1");
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      toutesLignesTousDevis = data.rows || [];
+      appliquerFiltreTousDevis();
+    } catch (err) {
+      document.getElementById("conteneurTableau").innerHTML =
+        `<div class="vide">Erreur de chargement : ${err.message}</div>`;
+    }
+  }
+
+  // ---------- Onglet Devis signés ----------
+
+  function renderStatsDevisSignes(lignes) {
+    const total = lignes.length;
+    const montantTotal = lignes.reduce((somme, l) => somme + (Number(l.montant_ttc) || 0), 0);
+    document.getElementById("stats").innerHTML = `
+      <div class="stat-carte"><div class="valeur">${total}</div><div class="libelle">Devis signés</div></div>
+      <div class="stat-carte"><div class="valeur">${formatMontant(montantTotal)}</div><div class="libelle">Montant total signé</div></div>
+    `;
+  }
+
+  function renderTableDevisSignes(lignes) {
+    const conteneur = document.getElementById("conteneurTableau");
+    if (!lignes.length) {
+      conteneur.innerHTML = `<div class="vide">Aucun devis signé pour le moment.</div>`;
+      return;
+    }
+    const lignesHtml = lignes.map(l => `
+      <tr>
+        <td>${formatDate(l.date_signature)}</td>
+        <td>${echapper(l.numero) || "—"}</td>
+        <td>${echapper(l.nom_client) || "—"}</td>
+        <td>${echapper(l.type_projet) || "—"}</td>
+        <td>${formatMontant(l.montant_ttc)}</td>
+        <td>${echapper(l.nom_signataire) || "—"}</td>
+        <td>${l.pdf_signe_url
+          ? `<a class="btn-lien" href="${l.pdf_signe_url}" target="_blank" rel="noopener">📄 PDF signé</a>`
+          : "—"}</td>
+        <td><button class="btn-suppr" data-id-suppr-devis-signe="${l.id}" title="Supprimer">🗑️</button></td>
+      </tr>
+    `).join("");
+    conteneur.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Date de signature</th>
+            <th>Numéro</th>
+            <th>Client</th>
+            <th>Projet</th>
+            <th>Montant TTC</th>
+            <th>Signataire</th>
+            <th>PDF signé</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${lignesHtml}</tbody>
+      </table>
+    `;
+
+    document.querySelectorAll("[data-id-suppr-devis-signe]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        supprimerDevisSigne(btn.dataset.idSupprDevisSigne);
+      });
+    });
+  }
+
+  async function supprimerDevisSigne(id) {
+    if (!confirm("Supprimer définitivement ce devis signé ? Cette action est irréversible.")) return;
+    try {
+      const res = await fetch(`${API_DEVIS_SIGNES}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      await chargerDevisSignes();
+    } catch (err) {
+      alert("Erreur lors de la suppression : " + err.message);
+    }
+  }
+
+  function appliquerFiltreDevisSignes() {
+    renderStatsDevisSignes(toutesLignesDevisSignes);
+    renderTableDevisSignes(toutesLignesDevisSignes);
+  }
+
+  async function chargerDevisSignes() {
+    document.getElementById("conteneurTableau").innerHTML = `<div class="chargement">Chargement…</div>`;
+    try {
+      const res = await fetch(API_DEVIS_SIGNES);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      toutesLignesDevisSignes = data.rows || [];
+      appliquerFiltreDevisSignes();
+    } catch (err) {
+      document.getElementById("conteneurTableau").innerHTML =
+        `<div class="vide">Erreur de chargement : ${err.message}</div>`;
+    }
+  }
+
+  // ---------- Modale d'envoi de devis manuel ----------
+
+  let leadDevisEnCours = null;
+  let devisIdCharge = null;
+  let pdfUrlCharge = null;
+
+  function reinitialiserModaleDevis() {
+    document.getElementById("fichierDevis").value = "";
+    document.getElementById("messageDevis").value = "";
+    document.getElementById("inclureRibDevis").checked = false;
+    document.getElementById("lienPaiementDevis").value = "";
+    document.getElementById("typeDocument").value = "devis";
+    document.getElementById("etapeChargementDevis").style.display = "block";
+    document.getElementById("zoneEnvoiDevis").classList.remove("visible");
+    document.getElementById("statutEnvoiDevis").textContent = "";
+    document.getElementById("statutEnvoiDevis").className = "statut-envoi-devis";
+    document.getElementById("btnChargerDevis").disabled = false;
+    document.getElementById("btnChargerDevis").textContent = "Charger le devis";
+    document.getElementById("devisExistants").innerHTML = "";
+    devisIdCharge = null;
+    pdfUrlCharge = null;
+  }
+
+  function ouvrirModaleDevis(btn) {
+    leadDevisEnCours = {
+      id: btn.dataset.leadId,
+      nom: btn.dataset.leadNom,
+      telephone: btn.dataset.leadTel,
+      email: btn.dataset.leadEmail,
+    };
+    reinitialiserModaleDevis();
+    document.getElementById("clientModaleDevis").textContent =
+      `${leadDevisEnCours.nom} — ${leadDevisEnCours.telephone || "sans tél."} — ${leadDevisEnCours.email && leadDevisEnCours.email !== "—" ? leadDevisEnCours.email : "sans email"}`;
+    document.getElementById("overlayDevis").classList.add("visible");
+    chargerDevisExistants(leadDevisEnCours.id);
+  }
+
+  async function chargerDevisExistants(leadId) {
+    const conteneur = document.getElementById("devisExistants");
+    conteneur.innerHTML = "";
+    try {
+      const res = await fetch(`${API_DEVIS_LEAD}?lead_id=${encodeURIComponent(leadId)}`);
+      const data = await res.json();
+      if (!data.ok || !data.rows || data.rows.length === 0) return;
+
+      const itemsHtml = data.rows.map(d => {
+        const statuts = [];
+        statuts.push(d.envoye_email_at ? "✅ Email envoyé" : "✉️ Email non envoyé");
+        statuts.push(d.envoye_sms_at ? "✅ SMS envoyé" : "📲 SMS non envoyé");
+        return `
+          <div class="item-devis-existant">
+            <div class="infos-devis-existant">
+              <a href="${d.pdf_url}" target="_blank" rel="noopener">${d.type_document === "facture" ? "🧾 " : "📄 "}${echapper(d.numero) || (d.type_document === "facture" ? "Facture" : "Devis")}</a>
+              <div class="statuts-devis-existant">${formatDate(d.created_at)} — ${statuts.join(" · ")}</div>
+            </div>
+            <button class="btn-reutiliser-devis" data-devis-id="${d.id}" data-pdf-url="${d.pdf_url}" data-message="${echapper(d.message_perso || "")}" data-lien-paiement="${echapper(d.lien_paiement || "")}">Renvoyer</button>
+          </div>
+        `;
+      }).join("");
+
+      conteneur.innerHTML = `
+        <div class="liste-devis-existants">
+          <div class="titre-liste">Devis / factures déjà chargés pour ce client</div>
+          ${itemsHtml}
+        </div>
+      `;
+
+      conteneur.querySelectorAll(".btn-reutiliser-devis").forEach(b => {
+        b.addEventListener("click", () => {
+          reutiliserDevisExistant(b.dataset.devisId, b.dataset.pdfUrl, b.dataset.message, b.dataset.lienPaiement);
+        });
+      });
+    } catch (err) {
+      // Pas bloquant : si la liste ne charge pas, on laisse simplement le formulaire d'upload.
+    }
+  }
+
+  function reutiliserDevisExistant(devisId, pdfUrl, message, lienPaiement) {
+    devisIdCharge = devisId;
+    pdfUrlCharge = pdfUrl;
+    document.getElementById("etapeChargementDevis").style.display = "none";
+    document.getElementById("zoneEnvoiDevis").classList.add("visible");
+    document.getElementById("lienPdfDevisCharge").href = pdfUrl;
+    document.getElementById("messageDevis").value = message || "";
+    document.getElementById("lienPaiementDevis").value = lienPaiement || "";
+    document.getElementById("inclureRibDevis").checked = false;
+    document.getElementById("statutEnvoiDevis").textContent = "";
+    document.getElementById("statutEnvoiDevis").className = "statut-envoi-devis";
+  }
+
+  function fermerModaleDevis() {
+    document.getElementById("overlayDevis").classList.remove("visible");
+    leadDevisEnCours = null;
+  }
+
+  function fichierEnBase64(fichier) {
+    return new Promise((resolve, reject) => {
+      const lecteur = new FileReader();
+      lecteur.onload = () => resolve(lecteur.result.split(",")[1]);
+      lecteur.onerror = reject;
+      lecteur.readAsDataURL(fichier);
+    });
+  }
+
+  async function chargerDevis() {
+    const fichierInput = document.getElementById("fichierDevis");
+    const fichier = fichierInput.files[0];
+    const statutEl = document.getElementById("statutEnvoiDevis");
+
+    if (!fichier) {
+      statutEl.textContent = "Merci de choisir un fichier PDF.";
+      statutEl.className = "statut-envoi-devis erreur";
+      return;
+    }
+
+    const btnCharger = document.getElementById("btnChargerDevis");
+    btnCharger.disabled = true;
+    btnCharger.textContent = "Analyse du document…";
+    statutEl.textContent = "";
+    statutEl.className = "statut-envoi-devis";
+
+    try {
+      const pdf_base64 = await fichierEnBase64(fichier);
+      const res = await fetch(API_UPLOAD_DEVIS, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: leadDevisEnCours.id,
+          pdf_base64,
+          filename: fichier.name,
+          type_document: document.getElementById("typeDocument").value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Échec de l'upload");
+
+      devisIdCharge = data.devis_id;
+      pdfUrlCharge = data.pdf_url;
+
+      document.getElementById("etapeChargementDevis").style.display = "none";
+      const zoneEnvoi = document.getElementById("zoneEnvoiDevis");
+      zoneEnvoi.classList.add("visible");
+      const lien = document.getElementById("lienPdfDevisCharge");
+      lien.href = pdfUrlCharge;
+      document.getElementById("messageDevis").value = data.message_perso
+        || `Bonjour, veuillez recevoir votre devis${data.numero ? ` n° ${data.numero}` : ""}.`;
+    } catch (err) {
+      statutEl.textContent = "Erreur : " + err.message;
+      statutEl.className = "statut-envoi-devis erreur";
+      btnCharger.disabled = false;
+      btnCharger.textContent = "Charger le devis";
+    }
+  }
+
+  async function envoyerDevis(channels) {
+    if (!devisIdCharge) return;
+    const statutEl = document.getElementById("statutEnvoiDevis");
+    statutEl.textContent = "Envoi en cours…";
+    statutEl.className = "statut-envoi-devis";
+
+    document.querySelectorAll(".boutons-envoi-devis button").forEach(b => b.disabled = true);
+
+    try {
+      const res = await fetch(API_SEND_DEVIS, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          devis_id: devisIdCharge,
+          channels,
+          message: document.getElementById("messageDevis").value,
+          inclure_rib: document.getElementById("inclureRibDevis").checked,
+          lien_paiement: document.getElementById("lienPaiementDevis").value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Échec de l'envoi");
+
+      const parties = [];
+      if (data.results.email) {
+        parties.push(data.results.email.sent ? "email envoyé" : `email non envoyé (${data.results.email.reason})`);
+      }
+      if (data.results.sms) {
+        parties.push(data.results.sms.sent ? "SMS envoyé" : `SMS non envoyé (${data.results.sms.reason})`);
+      }
+      statutEl.textContent = parties.join(" — ");
+      statutEl.className = "statut-envoi-devis ok";
+    } catch (err) {
+      statutEl.textContent = "Erreur : " + err.message;
+      statutEl.className = "statut-envoi-devis erreur";
+    } finally {
+      document.querySelectorAll(".boutons-envoi-devis button").forEach(b => b.disabled = false);
+    }
+  }
+
+  document.getElementById("btnChargerDevis").addEventListener("click", chargerDevis);
+  document.getElementById("btnFermerModaleDevis").addEventListener("click", fermerModaleDevis);
+  document.getElementById("btnFermerModaleDevisFin").addEventListener("click", fermerModaleDevis);
+  document.getElementById("btnChargerAutreDevis").addEventListener("click", () => {
+    document.getElementById("fichierDevis").value = "";
+    document.getElementById("messageDevis").value = "";
+    document.getElementById("inclureRibDevis").checked = false;
+    document.getElementById("etapeChargementDevis").style.display = "block";
+    document.getElementById("zoneEnvoiDevis").classList.remove("visible");
+    document.getElementById("statutEnvoiDevis").textContent = "";
+    document.getElementById("statutEnvoiDevis").className = "statut-envoi-devis";
+    devisIdCharge = null;
+    pdfUrlCharge = null;
+  });
+  document.getElementById("overlayDevis").addEventListener("click", (e) => {
+    if (e.target.id === "overlayDevis") fermerModaleDevis();
+  });
+  document.getElementById("btnEnvoyerDevisEmail").addEventListener("click", () => envoyerDevis(["email"]));
+  document.getElementById("btnEnvoyerDevisSms").addEventListener("click", () => envoyerDevis(["sms"]));
+  document.getElementById("btnEnvoyerDevisLesDeux").addEventListener("click", () => envoyerDevis(["email", "sms"]));
+
+  const PHRASE_RIB = "Vous trouverez également notre RIB pour le règlement.";
+  document.getElementById("inclureRibDevis").addEventListener("change", (e) => {
+    const champMessage = document.getElementById("messageDevis");
+    if (e.target.checked) {
+      if (!champMessage.value.includes(PHRASE_RIB)) {
+        champMessage.value = champMessage.value.trim()
+          ? `${champMessage.value.trim()} ${PHRASE_RIB}`
+          : PHRASE_RIB;
+      }
+    } else {
+      champMessage.value = champMessage.value.replace(` ${PHRASE_RIB}`, "").replace(PHRASE_RIB, "").trim();
+    }
+  });
+
+  function appliquerFiltreLeads() {
+    const statut = document.getElementById("filtreType").value;
+    const lignes = statut ? toutesLignesLeads.filter(l => l.statut === statut) : toutesLignesLeads;
+    renderStatsLeads(lignes);
+    renderTableLeads(lignes);
+  }
+
+  async function chargerLeads() {
+    document.getElementById("conteneurTableau").innerHTML = `<div class="chargement">Chargement…</div>`;
+    try {
+      const res = await fetch(API_LEADS);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      toutesLignesLeads = data.rows || [];
+      appliquerFiltreLeads();
+    } catch (err) {
+      document.getElementById("conteneurTableau").innerHTML =
+        `<div class="vide">Erreur de chargement : ${err.message}</div>`;
+    }
+  }
+
+  // ---------- Bascule d'onglet ----------
+
+  function remplirFiltreSelonOnglet() {
+    const select = document.getElementById("filtreType");
+    if (ongletActif === "sms") {
+      select.style.display = "";
+      select.innerHTML = `<option value="">Tous les types</option>` +
+        Object.entries(LIBELLES_TYPE_SMS).map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+    } else if (ongletActif === "leads") {
+      select.style.display = "";
+      select.innerHTML = `<option value="">Tous les statuts</option>` +
+        Object.entries(LIBELLES_STATUT_LEAD).map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+    } else if (ongletActif === "tous-devis") {
+      select.style.display = "";
+      select.innerHTML = `<option value="">Tous les statuts</option>` +
+        Object.entries(LIBELLES_STATUT_DEVIS).map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+    } else {
+      // Onglet "Devis signés" : pas de filtre, on masque simplement le sélecteur.
+      select.style.display = "none";
+      select.innerHTML = "";
+    }
+  }
+
+  function activerOnglet(onglet) {
+    ongletActif = onglet;
+    document.querySelectorAll(".onglet").forEach(el => {
+      el.classList.toggle("actif", el.dataset.onglet === onglet);
+    });
+    if (onglet === "sms") {
+      document.getElementById("titrePage").textContent = "📩 SMS reçus";
+      document.getElementById("sousTitrePage").textContent = "Historique des notifications SMS envoyées automatiquement";
+      remplirFiltreSelonOnglet();
+      chargerSms();
+    } else if (onglet === "leads") {
+      document.getElementById("titrePage").textContent = "📋 Demandes d'estimation";
+      document.getElementById("sousTitrePage").textContent = "Visiteurs ayant rempli (ou entamé) le formulaire d'estimation";
+      remplirFiltreSelonOnglet();
+      chargerLeads();
+    } else if (onglet === "tous-devis") {
+      document.getElementById("titrePage").textContent = "📄 Tous les devis";
+      document.getElementById("sousTitrePage").textContent = "Tous les devis chargés, envoyés ou signés, avec leur statut";
+      remplirFiltreSelonOnglet();
+      chargerTousDevis();
+    } else {
+      document.getElementById("titrePage").textContent = "✅ Devis signés";
+      document.getElementById("sousTitrePage").textContent = "Tous les devis signés électroniquement, avec accès direct au PDF signé";
+      remplirFiltreSelonOnglet();
+      chargerDevisSignes();
+    }
+  }
+
+  document.querySelectorAll(".onglet").forEach(el => {
+    el.addEventListener("click", () => {
+      selectionSms.clear();
+      activerOnglet(el.dataset.onglet);
+    });
+  });
+  document.getElementById("filtreType").addEventListener("change", () => {
+    selectionSms.clear();
+    if (ongletActif === "sms") appliquerFiltreSms();
+    else if (ongletActif === "leads") appliquerFiltreLeads();
+    else if (ongletActif === "tous-devis") appliquerFiltreTousDevis();
+  });
+  // ---------- Compteur global de clics publicitaires ----------
+
+  async function chargerCompteurClicsPub() {
+    const el = document.getElementById("compteurClicsPub");
+    try {
+      const res = await fetch(API_CLICS_PUB);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Erreur inconnue");
+      el.textContent = `🖱️ ${data.total} clic(s) pub (${data.google} Google · ${data.meta} Meta)`;
+    } catch (err) {
+      el.textContent = "🖱️ Erreur";
+    }
+  }
+
+  document.getElementById("btnActualiser").addEventListener("click", () => {
+    if (ongletActif === "sms") chargerSms();
+    else if (ongletActif === "leads") chargerLeads();
+    else if (ongletActif === "tous-devis") chargerTousDevis();
+    else chargerDevisSignes();
+    chargerCompteurClicsPub();
+  });
+  document.getElementById("btnSupprimerSelection").addEventListener("click", () => {
+    supprimerSms(Array.from(selectionSms));
+  });
+  document.getElementById("btnAnnulerSelection").addEventListener("click", () => {
+    selectionSms.clear();
+    appliquerFiltreSms();
+  });
+
+  activerOnglet("sms");
+  chargerCompteurClicsPub();
+</script>
+
+</body>
+</html>
