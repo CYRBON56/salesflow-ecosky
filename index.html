@@ -324,6 +324,7 @@ footer{text-align:center;font-size:12px;color:var(--mute);padding:30px 16px 10px
   body{background:#fff}.app{padding:0;max-width:none}main{padding:0}
   .cr{border:none;padding:0}
 }
+.sheet-back{display:inline-flex;align-items:center;gap:4px;border:0;background:#F1EEE8;color:var(--ink);font:700 14px/1 inherit;padding:8px 12px;border-radius:999px;margin:0 0 10px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -517,8 +518,9 @@ if(/[?&]demo\b/.test(location.search)) location.replace('/demo.html');
 function voirDemo(){ const v = document.getElementById('demoVid'); if(!v) return; v.scrollIntoView({behavior:'smooth', block:'center'}); setTimeout(()=>{ v.muted = false; const p = v.play(); if(p && p.catch) p.catch(()=>{ v.muted = true; v.play().catch(()=>{}); }); }, 700); }
 function headerHtml(){
   const inCh = S.route==='chantier';
-  const back = inCh ? (compteToken() ? '#/espace' : '#/') : null;
-  return `<header>${back?`<a class="back" href="${back}" aria-label="Retour">‹</a>`:''}
+  const back = inCh ? (compteToken() ? '#/espace' : '#/') : (S.route==='auth' ? '#/' : null);
+  const backEsp = S.route==='espace' && S.etab && S.etab!=='chantiers';
+  return `<header>${back?`<a class="back" href="${back}" aria-label="Retour">‹</a>`:''}${backEsp?`<button class="back" style="border:0;background:none;cursor:pointer" aria-label="Retour" onclick="S.etab='chantiers';render()">‹</button>`:''}
     <a class="logo" href="#/"><span class="logo-mark">${I.tri}</span>Contact Chantier</a>
     <div class="hright">${S.route==='espace'?`<button class="hbtn" onclick="logout()">Déconnexion</button>`:''}
     ${S.route==='home'?`<a class="hbtn" href="#/connexion">Connexion</a>`:''}</div></header>`;
@@ -526,6 +528,7 @@ function headerHtml(){
 function render(){
   $('#app').className = S.route==='home' ? 'app land' : 'app';
   if(S.route==='home'){ appliquerCouleur(null); $('#app').innerHTML = homeView(); return; }
+  setTimeout(navMemo, 0);
   if(S.route==='espace' && S.espace) appliquerCouleur(S.etab==='marque' && MQ ? (MQ.couleur||S.espace.compte.couleur) : S.espace.compte.couleur);
   else if(S.route==='chantier') appliquerCouleur(S.marque && S.marque.couleur);
   else appliquerCouleur(null);
@@ -1854,8 +1857,32 @@ function crView(){
 }
 
 /* ====================== SHEET ====================== */
-function sheet(html){ $('#layer').innerHTML = `<div class="veil" onclick="if(event.target===this){stopRec();closeSheet()}"><div class="sheet"><div class="grab"></div>${html}</div></div>`; }
+function sheet(html){
+  const deja = !!$('#layer').innerHTML;
+  $('#layer').innerHTML = `<div class="veil" onclick="if(event.target===this){stopRec();closeSheet()}"><div class="sheet"><div class="grab"></div><button type="button" class="sheet-back" onclick="stopRec();closeSheet()">‹ Retour</button>${html}</div></div>`;
+  if(!deja){ try{ history.pushState(Object.assign({}, history.state||{}, {sheet:true}), ''); }catch(e){} }
+}
 function closeSheet(){ $('#layer').innerHTML=''; }
+/* bouton « précédent » du téléphone / du navigateur : ferme le volet ou revient à l'onglet d'avant */
+let NAV_RESTO = false, NAV_CLE = '';
+function navCle(){ return [S.route, S.route==='espace'?S.etab||'chantiers':'', S.route==='chantier'?(S.tab||'')+'|'+(S.conv||''):''].join('/'); }
+function navMemo(){
+  if(NAV_RESTO) return; const k = navCle(); if(k===NAV_CLE) return;
+  const premier = !NAV_CLE; NAV_CLE = k;
+  const st = {vue:k, etab:S.etab||'', tab:S.tab||'', conv:S.conv||null};
+  try{ premier || !history.state || !history.state.vue ? history.replaceState(st, '') : history.pushState(st, ''); }catch(e){}
+}
+window.addEventListener('popstate', ev => {
+  if($('#layer').innerHTML){ stopRec(); closeSheet(); return; }
+  const st = ev.state;
+  if(st && st.sheet && !st.vue){ history.back(); return; }
+  if(!st || !st.vue) return;
+  if(st.vue.split('/')[0] !== S.route) return;
+  NAV_RESTO = true; S.etab = st.etab || 'chantiers'; S.tab = st.tab || S.tab; S.conv = st.conv || null; NAV_CLE = st.vue;
+  if(S.route==='espace' && S.etab==='marque') MQ = null;
+  if(S.route==='espace' && S.etab==='pros') loadPros(); else render();
+  NAV_RESTO = false;
+});
 
 /* ====================== START ====================== */
 if('serviceWorker' in navigator){ window.addEventListener('load', ()=>navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
