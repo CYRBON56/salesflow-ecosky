@@ -901,7 +901,8 @@ function avancementView(){
   const F = {toutes:()=>true, verifier:e=>e.statut==='déclaré', cours:e=>e.statut==='en cours', faire:e=>e.statut==='à faire', faites:e=>e.statut==='validé'};
   if(!F[S.efiltre]) S.efiltre = 'toutes';
   const list = et.filter(F[S.efiltre]);
-  let h = miseEnRoute() + `<div class="card"><div class="row between"><div><div class="meta" style="margin:0">Étapes validées</div><b style="font-size:24px">${ok}<span style="font-size:15px;color:var(--mute)"> / ${actifs.length}</span></b></div>
+  const aCctp = et.some(e=>e.source==='cctp');
+  let h = miseEnRoute() + (aCctp ? '' : `<div class="card" style="background:var(--ink);color:#fff;border-color:var(--ink)"><div class="row" style="gap:12px;align-items:flex-start"><div class="lv" style="width:46px;height:46px;background:var(--acc)">${I.doc.replace('width="20" height="20"','width="24" height="24"').replace('stroke="currentColor"','stroke="#fff"')}</div><div style="flex:1"><b style="font-size:16px">Importez votre CCTP</b><p style="font-size:13.5px;line-height:1.45;margin-top:4px;color:#C9CFD5">Chaque article est envoyé au corps de métier concerné. L’artisan coche ce qu’il a fait, vous validez.</p></div></div><button class="btn pri full" style="margin-top:12px" onclick="cctpOuvrir()">Importer le CCTP (PDF ou Word)</button></div>`) + `<div class="card"><div class="row between"><div><div class="meta" style="margin:0">Étapes validées</div><b style="font-size:24px">${ok}<span style="font-size:15px;color:var(--mute)"> / ${actifs.length}</span></b></div>
     <div style="text-align:right"><div class="meta" style="margin:0">À vérifier</div><b style="font-size:24px;color:${decl?'var(--acc)':'var(--ink)'}">${decl}</b></div></div>
     <p class="note">Les artisans voient seulement leurs propres étapes. Quand l’un d’eux coche « c’est fait », l’étape passe en « à vérifier » : à vous de valider.</p></div>
   <div class="filters">${[['toutes','Toutes'],['verifier','À vérifier · '+decl],['cours','En cours · '+enc],['faire','À faire'],['faites','Faites']].map(([k,l])=>`<button class="chip ${S.efiltre===k?'on':''}" onclick="S.efiltre='${k}';render()">${l}</button>`).join('')}</div>`;
@@ -912,7 +913,7 @@ function avancementView(){
     h += `<div class="row between" style="margin:18px 0 8px"><b style="font-size:15.5px">${esc(ph)}</b><span class="pill ${okp===all.length&&all.length?'p-ok':'p-mute'}">${okp}/${all.length}</span></div>`;
     list.filter(e=>e.phase===ph).forEach(e=> h += etapeRow(e, true));
   });
-  h += `<button class="btn full" style="margin-top:16px" onclick="addEtape()">${I.plus} Ajouter une étape</button>`;
+  h += `<div class="btns" style="margin-top:16px"><button class="btn" onclick="addEtape()">${I.plus} Ajouter une étape</button><button class="btn" onclick="cctpOuvrir()">${I.doc} ${aCctp?'Importer un autre CCTP':'Importer le CCTP'}</button></div>`;
   return h;
 }
 function etapeRow(e, moe){
@@ -930,6 +931,7 @@ function openEtape(id){
   sheet(`<div class="row" style="gap:12px">${e.lot?vignette(e.lot,56):''}<div><div class="meta" style="margin:0">${esc(e.phase)}</div><h1 style="font-size:19px">${esc(e.nom)}</h1></div></div>
   ${e.statut==='déclaré'?`<div class="card" style="margin-top:14px;background:var(--acc-soft);border-color:#F6C9A8"><b>${esc(M(e.declare_par).nom)} déclare cette étape terminée</b> <span class="meta">(${ago(e.declare_le)})</span><p class="note" style="color:#8A3A0A">Vérifiez sur place ou sur les photos, puis validez ou refusez.</p>
     <div class="btns"><button class="btn" onclick="refuserEtape('${id}')">Pas fait</button><button class="btn ok" onclick="majEtape('${id}','validé')">Valider ✓</button></div></div>`:''}
+  ${e.detail?`<details class="card" style="margin-top:12px" ${e.statut==='déclaré'?'':'open'}><summary style="cursor:pointer;font-weight:700">Article du CCTP</summary><p style="white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:8px">${esc(e.detail)}</p></details>`:''}
   <label class="lb">Statut</label>
   <div class="seg">${[['à faire','À faire'],['en cours','En cours'],['validé','Fait ✓'],['sans objet','Sans objet']].map(([k,l])=>`<button class="${e.statut===k?'on':''}" onclick="majEtape('${id}','${k}')">${l}</button>`).join('')}</div>
   <label class="lb">Corps de métier responsable</label>
@@ -965,6 +967,203 @@ function addEtape(){
 }
 async function saveEtape(){ try{ await rpc('cc_etape_ajouter',{p_token:S.token,p_phase:$('#aPh').value,p_nom:$('#aNom').value,p_lot:$('#aLot').value}); closeSheet(); await loadChantier(true); toast('Étape ajoutée'); }catch(e){ fail(e); } }
 
+/* ====================== CCTP : découpage par lot ====================== */
+const CCTP_GENERAL = /g[ée]n[ée]ralit|^objet|objet du (pr[ée]sent|march)|normes?|r[ée]glement|documents? (de r[ée]f|contractuel)|prescriptions? g[ée]n|d[ée]finitions?|consistance des|limites? de prestation|nettoyage|sommaire|pr[ée]ambule|textes? de r[ée]f|r[ée]ception des (supports|travaux)|garanties?$|^conditions? g[ée]n|^d[ée]signation|^pr[ée]sentation/i;
+const RX_TOC = /(\.{4,}|…{2,}|\s{3,})\s*\d{1,3}\s*$/;
+const RX_LOT = /^\s*(?:LOT|Lot)\s*(?:N\s*[°ºo]\.?\s*)?(\d{1,2}(?:\s?[A-Z](?![a-z]))?)\s*(?:[-–—:.]|\s)\s*(.{2,90}?)\s*$/;
+const RX_ART = /^\s*(?:(?:Article|ARTICLE|Art\.?|ART\.?)\s*)?((?:\d{1,2}|[A-Z])(?:\.\d{1,3}){1,5})\.?\s*[-–—:)]?\s+(\S.{1,160})$/;
+
+function cctpNettoyer(lignes){
+  const brut = lignes.map(l=>String(l||'').replace(/ /g,' ').replace(/\s+/g,' ').trim()).filter(Boolean);
+  // en-têtes / pieds de page répétés (≥ 4 fois à l'identique, courts)
+  const freq = {}; brut.forEach(l=>{ if(l.length<90) freq[l]=(freq[l]||0)+1; });
+  return brut.filter(l => !(freq[l]>=4 && !RX_ART.test(l)) && !/^(page\s*)?\d{1,3}\s*(\/|sur)\s*\d{1,3}$/i.test(l) && !/^\d{1,3}$/.test(l));
+}
+function cctpLot(intitule, lotsDispo){
+  // rattache l'intitulé du lot à un corps de métier de l'appli
+  const ix = t => { const n = norm(t); return METIERS.findIndex(([k])=>k.some(w=>n.includes(w))); };
+  const n = norm(intitule);
+  if(/gros.?oeuvre|maconn|beton arme|fondation/.test(n)) return lotsDispo.find(l=>/ma[cç]on/i.test(l)) || 'Maçonnerie';
+  if(/platr|cloison|doublage|faux.?plafond/.test(n)) return lotsDispo.find(l=>/pl[aâ]tr/i.test(l)) || 'Plâtrerie';
+  if(/cvc|chauff|ventil|climat|vmc/.test(n) && /plomb|sanit/.test(n)) return lotsDispo.find(l=>/plomb/i.test(l)) || 'Plomberie';
+  const i = ix(intitule);
+  if(i >= 0){ const l = lotsDispo.find(x=>ix(x)===i); if(l) return l; }
+  const propre = intitule.toLowerCase().replace(/(^|[\s\-/(])\p{L}/gu, s=>s.toUpperCase()).replace(/\s+/g,' ').trim();
+  return propre.slice(0,40);
+}
+function cctpDecouper(lignesBrutes, nomFichier, lotsDispo){
+  const L = cctpNettoyer(lignesBrutes).filter(l=>!RX_TOC.test(l));
+  // 1. repérage des lots
+  const lots = []; let cur = null;
+  const lotDuFichier = () => { const m = String(nomFichier||'').match(/lot\s*[_\- ]?(\d{1,2})[_\- ]*(.*)\.\w+$/i); return {num: m?m[1]:'', titre: m ? m[2].replace(/[_\-]+/g,' ').trim() : String(nomFichier||'CCTP').replace(/\.\w+$/,'').replace(/[_\-]+/g,' ') }; };
+  for(const l of L){
+    const m = l.match(RX_LOT);
+    if(m && l.length < 100 && !/[.;,]$/.test(m[2]) && !/^(du|de|des|le|la|les|et|en|au|aux)\b/i.test(m[2])){
+      const num = m[1].replace(/\s/g,'').replace(/^0+(?=\d)/,'');
+      const titre = m[2].replace(/^[-–—:.\s]+/,'').trim();
+      cur = lots.find(x=>x.num===num);
+      if(!cur){ cur = {num, titre, lignes:[]}; lots.push(cur); }
+      else if(titre.length > cur.titre.length && titre.length < 70) cur.titre = titre;
+      continue;
+    }
+    if(!cur){ const f = lotDuFichier(); cur = {num:f.num, titre:f.titre || 'CCTP', lignes:[], implicite:true}; lots.push(cur); }
+    cur.lignes.push(l);
+  }
+  // un « lot implicite » vide (page de garde avant le 1er lot) est retiré
+  const res = [];
+  for(const lot of lots){
+    // 2. articles numérotés
+    const arts = []; let a = null;
+    for(const l of lot.lignes){
+      const m = l.match(RX_ART);
+      const titreOk = m && m[2].length <= 160 && !/[,;]$/.test(m[2]) && !/^\d/.test(m[2]) && !/^(mm|cm|m|kg|m2|m²|m3|°|%)\b/i.test(m[2]);
+      if(titreOk){ a = {ref:m[1], titre:m[2].replace(/[.:]$/,'').trim(), texte:[]}; arts.push(a); continue; }
+      if(a) a.texte.push(l);
+    }
+    // ne garder que les articles « feuilles » ; les titres parents servent d'intitulé de section
+    const feuilles = arts.filter((x,i)=>!arts.some((y,j)=>j!==i && y.ref.startsWith(x.ref+'.')));
+    const parent = x => { const p = x.ref.split('.').slice(0,-1).join('.'); const pa = arts.find(y=>y.ref===p); return pa ? pa.titre : ''; };
+    let articles = feuilles.map(x=>{
+      const sec = parent(x);
+      return {ref:x.ref, titre:x.titre, section:sec, detail:x.texte.join('\n').slice(0,6000), garder: !CCTP_GENERAL.test(x.titre) && !CCTP_GENERAL.test(sec)};
+    });
+    if(!articles.length && lot.lignes.length > 3){
+      // CCTP sans numérotation : on découpe sur les lignes en MAJUSCULES
+      let b = null; articles = [];
+      for(const l of lot.lignes){
+        if(l.length < 90 && l === l.toUpperCase() && /[A-ZÀ-Ý]{4}/.test(l)){ b = {ref:'', titre:l.charAt(0)+l.slice(1).toLowerCase(), section:'', detail:'', garder:!CCTP_GENERAL.test(l)}; articles.push(b); }
+        else if(b) b.detail = (b.detail ? b.detail+'\n' : '') + l;
+      }
+    }
+    if(!articles.length) continue;
+    res.push({num:lot.num, intitule:lot.titre, lot:cctpLot(lot.titre, lotsDispo||[]), articles, garder:true});
+  }
+  return res;
+}
+
+/* ---------- lecture des fichiers (PDF, Word, texte) ---------- */
+const PDFJS_V = '4.10.38';
+async function cctpLirePdf(buf){
+  const pdfjs = await import(`https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_V}/build/pdf.min.mjs`);
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_V}/build/pdf.worker.min.mjs`;
+  const doc = await pdfjs.getDocument({data:buf}).promise;
+  const lignes = [];
+  for(let p=1; p<=doc.numPages; p++){
+    const tc = await (await doc.getPage(p)).getTextContent();
+    let y = null, x = 0, cur = '';
+    for(const it of tc.items){
+      if(!('str' in it)) continue;
+      const iy = it.transform[5], ix = it.transform[4];
+      if(y !== null && Math.abs(iy - y) > 2.5){ lignes.push(cur); cur = ''; }
+      else if(cur && ix - x > 1.5 && !cur.endsWith(' ') && !it.str.startsWith(' ')) cur += ' ';
+      cur += it.str; y = iy; x = ix + (it.width||0);
+      if(it.hasEOL){ lignes.push(cur); cur = ''; y = null; }
+    }
+    if(cur) lignes.push(cur);
+    $('#cctpEtat') && ($('#cctpEtat').textContent = `Lecture… page ${p} / ${doc.numPages}`);
+  }
+  return lignes;
+}
+function chargerScript(src){ return new Promise((ok, ko)=>{ if(document.querySelector(`script[src="${src}"]`)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => ko(new Error('Chargement impossible, vérifiez la connexion')); document.head.appendChild(s); }); }
+async function cctpLireDocx(buf){
+  await chargerScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
+  const html = (await window.mammoth.convertToHtml({arrayBuffer:buf})).value;
+  const d = new DOMParser().parseFromString(html, 'text/html');
+  const blocs = [...d.body.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,td')].filter(e=>!e.closest('li p, td p') || e.tagName!=='P');
+  const titres = blocs.filter(e=>/^H\d$/.test(e.tagName));
+  if(!titres.length) return (await window.mammoth.extractRawText({arrayBuffer:buf})).value.split('\n');
+  // les titres Word numérotés automatiquement perdent leur numéro : on le recrée à partir des niveaux
+  const niv = [...new Set(titres.map(e=>+e.tagName[1]))].sort();
+  const c = [0,0,0,0,0,0], lignes = [];
+  for(const e of blocs){
+    const t = e.textContent.replace(/\s+/g,' ').trim(); if(!t) continue;
+    if(!/^H\d$/.test(e.tagName)){ lignes.push(t); continue; }
+    const k = niv.indexOf(+e.tagName[1]);
+    c[k]++; for(let j=k+1;j<c.length;j++) c[j]=0;
+    if(k===0){ lignes.push(RX_LOT.test(t) || !/[a-z]{3}/i.test(t) ? t : (metier(t)[2] || /lot/i.test(t) ? (/^lot/i.test(t)?t:`LOT ${c[0]} - ${t}`) : t)); continue; }
+    if(/^\d+(\.\d+)+\s/.test(t)) lignes.push(t);
+    else lignes.push(`${c.slice(0,k+1).map((v,i)=>i===0?c[0]:v).join('.')} ${t}`);
+  }
+  return lignes;
+}
+async function cctpLire(file){
+  const buf = await file.arrayBuffer(), n = (file.name||'').toLowerCase();
+  if(n.endsWith('.pdf') || file.type==='application/pdf') return cctpLirePdf(buf);
+  if(n.endsWith('.docx')) return cctpLireDocx(buf);
+  if(n.endsWith('.txt')) return new TextDecoder().decode(buf).split('\n');
+  if(n.endsWith('.doc')) throw new Error('Ancien format Word (.doc) : enregistrez le fichier en .docx ou en PDF');
+  throw new Error('Format non reconnu : choisissez un PDF ou un Word (.docx)');
+}
+
+/* ---------- écran d'import ---------- */
+let CC = null; // {fichiers:[{file, lots:[...]}], joindre:true}
+function cctpOuvrir(){ CC = {fichiers:[], joindre:true, ouvert:{}}; cctpDessiner(); }
+function cctpDessiner(){
+  if(!CC) return;
+  const lotsOpts = [...new Set([...allLots(), ...lotsCourants(), ...CC.fichiers.flatMap(f=>f.lots.map(l=>l.lot))])];
+  const tous = CC.fichiers.flatMap(f=>f.lots.filter(l=>l.garder));
+  const nbArt = tous.reduce((s,l)=>s+l.articles.filter(a=>a.garder).length,0);
+  const nbLots = new Set(tous.filter(l=>l.articles.some(a=>a.garder)).map(l=>l.lot)).size;
+  let h = `<h1 style="font-size:20px">Importer le CCTP</h1>
+  <p class="sub">Déposez le CCTP (PDF ou Word), en un seul document ou un fichier par lot. Chaque article sera envoyé au corps de métier concerné, qui le cochera quand c’est fait. Vous validez ensuite.</p>
+  <label class="up" style="margin-top:14px"><div class="apercu">${I.doc}</div><div><b>${CC.fichiers.length?'Ajouter un autre fichier':'Choisir le CCTP'}</b><div class="meta">PDF ou Word (.docx), plusieurs fichiers possibles</div></div><input type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple onchange="cctpFichiers(this)"></label>
+  <div class="meta" id="cctpEtat" style="margin-top:8px"></div>`;
+  CC.fichiers.forEach((f, fi)=>{
+    h += `<h2 style="margin-top:18px">${I.doc} ${esc(f.file.name)}</h2>`;
+    if(!f.lots.length) h += `<div class="card"><b>Aucun article trouvé dans ce fichier.</b><p class="note">S’il s’agit d’un scan (image), le texte n’est pas lisible : demandez la version PDF d’origine ou Word au rédacteur du CCTP.</p></div>`;
+    f.lots.forEach((l, li)=>{
+      const k = fi+'-'+li, ouvert = CC.ouvert[k], nb = l.articles.filter(a=>a.garder).length;
+      h += `<div class="card" style="${l.garder?'':'opacity:.55'}">
+        <div class="row" style="gap:12px;align-items:flex-start">${vignette(l.lot,46)}
+          <div style="flex:1;min-width:0"><div class="meta" style="margin:0">${l.num?'Lot '+esc(l.num)+' · ':''}${esc(l.intitule)}</div>
+          <select class="inp" style="margin-top:6px;padding:8px 10px;font-size:15px" onchange="CC.fichiers[${fi}].lots[${li}].lot=this.value;cctpDessiner()">${lotsOpts.map(o=>`<option ${o===l.lot?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
+          <input type="checkbox" ${l.garder?'checked':''} style="width:22px;height:22px;margin-top:4px;accent-color:var(--acc)" onchange="CC.fichiers[${fi}].lots[${li}].garder=this.checked;cctpDessiner()" aria-label="Importer ce lot"></div>
+        <button class="chip" style="margin-top:10px" onclick="CC.ouvert['${k}']=!CC.ouvert['${k}'];cctpDessiner()">${nb} article${nb>1?'s':''} sur ${l.articles.length} · ${ouvert?'masquer':'voir et trier'}</button>
+        ${ouvert?`<div style="margin-top:8px">${l.articles.map((a,ai)=>`<label class="row" style="gap:10px;padding:7px 0;border-top:1px solid var(--line);align-items:flex-start;cursor:pointer"><input type="checkbox" ${a.garder?'checked':''} style="width:19px;height:19px;margin-top:2px;accent-color:var(--acc);flex:none" onchange="CC.fichiers[${fi}].lots[${li}].articles[${ai}].garder=this.checked;cctpDessiner()"><div style="min-width:0"><b style="font-size:14px">${esc(a.ref)} ${esc(a.titre)}</b>${a.section?`<div class="meta" style="margin:0">${esc(a.section)}</div>`:''}${a.detail?`<div class="meta" style="margin-top:2px;white-space:pre-wrap">${esc(a.detail.slice(0,180))}${a.detail.length>180?'…':''}</div>`:''}</div></label>`).join('')}</div>`:''}
+      </div>`;
+    });
+  });
+  if(CC.fichiers.some(f=>f.lots.length)){
+    h += `<label class="row" style="gap:10px;margin-top:14px;cursor:pointer"><input type="checkbox" ${CC.joindre?'checked':''} style="width:20px;height:20px;accent-color:var(--acc)" onchange="CC.joindre=this.checked"><span style="font-size:14px">Joindre aussi le fichier CCTP aux documents de chaque lot concerné</span></label>
+    <p class="note">Les généralités, normes et prescriptions communes sont décochées d’office : ce ne sont pas des tâches à valider. Vous pouvez les recocher.</p>
+    <div class="btns"><button class="btn" onclick="CC=null;closeSheet()">Annuler</button><button class="btn pri" id="cctpGo" ${nbArt?'':'disabled'} onclick="cctpImporter()">Répartir ${nbArt} article${nbArt>1?'s':''} · ${nbLots} lot${nbLots>1?'s':''}</button></div>`;
+  } else h += `<div class="btns"><button class="btn full" onclick="CC=null;closeSheet()">Annuler</button></div>`;
+  const sc = document.querySelector('.sheet') ? document.querySelector('.sheet').scrollTop : 0;
+  sheet(h);
+  const s2 = document.querySelector('.sheet'); if(s2) s2.scrollTop = sc;
+}
+async function cctpFichiers(inp){
+  const files = [...(inp.files||[])]; if(!files.length) return;
+  const lotsDispo = [...new Set([...allLots(), ...lotsCourants()])];
+  for(const f of files){
+    if($('#cctpEtat')) $('#cctpEtat').textContent = `Lecture de ${f.name}…`;
+    try{ const lignes = await cctpLire(f); CC.fichiers.push({file:f, lots: cctpDecouper(lignes, f.name, lotsDispo)}); }
+    catch(e){ fail(e); }
+  }
+  cctpDessiner();
+}
+async function cctpImporter(){
+  const b = $('#cctpGo'); b.disabled = true;
+  try{
+    let total = 0;
+    for(const f of CC.fichiers){
+      const lots = f.lots.filter(l=>l.garder);
+      const articles = lots.flatMap(l=>l.articles.filter(a=>a.garder).map(a=>({
+        lot:l.lot, ref:a.ref, titre:(a.ref?a.ref+' ':'')+a.titre,
+        phase:`CCTP · ${l.num?'Lot '+l.num+' ':''}${l.intitule}`.slice(0,120),
+        detail:(a.section?a.section+'\n':'')+(a.detail||'')})));
+      if(!articles.length) continue;
+      b.textContent = `Envoi de ${f.file.name}…`;
+      let url = '';
+      if(CC.joindre){ const md = await upload(f.file, D().chantier.id); url = md.url; }
+      const r = await rpc('cc_cctp_importer', {p_token:S.token, p_doc_nom:f.file.name.replace(/\.[^.]+$/,''), p_doc_url:url, p_articles:articles});
+      total += r.articles;
+    }
+    CC = null; closeSheet(); S.tab = 'avancement'; await loadChantier(true);
+    toast(`${total} articles répartis : chaque artisan les voit dans « Mes tâches »`);
+  }catch(e){ fail(e); b.disabled = false; b.textContent = 'Réessayer'; }
+}
+
 /* ---------- MES TÂCHES (artisan) ---------- */
 function bienvenue(){
   if(LS.get('cc_bv_'+S.token, false)) return '';
@@ -979,12 +1178,15 @@ function tachesView(){
   let h = bienvenue() + `<div class="card row" style="gap:12px">${vignette(m.lot||'Autre',52)}<div style="flex:1"><b>Lot ${esc(m.lot||'—')}</b><div class="meta">Statut de votre lot : ${esc(st||'à venir')}</div></div></div>
   <div class="quick">${st!=='en cours'&&st!=='terminé'?`<button class="chip" onclick="lotStatut('en cours')">▶️ Je démarre mon lot</button>`:''}${st!=='terminé'?`<button class="chip" onclick="lotStatut('terminé')">✅ J’ai terminé mon lot</button>`:''}</div>`;
   if(!et.length) return h + `<div class="empty">Aucune étape attribuée à votre lot pour l’instant.</div>`;
-  h += `<p class="note" style="margin:0 0 10px">Cochez « C’est fait » quand une étape est terminée : l’architecte vérifiera et validera.</p>`;
+  const okA = et.filter(e=>e.statut==='validé').length, declA = et.filter(e=>e.statut==='déclaré').length;
+  h += `<div class="card"><div class="row between"><b>${okA} / ${et.length} validées par l’architecte</b>${declA?`<span class="pill p-acc">${declA} en vérification</span>`:''}</div><div class="bar"><i style="width:${et.length?Math.round(okA*100/et.length):0}%"></i></div></div>
+  <p class="note" style="margin:0 0 10px">Cochez « C’est fait » quand une étape ou un article du CCTP est terminé : l’architecte vérifiera et validera.</p>`;
   [...new Set(et.map(e=>e.phase))].forEach(ph=>{
     h += `<h2>${esc(ph)}</h2>`;
     et.filter(e=>e.phase===ph).forEach(e=>{
       const s = ET[e.statut]||ET['à faire'];
       h += `<div class="card"><div class="row" style="gap:12px">${vignette(e.lot||'Autre',44)}<div style="flex:1;min-width:0"><div class="ptitle">${esc(e.nom)}</div>${e.note?`<div class="meta" style="color:var(--bad)">Note de l’architecte : ${esc(e.note)}</div>`:''}</div><span class="pill ${s[1]}">${e.statut==='déclaré'?'En vérification':s[0]}</span></div>
+      ${e.detail?`<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700;font-size:13.5px;color:var(--blue)">Lire l’article du CCTP</summary><p style="white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:6px;background:#F8F6F2;border-radius:10px;padding:10px">${esc(e.detail)}</p></details>`:''}
       ${e.statut==='à faire'||e.statut==='en cours'?`<div class="btns" style="margin-top:10px">${e.statut==='à faire'?`<button class="btn" onclick="tache('${e.id}','en cours')">Je commence</button>`:''}<button class="btn ok" onclick="tache('${e.id}','déclaré')">✅ C’est fait</button></div>`:''}</div>`;
     });
   });
