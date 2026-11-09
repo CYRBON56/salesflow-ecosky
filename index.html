@@ -647,7 +647,6 @@ function homeView(){
 
   <section class="l-wrap" style="padding-bottom:30px" id="tarifs"><div class="l-offre">
     <div><h2>3 mois offerts. Ensuite, un prix clair.</h2><p class="intro">Créez votre espace et menez un vrai chantier pendant 3 mois, sans carte bancaire. Les artisans restent toujours gratuits. Sans engagement, ou 2 mois offerts à l’année.</p>
-      <p class="intro" style="margin-top:14px"><b style="color:#fff">Membres fondateurs :</b> les 30 premiers cabinets gardent -30 % à vie.</p>
       <div class="l-cta"><a class="l-btn j" href="#/connexion/inscription">Commencer mes 3 mois offerts</a><a class="l-btn o" style="border-color:#fff;color:#fff" href="https://tidycal.com/boncyrille56/15-minute-meeting" target="_blank" rel="noopener">Réserver une démo de 15 minutes</a></div></div>
     <div style="display:grid;gap:14px;position:relative">
       <div class="box"><div class="row between" style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:20px">Essentiel</b><span style="color:var(--gris);font-size:14px">1 pilote</span></div>
@@ -1312,9 +1311,7 @@ function visioChantier(){
 const QONTO = 'https://pay.qonto.com/payment-links/';
 const TARIFS = {
   normal:    {essentiel:{mois:[39,'01a1c02c-e432-777d-b787-7b169b95105a?resource_id=01a1c02c-e434-724a-b0c4-8b502d4c4fe9'], an:[390,'01a1c02c-eb09-70de-a3bb-4f4e4c9de307?resource_id=01a1c02c-eb09-7b35-a019-8bd544df3372']},
-              pro:      {mois:[69,'01a1c02c-efc1-733f-a0f9-7689bba88667?resource_id=01a1c02c-efc1-7dff-ad06-3197848b2613'], an:[690,'01a1c02c-f705-76d1-bceb-778e32e54e95?resource_id=01a1c02c-f706-71e9-aad3-9ef2f7689601']}},
-  fondateur: {essentiel:{mois:[27,'01a1c02c-fbaf-7cc9-ae34-d5527d0f4a9a?resource_id=01a1c02c-fbb0-7d8e-929f-6d6fb87f44b9'], an:[270,'01a1c02d-0417-7a14-b962-fbd30bdc07dc?resource_id=01a1c02d-0419-73f5-bec0-b3e28cb8b756']},
-              pro:      {mois:[48,'01a1c02d-0884-756f-a476-7a75c63cba51?resource_id=01a1c02d-0887-785f-b73c-cf4d78f00db1'], an:[480,'01a1c02d-0bc3-7a5a-836a-88496d066028?resource_id=01a1c02d-0bc5-747c-9392-d325efb9ba82']}}
+              pro:      {mois:[69,'01a1c02c-efc1-733f-a0f9-7689bba88667?resource_id=01a1c02c-efc1-7dff-ad06-3197848b2613'], an:[690,'01a1c02c-f705-76d1-bceb-778e32e54e95?resource_id=01a1c02c-f706-71e9-aad3-9ef2f7689601']}}
 };
 const eur = n => n.toLocaleString('fr-FR',{minimumFractionDigits:n%1?2:0, maximumFractionDigits:2})+' €';
 function etatAbo(c){
@@ -1327,20 +1324,20 @@ function bandeauAbo(){
   const c = S.espace && S.espace.compte; if(!c || !c.essai_fin) return '';
   const e = etatAbo(c);
   if(e.type==='abonne') return e.jours <= 10 ? `<div class="card row between" style="gap:10px;border-color:#F6C9A8"><div><b>Formule ${esc(c.formule||'')}</b><div class="meta">Renouvellement dans ${e.jours} jour${e.jours>1?'s':''}</div></div><button class="btn pri" onclick="choisirFormule()">Renouveler</button></div>` : '';
-  if(e.type==='essai') return `<div class="card row between" style="gap:10px"><div><b>Essai gratuit : ${e.jours} jour${e.jours>1?'s':''} restant${e.jours>1?'s':''}</b><div class="meta">${c.fondateur?'Membre fondateur : -30 % à vie si vous vous abonnez avant la fin de l’essai':'Ensuite à partir de 39 € HT par mois, sans engagement'}</div></div><button class="chip on" onclick="choisirFormule()">Voir les formules</button></div>`;
+  if(e.type==='essai') return `<div class="card row between" style="gap:10px"><div><b>Essai gratuit : ${e.jours} jour${e.jours>1?'s':''} restant${e.jours>1?'s':''}</b><div class="meta">Ensuite à partir de 39 € HT par mois, sans engagement</div></div><button class="chip on" onclick="choisirFormule()">Voir les formules</button></div>`;
   return `<div class="invite" style="background:var(--bad)"><b>Votre essai gratuit est terminé</b><p style="color:#fff">Vos chantiers et leur historique restent consultables. Pour en créer de nouveaux, choisissez votre formule.</p><button class="btn" style="margin-top:10px;background:#fff;color:var(--bad)" onclick="choisirFormule()">Choisir ma formule</button></div>`;
 }
 let ABO = {periode:'mois'};
 function choisirFormule(){
-  const c = S.espace.compte, grille = TARIFS[c.fondateur ? 'fondateur' : 'normal'], p = ABO.periode;
-  const carte = (k, nom, points) => { const [ht] = grille[k][p], ref = TARIFS.normal[k][p][0];
+  const c = S.espace.compte, grille = TARIFS.normal, p = ABO.periode;
+  const carte = (k, nom, points) => { const [ht] = grille[k][p];
     return `<div class="card" style="${k==='pro'?'border:2px solid var(--acc)':''}"><div class="row between"><b style="font-size:18px">${nom}</b>${k==='pro'?'<span class="pill p-acc">Le plus complet</span>':''}</div>
-    <div style="margin-top:8px"><b style="font-size:28px">${eur(ht)} HT</b><span class="meta"> / ${p==='mois'?'mois':'an'}</span>${c.fondateur?` <span class="meta" style="text-decoration:line-through">${eur(ref)}</span>`:''}</div>
+    <div style="margin-top:8px"><b style="font-size:28px">${eur(ht)} HT</b><span class="meta"> / ${p==='mois'?'mois':'an'}</span></div>
     <div class="meta" style="margin-top:2px">soit ${eur(Math.round(ht*120)/100)} TTC (TVA 20 %)</div>
     <ul style="list-style:none;margin:12px 0;display:grid;gap:6px;font-size:14px">${points.map(x=>`<li>✓ ${x}</li>`).join('')}</ul>
     <button class="btn ${k==='pro'?'pri':'dark'} full" onclick="payerFormule('${k}')">Payer ${eur(Math.round(ht*120)/100)} TTC avec Qonto</button></div>`; };
   sheet(`<h1 style="font-size:20px">Choisir ma formule</h1>
-  <p class="sub">${c.fondateur?'Vous êtes <b>membre fondateur</b> : -30 % à vie sur votre abonnement.':'Sans engagement. Les artisans restent toujours gratuits.'}</p>
+  <p class="sub">Sans engagement. Les artisans restent toujours gratuits.</p>
   <div class="seg" style="margin:14px 0"><button class="${p==='mois'?'on':''}" onclick="ABO.periode='mois';choisirFormule()">Au mois</button><button class="${p==='an'?'on':''}" onclick="ABO.periode='an';choisirFormule()">À l’année · 2 mois offerts</button></div>
   ${carte('essentiel','Essentiel',['1 personne pilote','Chantiers, artisans et CCTP illimités','Visio, plans, compte rendu','Votre logo et votre couleur','SMS envoyés depuis votre téléphone'])}
   ${carte('pro','Pro',['Jusqu’à 3 personnes pilotes','Tout l’Essentiel','SMS et e-mails envoyés par l’appli et tracés (bientôt)','300 SMS par mois inclus dès l’ouverture'])}
@@ -1348,7 +1345,7 @@ function choisirFormule(){
   <p class="note">${p==='mois'?'Au mois, le paiement se fait chaque mois depuis ce même écran : nous vous prévenons quelques jours avant l’échéance.':'À l’année, vous payez une fois pour 12 mois.'}</p>`);
 }
 async function payerFormule(k){
-  const c = S.espace.compte, p = ABO.periode, lien = TARIFS[c.fondateur ? 'fondateur' : 'normal'][k][p][1];
+  const c = S.espace.compte, p = ABO.periode, lien = TARIFS.normal[k][p][1];
   const w = window.open(QONTO + lien, '_blank');
   try{ await rpc('cc_abonnement_demande', {p_token:compteToken(), p_formule:k, p_periode:p}); }catch(e){ console.error(e); }
   if(!w) location.href = QONTO + lien;
