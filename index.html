@@ -448,6 +448,7 @@ function linkFor(token){ return `${location.origin}/#/c/${token}`; }
 function phoneIntl(t){ const d = String(t||'').replace(/\D/g,''); if(d.startsWith('0') && d.length===10) return '33'+d.slice(1); return d; }
 async function copyText(t){ try{ await navigator.clipboard.writeText(t); toast('Copié'); }catch(e){ toast('Copie impossible, sélectionnez le texte à la main', true); } }
 function mediaHtml(md, cls){
+  if(!/^https:\/\//.test(md.url||'')) return '';
   if(md.type==='img') return `<a href="${esc(md.url)}" target="_blank" rel="noopener"><img class="${cls||''}" src="${esc(md.url)}" alt="" loading="lazy"></a>`;
   if(md.type==='vid') return `<video class="${cls||''}" src="${esc(md.url)}" controls playsinline preload="metadata"></video>`;
   if(md.type==='aud') return `<audio src="${esc(md.url)}" controls preload="none"></audio>`;
@@ -737,7 +738,7 @@ function authView(){
     <label class="lb">Entreprise / cabinet</label><input class="inp" id="aEnt" autocomplete="organization">
     <label class="lb">Téléphone</label><input class="inp" id="aTel" type="tel" autocomplete="tel">`:''}
     <label class="lb">E-mail</label><input class="inp" id="aMail" type="email" autocomplete="email" required>
-    <label class="lb">Mot de passe</label><input class="inp" id="aMdp" type="password" autocomplete="${up?'new-password':'current-password'}" minlength="6" required>
+    <label class="lb">Mot de passe</label><input class="inp" id="aMdp" type="password" autocomplete="${up?'new-password':'current-password'}" minlength="${up?8:1}" required>${up?'<p class="note">8 caractères minimum.</p>':''}
     <div class="btns"><button class="btn pri full" id="aBtn" type="submit">${up?'Créer mon espace':'Se connecter'}</button></div>
   </form>
   <p class="note" style="text-align:center;margin-top:16px">${up?'Déjà inscrit ? <a href="#/connexion">Se connecter</a>':'Pas encore de compte ? <a href="#/connexion/inscription">Créer mon espace</a>'}</p>
@@ -749,6 +750,7 @@ async function doAuth(){
     const up = S.authMode==='up';
     const r = up ? await rpc('cc_inscription', {p_email:$('#aMail').value, p_mdp:$('#aMdp').value, p_nom:$('#aNom').value, p_entreprise:$('#aEnt').value, p_tel:$('#aTel').value})
                  : await rpc('cc_connexion', {p_email:$('#aMail').value, p_mdp:$('#aMdp').value});
+    if(r && r.erreur) throw new Error(r.erreur);
     LS.set('cc_compte', r.token); if(up){ S.etab='marque'; MQ=null; } toast(up?'Espace créé ! Commencez par votre image':'Bonjour '+r.nom.split(' ')[0]); location.hash = '#/espace';
   }catch(e){ fail(e); b.disabled = false; }
 }
@@ -763,9 +765,10 @@ function espaceView(){
   if(!h) h = `<h1>Bonjour ${esc(co.nom.split(' ')[0])}</h1><p class="sub">${esc(co.entreprise||'')}${co.entreprise?' · ':''}architecte / maître d’œuvre</p>`;
   if(!co.personnalise && tab!=='marque') h += `<div class="invite"><b>Donnez votre image à vos chantiers</b><p>Ajoutez votre logo, votre couleur et une image de couverture : vos artisans verront votre cabinet en ouvrant leur lien.</p><button class="btn pri" style="margin-top:10px" onclick="S.etab='marque';MQ=null;render()">Personnaliser mon espace</button></div>`;
   h += bandeauAbo();
-  h += `<div class="seg" style="margin:16px 0 4px"><button class="${tab==='chantiers'?'on':''}" onclick="S.etab='chantiers';render()">Mes chantiers</button><button class="${tab==='pros'?'on':''}" onclick="S.etab='pros';loadPros()">Mes pros</button><button class="${tab==='marque'?'on':''}" onclick="S.etab='marque';MQ=null;render()">Mon image</button></div>`;
+  h += `<div class="seg" style="margin:16px 0 4px"><button class="${tab==='chantiers'?'on':''}" onclick="S.etab='chantiers';render()">Mes chantiers</button><button class="${tab==='pros'?'on':''}" onclick="S.etab='pros';loadPros()">Mes pros</button><button class="${tab==='marque'?'on':''}" onclick="S.etab='marque';MQ=null;render()">Mon image</button><button class="${tab==='secu'?'on':''}" onclick="S.etab='secu';render()">Sécurité</button></div>`;
   if(tab==='pros') return h + prosView();
   if(tab==='marque') return h + marqueEdit();
+  if(tab==='secu') return h + securiteView();
   const act = e.chantiers.filter(c=>!c.archive), arch = e.chantiers.filter(c=>c.archive);
   const card = c => `<a class="card tap" style="display:block;text-decoration:none" href="#/c/${c.token}">
       <div class="row between"><div style="min-width:0"><div class="ptitle" style="font-size:16.5px">${esc(c.nom)}</div><div class="meta">${esc(c.adresse||'')}</div></div>
@@ -778,6 +781,75 @@ function espaceView(){
   ${act.map(card).join('') || '<div class="empty">Aucun chantier pour l’instant.<br>Créez le premier : nom, adresse, documents, puis envoyez un lien SMS à chaque professionnel.</div>'}
   ${arch.length?`<h2>Archivés</h2>${arch.map(card).join('')}`:''}
   <footer>Contact Chantier · offre ${esc(e.compte.offre)} · ${esc(e.compte.email)}</footer>`;
+}
+/* ---------- SÉCURITÉ ET SAUVEGARDE ---------- */
+let SAUV = {fichiers:true, enCours:false, etat:''};
+function securiteView(){
+  return `<div class="card" style="margin-top:12px"><b style="font-size:17px">Sauvegarder toutes mes données</b>
+    <p class="meta" style="margin-top:6px">Une archive ZIP avec tous vos chantiers : étapes, problèmes, messages, documents, accusés de lecture, intervenants, votre carnet de professionnels et l’historique de votre compte. Vous l’enregistrez où vous voulez : ordinateur, disque externe, serveur du cabinet, Google Drive, OneDrive…</p>
+    <label class="row" style="gap:8px;margin-top:10px;font-size:14px"><input type="checkbox" ${SAUV.fichiers?'checked':''} onchange="SAUV.fichiers=this.checked"> Inclure les photos, vidéos et documents (archive plus lourde)</label>
+    <button class="btn pri full" style="margin-top:12px" ${SAUV.enCours?'disabled':''} onclick="sauvegarder()">${SAUV.enCours?'Préparation…':'Télécharger ma sauvegarde'}</button>
+    ${SAUV.etat?`<p class="note" style="margin-top:8px">${esc(SAUV.etat)}</p>`:''}
+    <p class="note" style="margin-top:8px">Les mots de passe et les liens d’accès ne sont jamais inclus dans la sauvegarde. Conseil : faites-en une à la fin de chaque chantier.</p></div>
+  <div class="card"><b style="font-size:17px">Mot de passe</b>
+    <label class="lb">Mot de passe actuel</label><input class="inp" id="sAnc" type="password" autocomplete="current-password">
+    <label class="lb">Nouveau mot de passe (8 caractères minimum)</label><input class="inp" id="sNou" type="password" autocomplete="new-password" minlength="8">
+    <button class="btn full" style="margin-top:10px" onclick="changerMdp()">Changer mon mot de passe</button>
+    <p class="note" style="margin-top:6px">Changer de mot de passe déconnecte aussi vos autres appareils.</p></div>
+  <div class="card"><b style="font-size:17px">Appareils connectés</b>
+    <p class="meta" style="margin-top:6px">Téléphone perdu, ordinateur partagé ? Déconnectez votre compte partout, sauf ici.</p>
+    <button class="btn full" style="margin-top:10px" onclick="deconnecterPartout()">Déconnecter tous mes autres appareils</button></div>
+  <div class="card"><b style="font-size:17px">Hébergement dédié</b>
+    <p class="meta" style="margin-top:6px">Vos données sont hébergées en Europe (Francfort), chiffrées pendant leur transfert, et sauvegardées automatiquement chaque jour. Pour un cabinet qui souhaite ses données sur un serveur dédié, nous étudions votre demande : <a href="mailto:infos@ecosky.fr?subject=Contact%20Chantier%20-%20h%C3%A9bergement%20d%C3%A9di%C3%A9">infos@ecosky.fr</a>.</p></div>`;
+}
+async function changerMdp(){
+  try{ const r = await rpc('cc_mdp_changer', {p_token:compteToken(), p_ancien:$('#sAnc').value, p_nouveau:$('#sNou').value});
+    LS.set('cc_compte', r.token); toast('Mot de passe changé'); render(); }catch(e){ fail(e); }
+}
+async function deconnecterPartout(){
+  try{ const r = await rpc('cc_deconnecter_partout', {p_token:compteToken()}); LS.set('cc_compte', r.token); toast('Vos autres appareils sont déconnectés'); }catch(e){ fail(e); }
+}
+const csvCell = v => { if(v==null) return ''; if(typeof v==='object') v = JSON.stringify(v); v = String(v); return /[";\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+function toCsv(rows){ if(!rows || !rows.length) return ''; const cols = [...new Set(rows.flatMap(r=>Object.keys(r)))]; return '﻿'+[cols.join(';'), ...rows.map(r=>cols.map(c=>csvCell(r[c])).join(';'))].join('\r\n'); }
+const nomFichier = s => String(s||'sans-nom').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w.-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60) || 'sans-nom';
+async function sauvegarder(){
+  SAUV.enCours = true; SAUV.etat = 'Récupération de vos données…'; render();
+  try{
+    if(!window.JSZip) await chargerScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+    const d = await rpc('cc_export', {p_token:compteToken()});
+    const zip = new JSZip(), jour = new Date().toISOString().slice(0,10);
+    zip.file('donnees-completes.json', JSON.stringify(d, null, 2));
+    zip.file('professionnels.csv', toCsv(d.professionnels));
+    zip.file('historique-compte.csv', toCsv(d.journal));
+    zip.file('LISEZ-MOI.txt', `Sauvegarde Contact Chantier du ${new Date().toLocaleString('fr-FR')}\r\nCompte : ${d.compte.email}\r\n\r\ndonnees-completes.json : toutes les données, réimportables.\r\nUn dossier par chantier : fichiers CSV lisibles dans Excel (séparateur point-virgule) et, si demandé, les fichiers joints.\r\nLes dates sont en temps universel (UTC).\r\n`);
+    const fichiers = [];
+    d.chantiers.forEach((c, i) => {
+      const dos = zip.folder(String(i+1).padStart(2,'0')+'-'+nomFichier(c.chantier.nom));
+      ['intervenants','etapes','problemes','conversations','messages','documents','medias'].forEach(k => { if(c[k].length) dos.file(k+'.csv', toCsv(c[k])); });
+      dos.file('chantier.json', JSON.stringify(c, null, 2));
+      if(SAUV.fichiers) [...c.documents.map(x=>({...x, rep:'documents'})), ...c.medias.map(x=>({...x, rep:'photos-et-videos'}))].forEach(x => { if(/^https:\/\//.test(x.url||'')) fichiers.push({dos, x}); });
+    });
+    let ok = 0, ko = 0;
+    for(const {dos, x} of fichiers){
+      SAUV.etat = `Fichiers : ${ok+ko+1} / ${fichiers.length}`; render();
+      try{ const r = await fetch(x.url); if(!r.ok) throw 0; const ext = (x.url.split('?')[0].split('.').pop()||'bin').slice(0,5);
+        dos.folder(x.rep).file(nomFichier(x.created_at?.slice(0,10)+'-'+(x.nom||x.id)).replace(/\.\w{1,5}$/,'')+'.'+ext, await r.blob()); ok++; }
+      catch(e){ ko++; }
+    }
+    SAUV.etat = 'Compression…'; render();
+    const blob = await zip.generateAsync({type:'blob', compression:'DEFLATE'});
+    const nom = `contact-chantier-sauvegarde-${jour}.zip`;
+    if(window.showSaveFilePicker){
+      try{ const h = await showSaveFilePicker({suggestedName:nom, types:[{description:'Archive ZIP', accept:{'application/zip':['.zip']}}]});
+        const w = await h.createWritable(); await w.write(blob); await w.close(); }
+      catch(e){ if(e.name==='AbortError'){ SAUV.etat = 'Enregistrement annulé.'; return; } throw e; }
+    } else {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nom; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+    }
+    SAUV.etat = `Sauvegarde terminée : ${d.chantiers.length} chantier${d.chantiers.length>1?'s':''}${SAUV.fichiers?`, ${ok} fichier${ok>1?'s':''}${ko?` (${ko} introuvable${ko>1?'s':''})`:''}`:''}, ${(blob.size/1e6).toFixed(1)} Mo.`;
+    toast('Sauvegarde enregistrée');
+  }catch(e){ fail(e); SAUV.etat = ''; }
+  finally{ SAUV.enCours = false; render(); }
 }
 /* ---------- CARNET DE PROFESSIONNELS ---------- */
 let PROS = null;

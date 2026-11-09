@@ -1,2 +1,2 @@
 {"images":{"sizes":[128,256,384],"remotePatterns":[{"protocol":"https","hostname":"cdn.gamma.app"}],"minimumCacheTTL":2678400,"formats":["image/webp"]},
- "headers":[{"source":"/sw.js","headers":[{"key":"Cache-Control","value":"no-cache"}]},{"source":"/(.*)","headers":[{"key":"X-Content-Type-Options","value":"nosniff"},{"key":"Referrer-Policy","value":"strict-origin-when-cross-origin"}]}]}
+ "headers":[{"source":"/sw.js","headers":[{"key":"Cache-Control","value":"no-cache"}]},{"source":"/(.*)","headers":[{"key":"X-Content-Type-Options","value":"nosniff"},{"key":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"key":"Strict-Transport-Security","value":"max-age=63072000; includeSubDomains"},{"key":"X-Frame-Options","value":"SAMEORIGIN"}]}]}
