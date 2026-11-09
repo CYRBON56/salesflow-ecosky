@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Contact Chantier">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#F4F1EC; --card:#FFFFFF; --ink:#1E2328; --mute:#6B7178; --line:#E3DED6;
@@ -153,6 +153,172 @@ audio{width:100%;max-width:280px;height:40px;margin-top:4px}
 .spinner{width:22px;height:22px;border:3px solid #D9D2C7;border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite;margin:40px auto}
 @keyframes spin{to{transform:rotate(360deg)}}
 footer{text-align:center;font-size:12px;color:var(--mute);padding:30px 16px 10px;line-height:1.5}
+/* ================= PAGE DE PRÉSENTATION ================= */
+.app.land{max-width:none;padding:0;background:#EDF1F4;overflow-x:hidden}
+.land{--plan:#163A63;--plan2:#1F4F86;--calque:#EDF1F4;--encre:#0E1822;--jaune:#FFC72C;--signal:#E5484D;--vert:#2F9E6A;--gris:#5B6876;
+  font-family:Archivo,Manrope,system-ui,sans-serif;color:var(--encre);font-stretch:100%}
+.land a{text-decoration:none}
+.land :focus-visible{outline:3px solid var(--jaune);outline-offset:3px;border-radius:6px}
+.l-wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+.l-top{display:flex;align-items:center;gap:14px;padding:22px 0}
+.l-brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;font-stretch:112%;color:var(--encre)}
+.l-brand i{width:34px;height:34px;border-radius:9px;background:var(--plan);display:grid;place-items:center}
+.l-top nav{margin-left:auto;display:flex;gap:6px;align-items:center}
+.l-top nav a{padding:9px 14px;border-radius:10px;font-weight:600;font-size:14.5px;color:var(--encre)}
+.l-top nav a:hover{background:#DDE5EC}
+.l-btn{display:inline-flex;align-items:center;gap:9px;padding:15px 24px;border-radius:12px;font-weight:700;font-size:16px;border:2px solid transparent;cursor:pointer;transition:transform .12s, box-shadow .12s}
+.l-btn:active{transform:translateY(1px)}
+.l-btn.j{background:var(--jaune);color:var(--encre);box-shadow:0 3px 0 #C99A10}
+.l-btn.j:hover{box-shadow:0 5px 0 #C99A10;transform:translateY(-2px)}
+.l-btn.o{border-color:var(--encre);color:var(--encre);background:transparent}
+.l-btn.o:hover{background:var(--encre);color:#fff}
+.l-btn.sm{padding:10px 16px;font-size:14.5px}
+
+/* --- hero --- */
+.l-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);gap:56px;align-items:center;padding:34px 0 70px}
+.l-hero h1{font-size:clamp(38px,5.2vw,66px);line-height:1.02;font-weight:800;font-stretch:118%;letter-spacing:-1.2px;max-width:13ch}
+.l-hero p.lead{font-size:19px;line-height:1.55;color:#33404D;margin-top:22px;max-width:44ch}
+.l-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
+.l-small{font-size:14px;color:var(--gris);margin-top:16px;line-height:1.5;max-width:46ch}
+
+.plan{position:relative;background:var(--plan);border-radius:22px;aspect-ratio:1.18;overflow:hidden;box-shadow:0 30px 60px -28px rgba(22,58,99,.6)}
+.plan:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px);background-size:24px 24px}
+.plan svg.murs{position:absolute;inset:7% 6% 12% 6%;width:88%;height:81%}
+.plan .cartouche{position:absolute;right:16px;bottom:14px;border:1.5px solid rgba(255,255,255,.55);color:#DCE7F3;font-size:11.5px;line-height:1.35;padding:7px 10px;border-radius:4px;font-stretch:90%}
+.plan .cartouche b{display:block;color:#fff;font-size:12.5px;font-stretch:110%}
+.pin{position:absolute;display:flex;align-items:flex-start;gap:8px;animation:pose .55s cubic-bezier(.2,1.4,.4,1) both}
+.pin .pt{width:30px;height:30px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);display:grid;place-items:center;flex:none;box-shadow:0 6px 14px rgba(0,0,0,.3);border:2.5px solid #fff}
+.pin .pt>*{transform:rotate(45deg)}
+.pin .bulle{background:#fff;border-radius:12px;padding:8px 11px;font-size:12.5px;line-height:1.35;max-width:200px;box-shadow:0 10px 24px -8px rgba(0,0,0,.4);color:var(--encre)}
+.pin .bulle b{display:block;font-size:12.8px}
+.pin .bulle span{color:var(--gris)}
+.pin .bulle .tag{display:inline-block;margin-top:4px;font-size:11px;font-weight:700;padding:2px 7px;border-radius:99px}
+@keyframes pose{from{opacity:0;transform:translateY(-26px) scale(.9)}}
+.p1{left:9%;top:14%;animation-delay:.5s}.p2{left:47%;top:30%;animation-delay:1.25s}.p3{left:14%;top:58%;animation-delay:2s}.p4{left:55%;top:66%;animation-delay:2.75s}
+@media (prefers-reduced-motion:reduce){.pin{animation:none}}
+
+/* --- bande métiers --- */
+.l-metiers{background:#fff;border-block:1px solid #D6DEE6;padding:22px 0;overflow:hidden}
+.l-metiers .rail{display:flex;gap:18px;align-items:center;justify-content:center;flex-wrap:wrap}
+.l-metiers .m{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#33404D;width:78px;text-align:center}
+.l-metiers p{text-align:center;font-size:14.5px;color:var(--gris);margin-bottom:16px}
+
+/* --- sections --- */
+.l-sec{padding:96px 0}
+.l-sec h2,.l-offre h2{font-size:clamp(30px,3.4vw,44px);line-height:1.08;font-weight:800;font-stretch:115%;letter-spacing:-.8px;max-width:20ch}
+.l-sec .intro,.l-offre .intro{font-size:18px;line-height:1.55;color:#33404D;margin-top:16px;max-width:56ch}
+
+/* personnalisation */
+.l-perso{background:var(--encre);color:#E8EEF4}
+.l-perso h2{color:#fff}.l-perso .intro{color:#B9C5D1}
+.perso-grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:56px;margin-top:48px;align-items:center}
+.ctrl{background:#17242F;border:1px solid #273745;border-radius:18px;padding:26px}
+.ctrl label{display:block;font-size:14px;font-weight:600;margin:0 0 8px;color:#CFDAE4}
+.ctrl label+*{margin-bottom:22px}
+.ctrl input[type=text]{width:100%;background:#0E1822;border:1.5px solid #304252;color:#fff;border-radius:10px;padding:13px 14px;font:inherit;font-size:16px;outline:none}
+.ctrl input[type=text]:focus{border-color:var(--jaune)}
+.sw{display:flex;gap:10px;flex-wrap:wrap}
+.sw button{width:38px;height:38px;border-radius:50%;border:3px solid transparent;box-shadow:0 0 0 1px #304252}
+.sw button.on{border-color:#fff}
+.drop{display:flex;align-items:center;gap:14px;border:1.5px dashed #3A5064;border-radius:12px;padding:14px;position:relative;cursor:pointer;color:#B9C5D1;font-size:14px}
+.drop:hover{border-color:var(--jaune)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop .lg{width:48px;height:48px;border-radius:10px;background:#0E1822;display:grid;place-items:center;overflow:hidden;flex:none}
+.drop .lg img{width:100%;height:100%;object-fit:contain;background:#fff}
+.ctrl .hint{font-size:13px;color:#8FA1B2;line-height:1.5}
+
+.tel{width:310px;max-width:100%;margin:0 auto;background:#0B131B;border-radius:40px;padding:12px;box-shadow:0 40px 80px -30px rgba(0,0,0,.8),0 0 0 2px #273745}
+.ecran{background:#EDF1F4;border-radius:30px;overflow:hidden;color:var(--encre);font-family:Manrope,system-ui,sans-serif;min-height:560px}
+.ecran .couv{height:118px;position:relative;background:var(--marque,#163A63);display:flex;align-items:flex-end;padding:14px}
+.ecran .couv .logo{width:52px;height:52px;border-radius:12px;background:#fff;display:grid;place-items:center;overflow:hidden;font-weight:800;font-size:19px;color:var(--marque,#163A63);box-shadow:0 6px 16px rgba(0,0,0,.25)}
+.ecran .couv .logo img{width:100%;height:100%;object-fit:contain}
+.ecran .couv .qui{color:#fff;margin-left:10px;line-height:1.25}
+.ecran .couv .qui small{display:block;font-size:11px;opacity:.85}
+.ecran .couv .qui b{font-size:15px}
+.ecran .corps{padding:14px}
+.ecran h4{font-size:17px;font-weight:800;letter-spacing:-.2px}
+.ecran .adr{font-size:12px;color:#5B6876;margin-top:2px}
+.ecran .mot{background:#fff;border-radius:12px;padding:11px 12px;font-size:12.5px;line-height:1.45;margin-top:12px;border-left:4px solid var(--marque,#163A63)}
+.ecran .tache{display:flex;align-items:center;gap:10px;background:#fff;border-radius:12px;padding:10px 12px;margin-top:8px;font-size:13px;font-weight:600}
+.ecran .tache i{width:20px;height:20px;border-radius:6px;border:2px solid #C3CDD7;flex:none}
+.ecran .tache.ok i{background:var(--vert);border-color:var(--vert)}
+.ecran .tache small{display:block;font-weight:500;color:#5B6876;font-size:11.5px}
+.ecran .bout{margin-top:14px;background:var(--marque,#163A63);color:#fff;text-align:center;font-weight:800;border-radius:99px;padding:13px;font-size:14px}
+
+/* étapes */
+.etapes{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:52px;counter-reset:e}
+.etape{border-top:3px solid var(--encre);padding-top:20px}
+.etape:before{counter-increment:e;content:counter(e);display:block;font-size:54px;font-weight:800;font-stretch:125%;color:var(--plan2);line-height:1;margin-bottom:14px}
+.etape h3{font-size:21px;font-weight:700;font-stretch:108%;margin-bottom:8px}
+.etape p{font-size:16px;line-height:1.55;color:#33404D}
+
+/* deux regards */
+.regards{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:48px}
+.regard{border-radius:20px;padding:30px;background:#fff;border:1px solid #D6DEE6}
+.regard.art{background:var(--jaune);border-color:var(--jaune)}
+.regard h3{font-size:24px;font-weight:800;font-stretch:112%;margin-bottom:6px}
+.regard .q{font-size:15px;color:#33404D;margin-bottom:18px}
+.regard.art .q{color:#4A3B00}
+.regard ul{list-style:none;display:grid;gap:12px}
+.regard li{display:flex;gap:12px;font-size:16px;line-height:1.45}
+.regard li svg{flex:none;margin-top:2px}
+
+/* offre */
+.l-offre{background:var(--plan);color:#fff;border-radius:28px;padding:64px;display:grid;grid-template-columns:1.2fr .8fr;gap:40px;align-items:center;position:relative;overflow:hidden}
+.l-offre:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px);background-size:24px 24px;pointer-events:none}
+.l-offre h2{color:#fff;position:relative}
+.l-offre .intro{color:#C9D8E8;position:relative}
+.l-offre .box{position:relative;background:#fff;color:var(--encre);border-radius:18px;padding:26px}
+.l-offre .prix{font-size:44px;font-weight:800;font-stretch:120%;line-height:1}
+.l-offre .prix small{font-size:15px;font-weight:600;color:var(--gris);font-stretch:100%}
+.l-offre .box ul{list-style:none;margin:16px 0 22px;display:grid;gap:9px;font-size:15px}
+.l-offre .box li:before{content:"✓";color:var(--vert);font-weight:800;margin-right:8px}
+.l-foot{padding:40px 0 50px;font-size:13.5px;color:var(--gris);line-height:1.6;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.l-mine{background:#fff;border:1px solid #D6DEE6;border-radius:16px;padding:18px 20px;margin-top:-30px;margin-bottom:40px}
+.l-mine a{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid #E6ECF1;color:var(--encre);font-weight:600}
+.l-mine a:first-of-type{border-top:none}
+
+@media (max-width:900px){
+  .l-hero,.perso-grid,.l-offre{grid-template-columns:1fr}
+  .l-hero{gap:36px;padding-top:10px}
+  .etapes,.regards{grid-template-columns:1fr}
+  .l-sec{padding:70px 0}
+  .l-offre{padding:36px 24px}
+  .l-top nav a.hide-m{display:none}
+  .l-brand{font-size:17px;white-space:nowrap}
+  .pin .bulle{max-width:150px;font-size:11.5px}
+}
+@media (max-width:560px){
+  .l-wrap{padding:0 18px}
+  .pin .bulle span{display:none}
+  .l-top nav .l-btn{display:none}
+  .p2{left:40%}.p4{left:44%}
+}
+
+/* ================= MARQUE DU PILOTE DANS L'APPLI ================= */
+.marque{border-radius:18px;overflow:hidden;margin-bottom:14px;background:var(--card);border:1px solid var(--line)}
+.marque .couv{height:110px;background:var(--acc) center/cover no-repeat;position:relative}
+.marque .couv:after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 40%,rgba(0,0,0,.35))}
+.marque .pied{display:flex;align-items:flex-start;gap:12px;padding:0 14px 12px;margin-top:-30px;position:relative;z-index:1}
+.marque .logo{width:64px;height:64px;border-radius:14px;background:#fff;border:3px solid #fff;box-shadow:0 6px 16px rgba(0,0,0,.18);display:grid;place-items:center;overflow:hidden;font-weight:800;font-size:22px;color:var(--acc);flex:none}
+.marque .logo img{width:100%;height:100%;object-fit:contain}
+.marque .qui{min-width:0;margin-top:36px}
+.marque .qui b{display:block;font-size:16px;line-height:1.2}
+.marque .qui small{color:var(--mute);font-size:12.5px}
+.marque .mot{margin:0 14px 14px;font-size:13.5px;line-height:1.5;background:#F8F6F2;border-left:4px solid var(--acc);padding:10px 12px;border-radius:8px;white-space:pre-wrap}
+.marque.mini .couv{height:70px}.marque.mini .logo{width:48px;height:48px;font-size:17px}.marque.mini .pied{margin-top:-22px}.marque.mini .qui{margin-top:26px}
+.up{display:flex;align-items:center;gap:12px;background:var(--card);border:1.5px dashed #CFC8BD;border-radius:12px;padding:12px;position:relative;cursor:pointer}
+.up input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.up .apercu{width:56px;height:56px;border-radius:10px;background:#EEEAE4;display:grid;place-items:center;overflow:hidden;flex:none;color:var(--mute)}
+.up .apercu img{width:100%;height:100%;object-fit:cover}
+.up.up-logo .apercu img{object-fit:contain;background:#fff}
+.couleurs{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.couleurs button{width:36px;height:36px;border-radius:50%;border:3px solid transparent;box-shadow:0 0 0 1px var(--line)}
+.couleurs button.on{border-color:var(--ink)}
+.couleurs input[type=color]{width:38px;height:38px;border:1px solid var(--line);border-radius:50%;background:none;padding:2px;cursor:pointer;overflow:hidden}.couleurs input[type=color]::-webkit-color-swatch-wrapper{padding:0}.couleurs input[type=color]::-webkit-color-swatch{border:none;border-radius:50%}
+.invite{background:var(--ink);color:#fff;border-radius:16px;padding:16px;margin:14px 0}
+.invite b{font-size:16px}.invite p{font-size:13.5px;color:#C9CFD5;margin-top:4px;line-height:1.45}
+
 @media print{
   header,.tabs,.fab,.btns,.no-print,footer{display:none!important}
   body{background:#fff}.app{padding:0;max-width:none}main{padding:0}
@@ -336,6 +502,7 @@ async function loadEspace(){
 async function loadChantier(first){
   try{
     const d = await rpc('cc_chantier', {p_token:S.token});
+    if(first || !S.marque || S.marqueTok!==S.token){ try{ S.marque = await rpc('cc_marque_chantier', {p_token:S.token}); S.marqueTok = S.token; }catch(e){ S.marque = null; } }
     const changed = JSON.stringify(d) !== JSON.stringify(S.data);
     S.data = d; rememberLink(S.token, d.chantier.nom, d.moi.role);
     if(first || changed) render();
@@ -354,9 +521,13 @@ function headerHtml(){
     ${S.route==='home'?`<a class="hbtn" href="#/connexion">Connexion</a>`:''}</div></header>`;
 }
 function render(){
+  $('#app').className = S.route==='home' ? 'app land' : 'app';
+  if(S.route==='home'){ appliquerCouleur(null); $('#app').innerHTML = homeView(); return; }
+  if(S.route==='espace' && S.espace) appliquerCouleur(S.etab==='marque' && MQ ? (MQ.couleur||S.espace.compte.couleur) : S.espace.compte.couleur);
+  else if(S.route==='chantier') appliquerCouleur(S.marque && S.marque.couleur);
+  else appliquerCouleur(null);
   let h = headerHtml() + '<main>';
-  if(S.route==='home') h += homeView();
-  else if(S.route==='auth') h += authView();
+  if(S.route==='auth') h += authView();
   else if(S.route==='espace') h += espaceView();
   else if(S.route==='chantier' && S.data) h += chantierView();
   h += '</main>';
@@ -367,25 +538,187 @@ function render(){
   
 }
 
-/* ---------- HOME ---------- */
+/* ---------- PAGE DE PRÉSENTATION ---------- */
+const CHECK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+const DEMO = { nom:'Atelier Kerlann Architectes', couleur:'#163A63', logo:null };
+const DEMO_COULEURS = ['#163A63','#2F6B4F','#8C2F39','#B8860B','#4B3F72','#1E2328','#C2571A'];
+function demoMaj(){
+  const e = document.querySelector('.ecran'); if(!e) return;
+  e.style.setProperty('--marque', DEMO.couleur);
+  e.querySelector('.qui b').textContent = DEMO.nom || 'Votre cabinet';
+  const lg = e.querySelector('.couv .logo');
+  lg.innerHTML = DEMO.logo ? `<img src="${DEMO.logo}" alt="">` : esc(initials(DEMO.nom||'VC'));
+  document.querySelectorAll('.sw button').forEach(b=>b.classList.toggle('on', b.dataset.c===DEMO.couleur));
+}
+function demoLogo(inp){
+  const f = inp.files && inp.files[0]; if(!f) return;
+  const r = new FileReader(); r.onload = () => { DEMO.logo = r.result; const p = document.querySelector('.drop .lg'); if(p) p.innerHTML = `<img src="${r.result}" alt="">`; demoMaj(); }; r.readAsDataURL(f);
+}
 function homeView(){
   const liens = LS.get('cc_liens', []);
-  return `<div class="hero"><h1>Tous les corps de métier d’un chantier, au même endroit.</h1>
-  <p>Photos, problèmes, vidéos, plans et discussions entre artisans — visibles en direct par l’architecte ou le maître d’œuvre. Fini les infos perdues dans les SMS.</p></div>
-  <div class="feat">
-    <div><b>📸 Signaler en 3 gestes</b>Photo ou vidéo, lot concerné, urgence.</div>
-    <div><b>🔁 Suivi des problèmes</b>Ouvert → en cours → résolu avec preuve → validé.</div>
-    <div><b>💬 Discussion de chantier</b>Messages, vocaux, @lot pour prévenir un artisan.</div>
-    <div><b>📐 Plans à jour</b>Nouvel indice signalé à tous, accusés de lecture.</div>
-    <div><b>🆓 Artisans gratuits</b>Un lien par SMS, sans compte ni mot de passe.</div>
-    <div><b>📄 Compte rendu</b>Généré en un clic, prêt à imprimer en PDF.</div>
+  const pin = (cls, couleur, ico, titre, txt, tag, tagStyle) => `<div class="pin ${cls}"><div class="pt" style="background:${couleur}"><span>${ico}</span></div><div class="bulle"><b>${titre}</b><span>${txt}</span>${tag?`<br><em class="tag" style="${tagStyle}">${tag}</em>`:''}</div></div>`;
+  const icoW = p => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const metiers = ['Terrassement','Maçonnerie','Charpente','Couverture','Menuiserie','Plomberie','Électricité','Plâtrerie','Carrelage','Peinture','Paysagiste'];
+  return `<div class="land">
+  <div class="l-wrap">
+    <div class="l-top">
+      <a class="l-brand" href="#/"><i>${I.tri}</i>Contact Chantier</a>
+      <nav><a class="hide-m" href="#perso" onclick="event.preventDefault();document.getElementById('perso').scrollIntoView({behavior:'smooth'})">Votre image</a>
+      <a class="hide-m" href="#comment" onclick="event.preventDefault();document.getElementById('comment').scrollIntoView({behavior:'smooth'})">Comment ça marche</a>
+      <a href="#/connexion">Connexion</a>
+      <a class="l-btn j sm" href="#/connexion/inscription">Essayer gratuitement</a></nav>
+    </div>
+
+    <section class="l-hero">
+      <div>
+        <h1>Tout ce qui se passe sur vos chantiers, sur un seul plan.</h1>
+        <p class="lead">Chaque artisan signale ce qu’il voit — photo, vidéo, message vocal — depuis son téléphone. Vous suivez tout depuis votre bureau, vous validez, vous relancez. Fini les infos perdues dans les SMS.</p>
+        <div class="l-cta"><a class="l-btn j" href="#/connexion/inscription">Créer mon espace gratuit</a>
+        <a class="l-btn o" href="#perso" onclick="event.preventDefault();document.getElementById('perso').scrollIntoView({behavior:'smooth'})">Voir la démo</a></div>
+        <p class="l-small">Pour les architectes, maîtres d’œuvre et constructeurs. Vos artisans n’ont rien à installer : ils reçoivent un lien par SMS.</p>
+      </div>
+      <div class="plan" role="img" aria-label="Plan d’une maison sur lequel les artisans ont signalé quatre points : une photo du plombier, une question de l’électricien, un problème bloquant en maçonnerie et une étape validée en menuiserie.">
+        <svg class="murs" viewBox="0 0 400 300" fill="none" stroke="#fff" stroke-linecap="square">
+          <g stroke-width="7" opacity=".95"><path d="M10 10h380v280H10z"/></g>
+          <g stroke-width="4" opacity=".8"><path d="M170 10v110M170 160v130M10 150h110M150 150h20M240 150h150M290 150v140M290 10v90"/></g>
+          <g stroke-width="1.4" opacity=".55"><path d="M120 150a30 30 0 0 1 30-30M170 120a40 40 0 0 1 40 40M290 100a30 30 0 0 1 30 30"/></g>
+          <g stroke-width="1" opacity=".45" stroke-dasharray="4 5"><path d="M10 -6h380M-6 10v280"/></g>
+          <g fill="#fff" stroke="none" opacity=".75" font-family="Archivo,sans-serif" font-size="11" letter-spacing=".5"><text x="60" y="80">SÉJOUR 32 m²</text><text x="205" y="70">CUISINE</text><text x="310" y="60">CELLIER</text><text x="45" y="225">CH. 1</text><text x="210" y="225">SDB</text><text x="315" y="225">CH. 2</text></g>
+        </svg>
+        ${pin('p1','#2C5D8F',icoW('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>'),'Plomberie · photo','Attentes eau posées côté séjour','','')}
+        ${pin('p2','#E0A800',icoW('<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/>'),'Électricité · vocal 0:42','Hauteur des prises plan de travail ?','Question à l’architecte','background:#FFF4CC;color:#7A5B00')}
+        ${pin('p3','#E5484D',icoW('<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>'),'Maçonnerie','Réservation VMC oubliée ch. 1','Bloquant','background:#FDE3E4;color:#B4232A')}
+        ${pin('p4','#2F9E6A',icoW('<polyline points="20 6 9 17 4 12"/>'),'Menuiserie','Pose fenêtres terminée','Validé par l’architecte','background:#DDF3E8;color:#1E6E48')}
+        <div class="cartouche"><b>Maison Le Goff</b>Vannes · 14 intervenants</div>
+      </div>
+    </section>
   </div>
-  <h2>Tous les corps de métier réunis</h2>
-  <div class="lgrid">${['Terrassement','Maçonnerie','Charpente','Couverture','Menuiserie','Plomberie','Électricité','Chauffage','Plâtrerie','Isolation','Carrelage','Sols / Résine','Peinture','Cuisine','Paysagiste'].map(l=>`<div class="lcell" style="padding:8px 6px">${vignette(l,84)}<div class="ptitle" style="font-size:12.5px;margin-top:6px">${l}</div></div>`).join('')}</div>
-  ${liens.length?`<h2>Vos chantiers sur ce téléphone</h2>${liens.map(l=>`<a class="card tap row between" style="text-decoration:none" href="#/c/${l.token}"><div><div class="ptitle">${esc(l.nom)}</div><div class="meta">${l.role==='moe'?'Pilote':l.role==='client'?'Client':'Intervenant'} · ouvert ${ago(l.d)}</div></div><span style="font-size:22px;color:var(--mute)">›</span></a>`).join('')}`:''}
-  <div class="btns" style="margin-top:22px"><a class="btn pri" href="#/connexion/inscription">Créer mon espace pilote</a><a class="btn" href="#/connexion">J’ai déjà un compte</a></div>
-  <p class="note" style="text-align:center">Vous êtes artisan et avez reçu un lien ? Ouvrez-le simplement : aucun compte n’est nécessaire.</p>
-  <footer>Contact Chantier · édité par RMS — Résine Marbre Sol, 56400 Brech · SIRET 939 997 870 00018<br>Contact : infos@ecosky.fr · 06 45 68 83 94</footer>`;
+
+  <div class="l-metiers"><div class="l-wrap"><p>Tous les corps de métier du chantier, chacun avec son espace.</p>
+    <div class="rail">${metiers.map(l=>`<div class="m">${vignette(l,60)}${l}</div>`).join('')}</div></div></div>
+
+  ${liens.length?`<div class="l-wrap" style="padding-top:60px"><div class="l-mine"><b>Vos chantiers sur cet appareil</b>${liens.map(l=>`<a href="#/c/${l.token}"><span>${esc(l.nom)}</span><span style="color:var(--gris)">${l.role==='moe'?'Pilote':l.role==='client'?'Client':'Intervenant'}</span></a>`).join('')}</div></div>`:''}
+
+  <section class="l-sec l-perso" id="perso"><div class="l-wrap">
+    <h2>Vos artisans ouvrent le chantier… et voient votre cabinet.</h2>
+    <p class="intro">Votre logo, votre couleur, une photo ou une perspective du projet, et un mot d’accueil. Essayez ici : c’est exactement ce que l’artisan verra sur son téléphone.</p>
+    <div class="perso-grid">
+      <div class="ctrl">
+        <label for="dNom">Nom de votre cabinet</label>
+        <input type="text" id="dNom" value="${esc(DEMO.nom)}" oninput="DEMO.nom=this.value;demoMaj()" maxlength="40">
+        <label>Votre couleur</label>
+        <div class="sw">${DEMO_COULEURS.map(c=>`<button type="button" data-c="${c}" class="${c===DEMO.couleur?'on':''}" style="background:${c}" aria-label="Couleur ${c}" onclick="DEMO.couleur='${c}';demoMaj()"></button>`).join('')}</div>
+        <label>Votre logo</label>
+        <div class="drop"><div class="lg">${DEMO.logo?`<img src="${DEMO.logo}" alt="">`:I.img}</div><div>Déposez votre logo ici<br><span class="hint">PNG ou JPG, il reste sur votre ordinateur pour cet essai</span></div><input type="file" accept="image/*" onchange="demoLogo(this)" aria-label="Choisir un logo"></div>
+        <p class="hint">Dans votre espace, vous ajoutez aussi une image de couverture (photo, perspective, plan de situation) et le message d’accueil que chaque artisan lira en arrivant.</p>
+      </div>
+      <div class="tel"><div class="ecran" style="--marque:${DEMO.couleur}">
+        <div class="couv"><div class="logo">${DEMO.logo?`<img src="${DEMO.logo}" alt="">`:esc(initials(DEMO.nom))}</div><div class="qui"><small>Chantier piloté par</small><b>${esc(DEMO.nom)}</b></div></div>
+        <div class="corps">
+          <h4>Maison Le Goff</h4><div class="adr">12 rue des Mimosas, Vannes</div>
+          <div class="mot">Bienvenue sur le chantier ! Signalez ici tout problème en photo. Réunion de chantier chaque jeudi 8 h 30.</div>
+          <div class="tache ok"><i></i><div>Réseaux EU/EV posés<small>Validé jeudi</small></div></div>
+          <div class="tache"><i></i><div>Attentes eau cuisine<small>À faire cette semaine</small></div></div>
+          <div class="tache"><i></i><div>Essai d’étanchéité<small>Avant le 28 nov.</small></div></div>
+          <div class="bout">Signaler un problème</div>
+        </div>
+      </div></div>
+    </div>
+  </div></section>
+
+  <section class="l-sec" id="comment"><div class="l-wrap">
+    <h2>En place en dix minutes, sur le chantier dès demain.</h2>
+    <div class="etapes">
+      <div class="etape"><h3>Créez le chantier</h3><p>Nom, adresse, corps de métier. Déposez les plans et le planning : chacun ne voit que les documents de son lot.</p></div>
+      <div class="etape"><h3>Envoyez un lien par SMS</h3><p>Chaque artisan reçoit son lien. Il l’ouvre, il est sur le chantier. Pas de compte, pas de mot de passe, pas d’appli à télécharger.</p></div>
+      <div class="etape"><h3>Suivez, validez, relancez</h3><p>Les signalements arrivent avec photo et lot concerné. Vous cochez l’avancement et le compte rendu se prépare tout seul.</p></div>
+    </div>
+  </div></section>
+
+  <section class="l-sec" style="padding-top:0"><div class="l-wrap">
+    <h2>Un même chantier, deux façons de le vivre.</h2>
+    <div class="regards">
+      <div class="regard"><h3>Au bureau</h3><p class="q">L’architecte, le maître d’œuvre, le conducteur de travaux.</p>
+        <ul><li>${CHECK}Tous les problèmes ouverts, par lot et par urgence</li><li>${CHECK}L’avancement étape par étape, déclaré par l’artisan, vérifié par vous</li><li>${CHECK}Les plans à jour : un nouvel indice prévient les lots concernés</li><li>${CHECK}Le compte rendu de chantier en un clic, prêt en PDF</li></ul></div>
+      <div class="regard art"><h3>Sur le chantier</h3><p class="q">Le plombier, l’électricien, le maçon… sur leur téléphone.</p>
+        <ul><li>${CHECK}Une photo, le lot, l’urgence : signalé en trois gestes</li><li>${CHECK}Un message vocal quand on a les mains prises</li><li>${CHECK}Sa liste de tâches, et l’étape cochée quand c’est fait</li><li>${CHECK}Gratuit pour l’artisan, toujours</li></ul></div>
+    </div>
+  </div></section>
+
+  <section class="l-wrap" style="padding-bottom:30px"><div class="l-offre">
+    <div><h2>Gratuit pendant le lancement.</h2><p class="intro">Créez votre espace, personnalisez-le et lancez un vrai chantier. Sans carte bancaire, sans engagement.</p></div>
+    <div class="box"><div class="prix">0 € <small>pendant la phase de lancement</small></div>
+      <ul><li>Chantiers et intervenants illimités</li><li>Votre logo et votre couleur</li><li>Photos, vidéos, vocaux, plans</li><li>Compte rendu PDF</li></ul>
+      <a class="l-btn j" style="width:100%;justify-content:center" href="#/connexion/inscription">Créer mon espace gratuit</a></div>
+  </div></section>
+
+  <div class="l-wrap"><div class="l-foot"><div><b style="color:var(--encre)">Contact Chantier</b><br>Édité par RMS — Résine Marbre Sol, 23 route de Corn er Hoet, 56400 Brech<br>SIRET 939 997 870 00018</div>
+  <div>Une question ? 06 45 68 83 94<br>infos@ecosky.fr</div></div></div>
+  </div>`;
+}
+
+/* ---------- MARQUE DU PILOTE ---------- */
+const ACC_DEF = '#E8590C';
+function appliquerCouleur(c){
+  const r = document.documentElement.style;
+  if(c && /^#[0-9a-f]{6}$/i.test(c)){ r.setProperty('--acc', c); r.setProperty('--acc-soft', c+'22'); }
+  else { r.removeProperty('--acc'); r.removeProperty('--acc-soft'); }
+}
+function marqueHtml(m, opts){
+  if(!m) return '';
+  const nomAff = m.entreprise || m.nom || '';
+  if(!m.logo && !m.couverture && !m.accueil && !m.couleur) return '';
+  const o = opts||{};
+  return `<div class="marque${o.mini?' mini':''}">
+    <div class="couv" style="${m.couverture?`background-image:url('${esc(m.couverture)}')`:''}"></div>
+    <div class="pied"><div class="logo">${m.logo?`<img src="${esc(m.logo)}" alt="Logo ${esc(nomAff)}">`:esc(initials(nomAff))}</div>
+    <div class="qui"><small>${o.titre||'Chantier piloté par'}</small><b>${esc(nomAff)}</b>${m.slogan?`<small>${esc(m.slogan)}</small>`:''}</div></div>
+    ${!o.sansMot && m.accueil?`<div class="mot">${esc(m.accueil)}</div>`:''}</div>`;
+}
+
+/* éditeur « Mon cabinet » dans l'espace pilote */
+let MQ = null;
+const COULEURS_APP = ['#163A63','#2C5D8F','#2F6B4F','#8C2F39','#B8860B','#4B3F72','#C2571A','#1E2328'];
+function marqueEdit(){
+  const c = S.espace.compte;
+  if(!MQ) MQ = {logo:c.logo||'', couverture:c.couverture||'', couleur:c.couleur||'', entreprise:c.entreprise||'', slogan:c.slogan||'', accueil:c.accueil||'', site:c.site||'', tel:c.tel||''};
+  const ap = {nom:c.nom, entreprise:MQ.entreprise, logo:MQ.logo, couverture:MQ.couverture, couleur:MQ.couleur||'#163A63', slogan:MQ.slogan, accueil:MQ.accueil||'Bienvenue sur le chantier ! Signalez ici tout problème en photo.'};
+  return `<p class="sub" style="margin:14px 0 4px">Ce que vos artisans et vos clients voient en ouvrant un de vos chantiers :</p>
+  <div id="mqApercu" style="--acc:${esc(ap.couleur)}">${marqueHtml(ap)}</div>
+  <label class="lb">Nom du cabinet / de l’entreprise</label><input class="inp" value="${esc(MQ.entreprise)}" oninput="MQ.entreprise=this.value;mqApercu()" maxlength="60">
+  <label class="lb">Votre logo</label>
+  <label class="up up-logo"><div class="apercu" id="upLogo">${MQ.logo?`<img src="${esc(MQ.logo)}" alt="">`:I.img}</div><div><b>${MQ.logo?'Changer le logo':'Ajouter votre logo'}</b><div class="meta">PNG ou JPG, idéalement sur fond transparent</div></div><input type="file" accept="image/*" onchange="mqUpload(this,'logo')"></label>
+  ${MQ.logo?`<button class="btn bad" style="margin-top:6px;padding:7px 10px;font-size:13px" onclick="MQ.logo='';render()">Retirer le logo</button>`:''}
+  <label class="lb">Image de couverture</label>
+  <label class="up"><div class="apercu" id="upCouv">${MQ.couverture?`<img src="${esc(MQ.couverture)}" alt="">`:I.img}</div><div><b>${MQ.couverture?'Changer l’image':'Ajouter une image'}</b><div class="meta">Photo de réalisation, perspective, carte de visite ou plan de situation</div></div><input type="file" accept="image/*" onchange="mqUpload(this,'couverture')"></label>
+  ${MQ.couverture?`<button class="btn bad" style="margin-top:6px;padding:7px 10px;font-size:13px" onclick="MQ.couverture='';render()">Retirer l’image</button>`:''}
+  <label class="lb">Votre couleur</label>
+  <div class="couleurs">${COULEURS_APP.map(x=>`<button type="button" aria-label="Couleur ${x}" class="${(MQ.couleur||'').toLowerCase()===x.toLowerCase()?'on':''}" style="background:${x}" onclick="MQ.couleur='${x}';render()"></button>`).join('')}
+    <input type="color" value="${esc(MQ.couleur||'#163A63')}" onchange="MQ.couleur=this.value;render()" aria-label="Autre couleur"></div>
+  <label class="lb">Votre signature (facultatif)</label><input class="inp" value="${esc(MQ.slogan)}" oninput="MQ.slogan=this.value;mqApercu()" maxlength="120" placeholder="Architecte DPLG · Vannes">
+  <label class="lb">Message d’accueil des artisans</label><textarea class="inp" oninput="MQ.accueil=this.value;mqApercu()" maxlength="600" placeholder="Bienvenue sur le chantier ! Réunion chaque jeudi 8 h 30. Signalez tout problème en photo.">${esc(MQ.accueil)}</textarea>
+  <div class="row" style="gap:8px"><div style="flex:1"><label class="lb">Téléphone</label><input class="inp" type="tel" value="${esc(MQ.tel)}" oninput="MQ.tel=this.value"></div>
+  <div style="flex:1"><label class="lb">Site internet</label><input class="inp" value="${esc(MQ.site)}" oninput="MQ.site=this.value" placeholder="www.moncabinet.fr"></div></div>
+  <div class="btns"><button class="btn pri full" id="mqBtn" onclick="mqSave()">Enregistrer mon image</button></div>
+  <p class="note">Votre couleur remplace l’orange de l’application sur tous vos chantiers, pour vous comme pour vos artisans.</p>`;
+}
+function mqApercu(){
+  const c = S.espace.compte, el = $('#mqApercu'); if(!el) return;
+  el.innerHTML = marqueHtml({nom:c.nom, entreprise:MQ.entreprise, logo:MQ.logo, couverture:MQ.couverture, couleur:MQ.couleur||'#163A63', slogan:MQ.slogan, accueil:MQ.accueil||'Bienvenue sur le chantier ! Signalez ici tout problème en photo.'});
+}
+async function mqUpload(inp, champ){
+  const f = inp.files && inp.files[0]; if(!f) return;
+  if(!f.type.startsWith('image/')){ toast('Choisissez une image (PNG ou JPG)', true); return; }
+  const box = $(champ==='logo'?'#upLogo':'#upCouv'); if(box) box.innerHTML = '<div class="spinner" style="margin:0;width:18px;height:18px"></div>';
+  try{ const md = await upload(f, 'marque-'+uid()); MQ[champ] = md.url; render(); toast(champ==='logo'?'Logo ajouté':'Image ajoutée'); }
+  catch(e){ fail(e); render(); }
+}
+async function mqSave(){
+  const b = $('#mqBtn'); b.disabled = true; b.textContent = 'Enregistrement…';
+  try{
+    await rpc('cc_profil_maj', {p_token:compteToken(), p_logo:MQ.logo, p_couverture:MQ.couverture, p_couleur:MQ.couleur, p_slogan:MQ.slogan, p_accueil:MQ.accueil, p_entreprise:MQ.entreprise, p_site:MQ.site, p_tel:MQ.tel});
+    MQ = null; S.etab = 'chantiers'; toast('Votre image est enregistrée'); await loadEspace();
+  }catch(e){ fail(e); b.disabled = false; b.textContent = 'Enregistrer mon image'; }
 }
 
 /* ---------- AUTH ---------- */
@@ -410,7 +743,7 @@ async function doAuth(){
     const up = S.authMode==='up';
     const r = up ? await rpc('cc_inscription', {p_email:$('#aMail').value, p_mdp:$('#aMdp').value, p_nom:$('#aNom').value, p_entreprise:$('#aEnt').value, p_tel:$('#aTel').value})
                  : await rpc('cc_connexion', {p_email:$('#aMail').value, p_mdp:$('#aMdp').value});
-    LS.set('cc_compte', r.token); toast(up?'Espace créé, bienvenue !':'Bonjour '+r.nom.split(' ')[0]); location.hash = '#/espace';
+    LS.set('cc_compte', r.token); if(up){ S.etab='marque'; MQ=null; } toast(up?'Espace créé ! Commencez par votre image':'Bonjour '+r.nom.split(' ')[0]); location.hash = '#/espace';
   }catch(e){ fail(e); b.disabled = false; }
 }
 function logout(){ LS.del('cc_compte'); location.hash = '#/'; }
@@ -419,9 +752,13 @@ function logout(){ LS.del('cc_compte'); location.hash = '#/'; }
 function espaceView(){
   const e = S.espace; if(!e) return '';
   const tab = S.etab || 'chantiers';
-  let h = `<h1>Bonjour ${esc(e.compte.nom.split(' ')[0])}</h1><p class="sub">${esc(e.compte.entreprise||'')} · architecte / maître d’œuvre</p>
-  <div class="seg" style="margin:16px 0 4px"><button class="${tab==='chantiers'?'on':''}" onclick="S.etab='chantiers';render()">Mes chantiers</button><button class="${tab==='pros'?'on':''}" onclick="S.etab='pros';loadPros()">Mes professionnels</button></div>`;
+  const co = e.compte;
+  let h = (co.personnalise && tab!=='marque') ? marqueHtml({nom:co.nom, entreprise:co.entreprise, logo:co.logo, couverture:co.couverture, couleur:co.couleur, slogan:co.slogan}, {titre:'Bonjour '+esc(co.nom.split(' ')[0]), sansMot:true}) : '';
+  if(!h) h = `<h1>Bonjour ${esc(co.nom.split(' ')[0])}</h1><p class="sub">${esc(co.entreprise||'')}${co.entreprise?' · ':''}architecte / maître d’œuvre</p>`;
+  if(!co.personnalise && tab!=='marque') h += `<div class="invite"><b>Donnez votre image à vos chantiers</b><p>Ajoutez votre logo, votre couleur et une image de couverture : vos artisans verront votre cabinet en ouvrant leur lien.</p><button class="btn pri" style="margin-top:10px" onclick="S.etab='marque';MQ=null;render()">Personnaliser mon espace</button></div>`;
+  h += `<div class="seg" style="margin:16px 0 4px"><button class="${tab==='chantiers'?'on':''}" onclick="S.etab='chantiers';render()">Mes chantiers</button><button class="${tab==='pros'?'on':''}" onclick="S.etab='pros';loadPros()">Mes pros</button><button class="${tab==='marque'?'on':''}" onclick="S.etab='marque';MQ=null;render()">Mon image</button></div>`;
   if(tab==='pros') return h + prosView();
+  if(tab==='marque') return h + marqueEdit();
   const act = e.chantiers.filter(c=>!c.archive), arch = e.chantiers.filter(c=>c.archive);
   const card = c => `<a class="card tap" style="display:block;text-decoration:none" href="#/c/${c.token}">
       <div class="row between"><div style="min-width:0"><div class="ptitle" style="font-size:16.5px">${esc(c.nom)}</div><div class="meta">${esc(c.adresse||'')}</div></div>
@@ -527,7 +864,8 @@ function chantierView(){
   tabs.push(['msg','Messages',0],['photos','Photos',0],['docs','Documents',unreadDocs()],['equipe','Équipe',0]);
   if(isMoe()) tabs.push(['cr','Compte rendu',0]);
   if(!tabs.find(t=>t[0]===S.tab)) S.tab = defaultTab();
-  let h = `<div class="row" style="align-items:flex-start;gap:12px">${isArt()?vignette(m.lot||'Autre',58):vignette('',58,m.role)}
+  const bandeau = (S.tab===defaultTab() || S.tab==='') && S.marque ? marqueHtml(S.marque, {mini: isMoe(), sansMot: isMoe()}) : '';
+  let h = bandeau + `<div class="row" style="align-items:flex-start;gap:12px">${isArt()?vignette(m.lot||'Autre',58):vignette('',58,m.role)}
     <div style="min-width:0;flex:1"><h1>${esc(c.nom)}</h1><p class="sub">${esc(c.adresse||'')}${c.debut||c.fin?` · ${esc(c.debut||'?')} → ${esc(c.fin||'?')}`:''}</p>
     <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><span class="pill p-mute">${isMoe()?'Architecte · administrateur':m.role==='client'?'Client':'Votre lot : '+esc(m.lot||'—')}</span></div></div></div>
     ${c.avancement!==null && c.avancement!==undefined?`<div class="row between" style="margin-top:12px"><span class="meta" style="margin:0">Avancement</span><b style="font-size:13px">${c.avancement}%</b></div><div class="bar" style="margin:4px 0 12px"><i style="width:${c.avancement}%"></i></div>`:'<div style="height:12px"></div>'}
