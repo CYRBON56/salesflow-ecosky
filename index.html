@@ -513,6 +513,7 @@ async function loadChantier(first){
 }
 
 /* ====================== RENDER ====================== */
+function voirDemo(){ const v = document.getElementById('demoVid'); if(!v) return; v.scrollIntoView({behavior:'smooth', block:'center'}); setTimeout(()=>{ try{ v.play(); }catch(e){} }, 700); }
 function headerHtml(){
   const inCh = S.route==='chantier';
   const back = inCh ? (compteToken() ? '#/espace' : '#/') : null;
@@ -523,7 +524,7 @@ function headerHtml(){
 }
 function render(){
   $('#app').className = S.route==='home' ? 'app land' : 'app';
-  if(S.route==='home'){ appliquerCouleur(null); $('#app').innerHTML = homeView(); return; }
+  if(S.route==='home'){ appliquerCouleur(null); $('#app').innerHTML = homeView(); if(/[?&]demo\b/.test(location.search)) setTimeout(voirDemo, 300); return; }
   if(S.route==='espace' && S.espace) appliquerCouleur(S.etab==='marque' && MQ ? (MQ.couleur||S.espace.compte.couleur) : S.espace.compte.couleur);
   else if(S.route==='chantier') appliquerCouleur(S.marque && S.marque.couleur);
   else appliquerCouleur(null);
@@ -575,7 +576,7 @@ function homeView(){
         <h1>Tout ce qui se passe sur vos chantiers, sur un seul plan.</h1>
         <p class="lead">Chaque artisan signale ce qu’il voit — photo, vidéo, message vocal — depuis son téléphone. Vous suivez tout depuis votre bureau, vous validez, vous relancez. Fini les infos perdues dans les SMS.</p>
         <div class="l-cta"><a class="l-btn j" href="#/connexion/inscription">Créer mon espace gratuit</a>
-        <a class="l-btn o" href="#perso" onclick="event.preventDefault();document.getElementById('perso').scrollIntoView({behavior:'smooth'})">Voir la démo</a></div>
+        <a class="l-btn o" href="#demo" onclick="event.preventDefault();voirDemo()">▶ Voir la démo (3 min)</a></div>
         <p class="l-small">Pour les architectes, maîtres d’œuvre et constructeurs. Vos artisans n’ont rien à installer : ils reçoivent un lien par SMS.</p>
       </div>
       <div class="plan" role="img" aria-label="Plan d’une maison sur lequel les artisans ont signalé quatre points : une photo du plombier, une question de l’électricien, un problème bloquant en maçonnerie et une étape validée en menuiserie.">
@@ -599,6 +600,13 @@ function homeView(){
     <div class="rail">${metiers.map(l=>`<div class="m">${vignette(l,60)}${l}</div>`).join('')}</div></div></div>
 
   ${liens.length?`<div class="l-wrap" style="padding-top:60px"><div class="l-mine"><b>Vos chantiers sur cet appareil</b>${liens.map(l=>`<a href="#/c/${l.token}"><span>${esc(l.nom)}</span><span style="color:var(--gris)">${l.role==='moe'?'Pilote':l.role==='client'?'Client':'Intervenant'}</span></a>`).join('')}</div></div>`:''}
+
+  <section class="l-sec" id="demo" style="padding-bottom:20px"><div class="l-wrap">
+    <h2>La démo en 3 minutes.</h2>
+    <p class="intro">De l’inscription au compte rendu : le CCTP découpé par lot, vos artisans choisis dans votre carnet, la photo laissée par le plombier à l’électricien, et la maison qui passe hors d’eau puis hors d’air.</p>
+    <div style="margin-top:28px;display:flex;justify-content:center"><video id="demoVid" controls playsinline muted preload="none" style="width:100%;max-width:1100px;max-height:82vh;border-radius:18px;background:#163A63;box-shadow:0 24px 60px rgba(14,24,34,.25)" poster="${matchMedia('(max-width:700px)').matches?'/demo-poster-v.jpg':'/demo-poster.jpg'}" src="${matchMedia('(max-width:700px)').matches?'/demo-vertical.mp4':'/demo.mp4'}"></video></div>
+    <div class="l-cta" style="justify-content:center;margin-top:24px"><a class="l-btn j" href="#/connexion/inscription">Commencer mes 3 mois offerts</a></div>
+  </div></section>
 
   <section class="l-sec l-perso" id="perso"><div class="l-wrap">
     <h2>Vos artisans ouvrent le chantier… et voient votre cabinet.</h2>
