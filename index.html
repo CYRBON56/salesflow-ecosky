@@ -513,6 +513,7 @@ async function loadChantier(first){
 }
 
 /* ====================== RENDER ====================== */
+if(/[?&]demo\b/.test(location.search)) location.replace('/demo.html');
 function voirDemo(){ const v = document.getElementById('demoVid'); if(!v) return; v.scrollIntoView({behavior:'smooth', block:'center'}); setTimeout(()=>{ v.muted = false; const p = v.play(); if(p && p.catch) p.catch(()=>{ v.muted = true; v.play().catch(()=>{}); }); }, 700); }
 function headerHtml(){
   const inCh = S.route==='chantier';
@@ -524,7 +525,7 @@ function headerHtml(){
 }
 function render(){
   $('#app').className = S.route==='home' ? 'app land' : 'app';
-  if(S.route==='home'){ appliquerCouleur(null); $('#app').innerHTML = homeView(); if(/[?&]demo\b/.test(location.search)) setTimeout(voirDemo, 300); return; }
+  if(S.route==='home'){ appliquerCouleur(null); $('#app').innerHTML = homeView(); return; }
   if(S.route==='espace' && S.espace) appliquerCouleur(S.etab==='marque' && MQ ? (MQ.couleur||S.espace.compte.couleur) : S.espace.compte.couleur);
   else if(S.route==='chantier') appliquerCouleur(S.marque && S.marque.couleur);
   else appliquerCouleur(null);
@@ -576,7 +577,7 @@ function homeView(){
         <h1>Tout ce qui se passe sur vos chantiers, sur un seul plan.</h1>
         <p class="lead">Chaque artisan signale ce qu’il voit — photo, vidéo, message vocal — depuis son téléphone. Vous suivez tout depuis votre bureau, vous validez, vous relancez. Fini les infos perdues dans les SMS.</p>
         <div class="l-cta"><a class="l-btn j" href="#/connexion/inscription">Créer mon espace gratuit</a>
-        <a class="l-btn o" href="#demo" onclick="event.preventDefault();voirDemo()">▶ Voir la démo (3 min)</a></div>
+        <a class="l-btn o" href="/demo.html">▶ Voir la démo (3 min)</a></div>
         <p class="l-small">Pour les architectes, maîtres d’œuvre et constructeurs. Vos artisans n’ont rien à installer : ils reçoivent un lien par SMS.</p>
       </div>
       <div class="plan" role="img" aria-label="Plan d’une maison sur lequel les artisans ont signalé quatre points : une photo du plombier, une question de l’électricien, un problème bloquant en maçonnerie et une étape validée en menuiserie.">

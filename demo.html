@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Contact Chantier – la démo en 3 minutes</title>
+<meta name="description" content="Contact Chantier, l’application des donneurs d’ordre : CCTP découpé par lot, artisans, photos, avancement jusqu’au hors d’eau et hors d’air.">
+<meta property="og:title" content="Contact Chantier – la démo en 3 minutes">
+<meta property="og:image" content="https://contactchantier.com/demo-poster.jpg">
+<link rel="icon" href="/icon.svg">
+<style>
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%;background:#0E1822;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Arial,sans-serif}
+  .page{min-height:100dvh;display:flex;flex-direction:column}
+  .stage{position:relative;flex:1;display:flex;align-items:center;justify-content:center;background:#0E1822;min-height:0}
+  video{width:100%;height:100%;max-height:calc(100dvh - 86px);object-fit:contain;background:#0E1822;display:block}
+  .son{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);border:0;border-radius:999px;background:#FFC72C;color:#0E1822;font:800 17px/1 inherit;padding:15px 24px;box-shadow:0 10px 30px rgba(0,0,0,.4);cursor:pointer;display:none;white-space:nowrap}
+  .son.on{display:block}
+  .bar{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:#163A63}
+  .bar a{display:inline-block;border-radius:12px;padding:13px 18px;font-weight:800;font-size:15.5px;text-decoration:none}
+  .j{background:#FFC72C;color:#0E1822;border-bottom:3px solid #C99A10}
+  .b{background:transparent;color:#fff;border:2px solid rgba(255,255,255,.7)}
+  .logo{position:absolute;top:14px;left:16px;display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px;opacity:.9;pointer-events:none}
+  .logo i{width:24px;height:24px;border-radius:6px;background:#E85D04;display:inline-block;position:relative}
+  .logo i:after{content:"";position:absolute;left:6px;top:6px;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:11px solid #fff}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="stage">
+    <video id="v" playsinline autoplay muted controls preload="auto"></video>
+    <button class="son" id="son" type="button">🔊 Touchez pour activer le son</button>
+  </div>
+  <div class="bar">
+    <a class="j" href="/?src=demo#/connexion/inscription">Créer mon espace gratuit · 3 mois offerts ›</a>
+    <a class="b" href="https://tidycal.com/boncyrille56/15-minute-meeting">📅 Réserver 15 min avec Cyrille ›</a>
+  </div>
+</div>
+<script>
+  const v = document.getElementById('v'), son = document.getElementById('son');
+  const portrait = matchMedia('(orientation: portrait) and (max-width: 820px)').matches;
+  v.poster = portrait ? '/demo-poster-v.jpg' : '/demo-poster.jpg';
+  v.src = portrait ? '/demo-vertical.mp4' : '/demo.mp4';
+  function avecSon(){ v.muted = false; v.volume = 1; son.classList.remove('on'); if(v.paused) v.play().catch(()=>{}); }
+  // 1) on tente avec le son ; 2) si le navigateur refuse, on démarre sans le son et on propose de l'activer
+  v.muted = false;
+  v.play().then(()=>{ if(v.muted) son.classList.add('on'); }).catch(()=>{ v.muted = true; v.play().catch(()=>{}); son.classList.add('on'); });
+  son.addEventListener('click', e => { e.stopPropagation(); avecSon(); });
+  document.addEventListener('pointerdown', e => { if(v.muted && !e.target.closest('a')) avecSon(); }, {once:false});
+  v.addEventListener('volumechange', () => { if(!v.muted) son.classList.remove('on'); });
+</script>
+</body>
+</html>
