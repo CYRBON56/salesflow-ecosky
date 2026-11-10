@@ -236,6 +236,7 @@
     margin-left: 4px;
   }
   .btn-lien:hover { background: #eef4f1; }
+  button.btn-lien { cursor: pointer; font-family: inherit; margin-top: 4px; }
   .btn-lien-desactive {
     display: inline-block;
     background: #f5f5f3;
@@ -983,6 +984,7 @@
         <td>
           ${l.pdf_url ? `<a class="btn-lien" href="${l.pdf_url}" target="_blank" rel="noopener">📄 Devis</a>` : ""}
           ${l.pdf_signe_url ? `<a class="btn-lien" href="${l.pdf_signe_url}" target="_blank" rel="noopener">✅ Signé</a>` : ""}
+          ${statutDevis(l) !== "signe" ? `<button type="button" class="btn-lien btn-envoyer-sms" data-id="${l.id}" data-client="${echapper(l.nom_client || "")}" data-numero="${echapper(l.numero || "")}">📲 Envoyer par SMS</button>` : ""}
         </td>
       </tr>
     `).join("");
@@ -1004,6 +1006,34 @@
       </table>
     `;
   }
+
+  // Bouton "Envoyer par SMS" : envoie (ou renvoie) le devis au client via /api/send-devis,
+  // avec le message personnalisé, le lien du PDF et le lien de signature.
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".btn-envoyer-sms");
+    if (!btn) return;
+    const client = btn.dataset.client || "ce client";
+    const numero = btn.dataset.numero || "";
+    if (!confirm(`Envoyer le devis ${numero} par SMS à ${client} ?`)) return;
+    btn.disabled = true;
+    const texteInitial = btn.textContent;
+    btn.textContent = "Envoi…";
+    try {
+      const res = await fetch(API_SEND_DEVIS, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ devis_id: Number(btn.dataset.id), channels: ["sms"] }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) throw new Error(data.error || ("Erreur " + res.status));
+      alert(`Devis ${numero} envoyé par SMS à ${client}.`);
+      chargerTousDevis();
+    } catch (err) {
+      alert("Échec de l'envoi : " + err.message);
+      btn.disabled = false;
+      btn.textContent = texteInitial;
+    }
+  });
 
   function appliquerFiltreTousDevis() {
     const filtre = document.getElementById("filtreType").value;
@@ -1457,7 +1487,9 @@
     appliquerFiltreSms();
   });
 
-  activerOnglet("sms");
+  // Ouverture directe d'un onglet via l'adresse, ex. /sms-recus.html?onglet=tous-devis
+  const ongletDemande = new URLSearchParams(location.search).get("onglet");
+  activerOnglet(["sms", "leads", "tous-devis", "devis-signes"].includes(ongletDemande) ? ongletDemande : "sms");
   chargerCompteurClicsPub();
 </script>
 
