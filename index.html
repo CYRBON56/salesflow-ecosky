@@ -797,7 +797,18 @@ function espaceView(){
 /* ---------- SÉCURITÉ ET SAUVEGARDE ---------- */
 let SAUV = {fichiers:true, enCours:false, etat:''};
 function securiteView(){
-  return `<div class="card" style="margin-top:12px"><b style="font-size:17px">Sauvegarder toutes mes données</b>
+  const pt = (t, d) => `<div style="display:flex;gap:10px;margin-top:10px"><span style="color:#2F9E6A;font-weight:900">&#10003;</span><div><b>${t}</b><div class="meta" style="margin-top:2px">${d}</div></div></div>`;
+  return `<div class="card" style="margin-top:12px"><b style="font-size:17px">Comment vos données sont protégées</b>
+    ${pt('Hébergées en Europe', 'Vos chantiers sont stockés à Francfort (Allemagne), chez Supabase, sur l’infrastructure Amazon Web Services. Vos données restent dans l’Union européenne.')}
+    ${pt('Chiffrées pendant le transfert', 'Tous les échanges entre votre appareil et nos serveurs passent par une connexion sécurisée HTTPS (TLS), comme sur le site de votre banque.')}
+    ${pt('Chiffrées sur les serveurs', 'Les données enregistrées sont chiffrées sur les disques de l’hébergeur (chiffrement AES-256).')}
+    ${pt('Mots de passe illisibles, même pour nous', 'Votre mot de passe n’est jamais enregistré en clair : nous n’en gardons qu’une empreinte chiffrée (bcrypt). Personne chez Contact Chantier ne peut le lire.')}
+    ${pt('Protection contre les intrusions', 'Après 8 mots de passe erronés, la connexion au compte est bloquée pendant 15 minutes. Vous pouvez déconnecter à distance tous vos autres appareils.')}
+    ${pt('Chacun ne voit que ce qui le concerne', 'Personne ne lit la base de données directement : chaque demande passe par le serveur, qui vérifie d’abord qui vous êtes. Un artisan entre par son lien personnel et ne voit que sa partie du chantier.')}
+    ${pt('Photos et documents protégés par des liens secrets', 'Chaque fichier a une adresse aléatoire impossible à deviner, et aucune liste des fichiers n’est consultable publiquement.')}
+    ${pt('Sauvegardés chaque jour', 'L’hébergeur sauvegarde automatiquement la base chaque jour. Et vous pouvez télécharger à tout moment votre propre copie complète, ci-dessous.')}
+  </div>
+  <div class="card"><b style="font-size:17px">Sauvegarder toutes mes données</b>
     <p class="meta" style="margin-top:6px">Une archive ZIP avec tous vos chantiers : étapes, problèmes, messages, documents, accusés de lecture, intervenants, votre carnet de professionnels et l’historique de votre compte. Vous l’enregistrez où vous voulez : ordinateur, disque externe, serveur du cabinet, Google Drive, OneDrive…</p>
     <label class="row" style="gap:8px;margin-top:10px;font-size:14px"><input type="checkbox" ${SAUV.fichiers?'checked':''} onchange="SAUV.fichiers=this.checked"> Inclure les photos, vidéos et documents (archive plus lourde)</label>
     <button class="btn pri full" style="margin-top:12px" ${SAUV.enCours?'disabled':''} onclick="sauvegarder()">${SAUV.enCours?'Préparation…':'Télécharger ma sauvegarde'}</button>
@@ -812,7 +823,7 @@ function securiteView(){
     <p class="meta" style="margin-top:6px">Téléphone perdu, ordinateur partagé ? Déconnectez votre compte partout, sauf ici.</p>
     <button class="btn full" style="margin-top:10px" onclick="deconnecterPartout()">Déconnecter tous mes autres appareils</button></div>
   <div class="card"><b style="font-size:17px">Hébergement dédié</b>
-    <p class="meta" style="margin-top:6px">Vos données sont hébergées en Europe (Francfort), chiffrées pendant leur transfert, et sauvegardées automatiquement chaque jour. Pour un cabinet qui souhaite ses données sur un serveur dédié, nous étudions votre demande : <a href="mailto:infos@ecosky.fr?subject=Contact%20Chantier%20-%20h%C3%A9bergement%20d%C3%A9di%C3%A9">infos@ecosky.fr</a>.</p></div>`;
+    <p class="meta" style="margin-top:6px">Pour un cabinet qui souhaite ses données sur un serveur qui lui est réservé, nous étudions votre demande : <a href="mailto:infos@ecosky.fr?subject=Contact%20Chantier%20-%20h%C3%A9bergement%20d%C3%A9di%C3%A9">infos@ecosky.fr</a>.</p></div>`;
 }
 async function changerMdp(){
   try{ const r = await rpc('cc_mdp_changer', {p_token:compteToken(), p_ancien:$('#sAnc').value, p_nouveau:$('#sNou').value});
