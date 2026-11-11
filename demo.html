@@ -31,7 +31,7 @@
   </div>
   <div class="bar">
     <a class="j" href="/?src=demo#/connexion/inscription">Créer mon espace gratuit · 3 mois offerts ›</a>
-    <a class="b" href="https://tidycal.com/boncyrille56/15-minute-meeting">📅 Réserver 15 min avec Cyrille ›</a>
+    <a class="b" id="rdv" href="/rdv.html?src=demo">📅 Réserver 15 min avec Cyrille ›</a>
   </div>
 </div>
 <script>
@@ -40,6 +40,7 @@
   const f = /artisan|equipe/i.test(new URLSearchParams(location.search).get('v')||'') ? 'demo-artisans' : 'demo';
   v.poster = '/' + f + '-poster' + (portrait ? '-v' : '') + '.jpg';
   v.src = '/' + f + (portrait ? '-vertical' : '') + '.mp4';
+  document.getElementById('rdv').href = '/rdv.html?src=demo&p=' + (f === 'demo' ? 'architecte' : 'artisan');
   function avecSon(){ v.muted = false; v.volume = 1; son.classList.remove('on'); if(v.paused) v.play().catch(()=>{}); }
   // 1) on tente avec le son ; 2) si le navigateur refuse, on démarre sans le son et on propose de l'activer
   v.muted = false;
