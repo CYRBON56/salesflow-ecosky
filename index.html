@@ -490,10 +490,12 @@ async function route(){
   const h = location.hash || '#/';
   clearInterval(poll); poll = null; closeSheet();
   const m = h.match(/^#\/c\/([0-9a-f-]{36})/i);
-  if(m){ S.route='chantier'; S.token=m[1]; S.data=null; if(S.lastTok!==m[1]){ S.tab=''; S.conv=null; } S.lastTok=m[1]; renderLoading(); await loadChantier(true); poll = setInterval(()=>{ if(document.visibilityState==='visible' && !$('#layer').innerHTML && !REC.mr) loadChantier(false); }, 15000); return; }
+  if(m){ try{ localStorage.setItem('cc_dernier', '#/c/'+m[1]); }catch(e){}
+    S.route='chantier'; S.token=m[1]; S.data=null; if(S.lastTok!==m[1]){ S.tab=''; S.conv=null; } S.lastTok=m[1]; renderLoading(); await loadChantier(true); poll = setInterval(()=>{ if(document.visibilityState==='visible' && !$('#layer').innerHTML && !REC.mr) loadChantier(false); }, 15000); return; }
   if(h.startsWith('#/espace') && compteToken()){ S.route='espace'; renderLoading(); return loadEspace(); }
   if(h.startsWith('#/connexion')){ S.route='auth'; S.authMode = h.includes('inscription') ? 'up' : 'in'; return render(); }
   if(compteToken()){ location.hash = '#/espace'; return; }
+  if(estInstallee() && h === '#/'){ let d=''; try{ d = localStorage.getItem('cc_dernier')||''; }catch(e){} if(d){ location.hash = d; return; } }
   S.route='home'; render();
 }
 function renderLoading(){ $('#app').innerHTML = headerHtml() + '<div class="spinner"></div>'; }
@@ -531,7 +533,7 @@ function headerHtml(){
   const backEsp = S.route==='espace' && S.etab && S.etab!=='chantiers';
   return `<header>${back?`<a class="back" href="${back}" aria-label="Retour">‹</a>`:''}${backEsp?`<button class="back" style="border:0;background:none;cursor:pointer" aria-label="Retour" onclick="S.etab='chantiers';render()">‹</button>`:''}
     <a class="logo" href="#/"><span class="logo-mark">${I.tri}</span>Contact Chantier</a>
-    <div class="hright">${S.route==='espace'?`<button class="hbtn" onclick="logout()">Déconnexion</button>`:''}
+    <div class="hright">${boutonInstaller()}${S.route==='espace'?`<button class="hbtn" onclick="logout()">Déconnexion</button>`:''}
     ${S.route==='home'?`<a class="hbtn" href="#/connexion">Connexion</a>`:''}</div></header>`;
 }
 function render(){
@@ -2069,6 +2071,30 @@ window.addEventListener('popstate', ev => {
   if(S.route==='espace' && S.etab==='pros') loadPros(); else render();
   NAV_RESTO = false;
 });
+
+
+/* ====================== INSTALLER L'APPLI (PWA) ====================== */
+let PWA_EVT = null;
+function estInstallee(){ return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }
+function estIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function boutonInstaller(){
+  if(estInstallee() || (S.route!=='chantier' && S.route!=='espace')) return '';
+  if(!PWA_EVT && !estIOS()) return '';
+  return `<button class="hbtn" style="background:#FFC72C;color:#0E1822;border-color:#FFC72C;font-weight:800" onclick="installerAppli()">📲 Installer</button>`;
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); PWA_EVT = e; if(S.route==='chantier' || S.route==='espace') render(); });
+window.addEventListener('appinstalled', () => { PWA_EVT = null; toast('Appli installée : retrouvez Contact Chantier sur votre écran d’accueil'); if(S.route==='chantier' || S.route==='espace') render(); });
+async function installerAppli(){
+  if(PWA_EVT){ const e = PWA_EVT; PWA_EVT = null; e.prompt(); try{ await e.userChoice; }catch(_){} render(); return; }
+  sheet(`<h1 style="font-size:20px">📲 Installer Contact Chantier</h1>
+    <p class="note" style="margin-top:6px">Une icône sur votre écran d’accueil, comme une vraie appli. Elle ouvre directement ${S.route==='chantier'?'ce chantier':'votre espace'}.</p>
+    <ol style="margin:16px 0 0 20px;line-height:1.9;font-size:16px">
+      <li>Touchez le bouton <b>Partager</b> <span style="display:inline-block;border:1.5px solid currentColor;border-radius:6px;padding:0 6px;font-size:14px">⬆︎</span> en bas de Safari (en haut sur iPad)</li>
+      <li>Faites défiler et touchez <b>« Sur l’écran d’accueil »</b></li>
+      <li>Touchez <b>« Ajouter »</b> en haut à droite</li>
+    </ol>
+    <p class="note" style="margin-top:14px">Le lien doit être ouvert dans Safari. S’il s’est ouvert dans une autre appli (SMS, mail…), touchez d’abord « Ouvrir dans Safari ».</p>`);
+}
 
 /* ====================== START ====================== */
 if('serviceWorker' in navigator){ window.addEventListener('load', ()=>navigator.serviceWorker.register('/sw.js').catch(()=>{})); }
