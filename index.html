@@ -1036,7 +1036,7 @@ function avancementView(){
   if(!F[S.efiltre]) S.efiltre = 'toutes';
   const list = et.filter(F[S.efiltre]);
   const aCctp = et.some(e=>e.source==='cctp');
-  let h = miseEnRoute() + (aCctp ? '' : `<div class="card" style="background:var(--ink);color:#fff;border-color:var(--ink)"><div class="row" style="gap:12px;align-items:flex-start"><div class="lv" style="width:46px;height:46px;background:var(--acc)">${I.doc.replace('width="20" height="20"','width="24" height="24"').replace('stroke="currentColor"','stroke="#fff"')}</div><div style="flex:1"><b style="font-size:16px">Importez votre CCTP</b><p style="font-size:13.5px;line-height:1.45;margin-top:4px;color:#C9CFD5">Chaque article est envoyé au corps de métier concerné. L’artisan coche ce qu’il a fait, vous validez.</p></div></div><button class="btn pri full" style="margin-top:12px" onclick="cctpOuvrir()">Importer le CCTP (PDF ou Word)</button></div>`) + `<div class="card"><div class="row between"><div><div class="meta" style="margin:0">Étapes validées</div><b style="font-size:24px">${ok}<span style="font-size:15px;color:var(--mute)"> / ${actifs.length}</span></b></div>
+  let h = miseEnRoute() + (aCctp ? '' : `<div class="card" style="background:var(--ink);color:#fff;border-color:var(--ink)"><div class="row" style="gap:12px;align-items:flex-start"><div class="lv" style="width:46px;height:46px;background:var(--acc)">${I.doc.replace('width="20" height="20"','width="24" height="24"').replace('stroke="currentColor"','stroke="#fff"')}</div><div style="flex:1"><b style="font-size:16px">Importez votre CCTP</b><p style="font-size:13.5px;line-height:1.45;margin-top:4px;color:#C9CFD5">Chaque article est envoyé au corps de métier concerné. L’artisan coche ce qu’il a fait, vous validez.</p></div></div><button class="btn pri full" style="margin-top:12px" onclick="cctpOuvrir()">Importer le CCTP (PDF ou Word)</button><button class="btn full" style="margin-top:8px;background:transparent;color:#fff;border-color:#5B6670" onclick="devisOuvrir()">Artisan ? Importer votre devis (les prix sont retirés)</button></div>`) + `<div class="card"><div class="row between"><div><div class="meta" style="margin:0">Étapes validées</div><b style="font-size:24px">${ok}<span style="font-size:15px;color:var(--mute)"> / ${actifs.length}</span></b></div>
     <div style="text-align:right"><div class="meta" style="margin:0">À vérifier</div><b style="font-size:24px;color:${decl?'var(--acc)':'var(--ink)'}">${decl}</b></div></div>
     <p class="note">Les artisans voient seulement leurs propres étapes. Quand l’un d’eux coche « c’est fait », l’étape passe en « à vérifier » : à vous de valider.</p></div>
   <div class="filters">${[['toutes','Toutes'],['verifier','À vérifier · '+decl],['cours','En cours · '+enc],['faire','À faire'],['faites','Faites']].map(([k,l])=>`<button class="chip ${S.efiltre===k?'on':''}" onclick="S.efiltre='${k}';render()">${l}</button>`).join('')}</div>`;
@@ -1048,7 +1048,7 @@ function avancementView(){
     h += `<div class="row between" style="margin:18px 0 8px;gap:8px"><b style="font-size:15.5px">${esc(ph)}</b><div class="row" style="gap:6px">${sansArt?`<button class="chip on" onclick="choisirArtisan(${esc(JSON.stringify(lotPh))})">Choisir l’artisan</button>`:''}<span class="pill ${okp===all.length&&all.length?'p-ok':'p-mute'}">${okp}/${all.length}</span></div></div>`;
     list.filter(e=>e.phase===ph).forEach(e=> h += etapeRow(e, true));
   });
-  h += `<div class="btns" style="margin-top:16px"><button class="btn" onclick="addEtape()">${I.plus} Ajouter une étape</button><button class="btn" onclick="cctpOuvrir()">${I.doc} ${aCctp?'Importer un autre CCTP':'Importer le CCTP'}</button></div>`;
+  h += `<div class="btns" style="margin-top:16px"><button class="btn" onclick="addEtape()">${I.plus} Ajouter une étape</button><button class="btn" onclick="cctpOuvrir()">${I.doc} ${aCctp?'Importer un autre CCTP':'Importer le CCTP'}</button><button class="btn" onclick="devisOuvrir()">${I.doc} Importer un devis</button></div>`;
   return h;
 }
 function etapeRow(e, moe){
@@ -1296,6 +1296,88 @@ async function cctpImporter(){
     }
     CC = null; closeSheet(); S.tab = 'avancement'; await loadChantier(true);
     toast(`${total} articles répartis entre les corps de métier`);
+    if(lotsSansArtisan().length) setTimeout(attribuerLots, 400);
+  }catch(e){ fail(e); b.disabled = false; b.textContent = 'Réessayer'; }
+}
+
+/* ---------- IMPORT D'UN DEVIS (artisan avec ses équipes) ----------
+   Le devis est lu dans le navigateur (rien n'est envoyé ailleurs), les prix, quantités et totaux sont retirés,
+   chaque ligne de travaux devient une tâche confiée à une équipe. Le fichier du devis n'est jamais joint au chantier. */
+let DV = null; // {lignes:[{titre, detail, section, equipe, garder}], nom}
+const RX_DV_BRUIT = /(^|\s)(date d.?(?:émission|expiration|échéance)|total|sous[- ]?total|montant|net à payer|tva|t\.v\.a|h\.?t\.?\b|t\.?t\.?c\.?\b|acompte|iban|bic|swift|siret|siren|rcs|capital|ape|naf|code banque|rib|conditions? (de|générales)|validité|bon pour accord|signature|date d.?échéance|devis n|facture n|n° de devis|référence client|page \d|désignation|quantité|prix unit|p\.u|remise|escompte|pénalit|indemnité forfaitaire|garantie décennale|assurance|tél|tel\.|e-?mail|www\.|@)/i;
+const RX_DV_NOMBRE = /\s+(?:[-+]?\d{1,3}(?:[\s  .]\d{3})*(?:[.,]\d+)?|\d+(?:[.,]\d+)?)\s*(?:€|eur|euros?|%|ht|ttc|u\.?|un\.?|unités?|pce|pièces?|ens\.?|ensemble|forfait|fft|ft|m²|m2|m³|m3|ml|m|h|heures?|j|jours?|kg|t|l)?\.?$/i;
+function devisNettoyer(t){
+  let x = String(t||'').replace(/\s+/g,' ').trim(), avaitChiffres = false, prev;
+  do { prev = x; x = x.replace(RX_DV_NOMBRE, '').replace(/\s*[|;:]\s*$/,'').trim(); if(x !== prev) avaitChiffres = true; } while(x !== prev && x);
+  x = x.replace(/^\d+(?:[.,]\d+)*\s*[-–.)]?\s+(?=[A-Za-zÀ-ÿ])/, ''); // numéro de ligne en tête
+  return {texte: x, chiffre: avaitChiffres};
+}
+const RX_DV_ENTETE = /^(?:désignation|description|libellé|produits?|prestations?|articles?|détail des travaux|nature des travaux)\b/i;
+const RX_DV_FIN = /^(?:total|sous[- ]?total|montant total|net à payer|récapitulatif|mentions? spéciales?|conditions|non compris|ce devis (?:comprend|ne comprend|est valable)|modalités|règlement|paiement|bon pour accord|taux|base ht)/i;
+const RX_DV_ADRESSE = /\b(?:rue|route|chemin|avenue|av\.|impasse|allée|boulevard|bd|place|lieu[- ]dit|cedex|zone|za|zi|bp)\b|\b\d{5}\b/i;
+function devisDecouper(lignesBrutes, nomFichier){
+  const lignes = lignesBrutes.map(l => String(l||'').replace(/\s+/g,' ').trim()).filter(Boolean);
+  const avecEntete = lignes.some(l => RX_DV_ENTETE.test(l));
+  const out = []; let section = '', debut = !avecEntete, fin = false;
+  for(const b of lignes){
+    if(fin) break;
+    if(!debut){ if(RX_DV_ENTETE.test(b)) debut = true; continue; }
+    if(RX_DV_FIN.test(b)){ if(out.length) fin = true; continue; }
+    if(RX_DV_BRUIT.test(b)) continue;
+    const {texte, chiffre} = devisNettoyer(b);
+    if(!/[A-Za-zÀ-ÿ]{3}/.test(texte) || texte.length < 4) continue;
+    const lettres = texte.replace(/[^A-Za-zÀ-ÿ]/g,'');
+    if(!chiffre && texte.length <= 60 && lettres.length >= 4 && lettres === lettres.toUpperCase() && !RX_DV_ADRESSE.test(texte)){
+      section = texte.charAt(0) + texte.slice(1).toLowerCase(); continue; }
+    if(chiffre) out.push({titre: texte.slice(0,200), detail:'', section, equipe: section || 'Équipe 1', garder: true});
+    else if(out.length){ const d = out[out.length-1]; if(d.detail.length < 1500) d.detail += (d.detail?'\n':'') + texte; }
+  }
+  // Devis sans montants sur les lignes (devis « au forfait ») : on propose les lignes descriptives, à trier.
+  if(!out.length){ let go = !avecEntete; for(const t of lignes){ if(!go){ if(RX_DV_ENTETE.test(t)) go = true; continue; } if(RX_DV_FIN.test(t)) break;
+    if(t.length >= 6 && /[A-Za-zÀ-ÿ]{3}/.test(t) && !RX_DV_BRUIT.test(t)) out.push({titre:t.slice(0,200), detail:'', section:'', equipe:'Équipe 1', garder:true}); } }
+  return out;
+}
+function devisOuvrir(){ DV = {lignes:[], nom:'', toutes:''}; devisDessiner(); }
+function devisDessiner(){
+  if(!DV) return;
+  const equipes = [...new Set([...allLots(), ...DV.lignes.map(l=>l.equipe).filter(Boolean), 'Équipe 1'])];
+  const nb = DV.lignes.filter(l=>l.garder).length, nbEq = new Set(DV.lignes.filter(l=>l.garder).map(l=>l.equipe)).size;
+  let h = `<h1 style="font-size:20px">Importer un devis</h1>
+  <p class="sub">Pour l’artisan qui dirige ses équipes. Déposez le devis signé par votre client (PDF ou Word) : <b>les prix, quantités et totaux sont retirés</b>, chaque ligne de travaux devient une tâche que l’équipe coche quand c’est fait. Le fichier du devis n’est pas joint au chantier.</p>
+  <label class="up" style="margin-top:14px"><div class="apercu">${I.doc}</div><div><b>${DV.lignes.length?'Choisir un autre devis':'Choisir le devis'}</b><div class="meta">PDF ou Word (.docx)</div></div><input type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onchange="devisFichier(this)"></label>
+  <div class="meta" id="cctpEtat" style="margin-top:8px"></div>
+  <datalist id="dvEquipes">${equipes.map(e=>`<option value="${esc(e)}">`).join('')}</datalist>`;
+  if(DV.nom && !DV.lignes.length) h += `<div class="card"><b>Aucune ligne de travaux trouvée.</b><p class="note">S’il s’agit d’un scan (photo), le texte n’est pas lisible : utilisez le PDF généré par votre logiciel de devis.</p></div>`;
+  if(DV.lignes.length){
+    h += `<div class="card" style="margin-top:12px"><b>Tout confier à une équipe</b><div class="row" style="gap:8px;margin-top:8px"><input class="inp" id="dvToutes" list="dvEquipes" placeholder="Ex. Équipe Thomas" style="flex:1"><button class="btn" onclick="const v=$('#dvToutes').value.trim(); if(v){DV.lignes.forEach(l=>l.equipe=v); devisDessiner();}">Appliquer</button></div><p class="note" style="margin-top:6px">Ou choisissez l’équipe ligne par ligne ci-dessous. Vérifiez chaque intitulé : vous pouvez le corriger.</p></div>`;
+    DV.lignes.forEach((l,i)=>{
+      h += `<div class="card" style="${l.garder?'':'opacity:.55'}"><div class="row" style="gap:10px;align-items:flex-start">
+        <input type="checkbox" ${l.garder?'checked':''} style="width:20px;height:20px;margin-top:10px;accent-color:var(--acc);flex:none" onchange="DV.lignes[${i}].garder=this.checked;devisDessiner()" aria-label="Garder cette tâche">
+        <div style="flex:1;min-width:0">${l.section?`<div class="meta" style="margin:0">${esc(l.section)}</div>`:''}
+          <input class="inp" value="${esc(l.titre)}" style="font-weight:700" onchange="DV.lignes[${i}].titre=this.value">
+          ${l.detail?`<div class="meta" style="margin-top:4px;white-space:pre-wrap">${esc(l.detail.slice(0,200))}${l.detail.length>200?'…':''}</div>`:''}
+          <label class="lb" style="margin-top:8px">Équipe</label><input class="inp" list="dvEquipes" value="${esc(l.equipe)}" onchange="DV.lignes[${i}].equipe=this.value.trim()||'Équipe 1';devisDessiner()"></div></div></div>`;
+    });
+    h += `<div class="btns"><button class="btn" onclick="DV=null;closeSheet()">Annuler</button><button class="btn pri" id="dvGo" ${nb?'':'disabled'} onclick="devisImporter()">Créer ${nb} tâche${nb>1?'s':''} · ${nbEq} équipe${nbEq>1?'s':''}</button></div>`;
+  } else h += `<div class="btns"><button class="btn full" onclick="DV=null;closeSheet()">Annuler</button></div>`;
+  const sc = document.querySelector('.sheet') ? document.querySelector('.sheet').scrollTop : 0;
+  sheet(h); const s2 = document.querySelector('.sheet'); if(s2) s2.scrollTop = sc;
+}
+async function devisFichier(inp){
+  const f = (inp.files||[])[0]; if(!f) return;
+  if($('#cctpEtat')) $('#cctpEtat').textContent = `Lecture de ${f.name}…`;
+  try{ const lignes = await cctpLire(f); DV.nom = f.name.replace(/\.[^.]+$/,''); DV.lignes = devisDecouper(lignes, f.name); }
+  catch(e){ fail(e); }
+  devisDessiner();
+}
+async function devisImporter(){
+  const b = $('#dvGo'); b.disabled = true; b.textContent = 'Création des tâches…';
+  try{
+    const articles = DV.lignes.filter(l=>l.garder && l.titre.trim()).map(l=>({lot:(l.equipe||'Équipe 1').slice(0,80), ref:'', titre:l.titre.trim(),
+      phase:`Devis · ${l.section || DV.nom || 'Travaux'}`.slice(0,120), detail:l.detail||''}));
+    const r = await rpc('cc_cctp_importer', {p_token:S.token, p_doc_nom:'', p_doc_url:'', p_articles:articles});
+    DV = null; closeSheet(); S.tab = 'avancement'; await loadChantier(true);
+    toast(`${r.articles} tâches créées, réparties entre vos équipes`);
     if(lotsSansArtisan().length) setTimeout(attribuerLots, 400);
   }catch(e){ fail(e); b.disabled = false; b.textContent = 'Réessayer'; }
 }
