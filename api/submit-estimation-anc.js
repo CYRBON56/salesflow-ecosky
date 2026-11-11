@@ -260,11 +260,25 @@ export default async function handler(req, res) {
     // Best effort : un échec ne bloque jamais la demande du client.
     try {
       if (typeof prixBaseHT === "number" && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
-        const lignesPL = [{
-          label: `${filiere.label} – ${ehRetenu} EH`,
-          description: (filiere.composantsInclus || []).join(" ; "),
-          prix_ht: prixBaseHT,
-        }];
+        let lignesPL;
+        if (filiereIndicative === "filtreCompact" || !PRICING_CONFIG_ANC.filieres[filiereIndicative]) {
+          // easyRock GRAF : station au prix public (tarif GRAF + 50 %) + terrassement/pose 1 500 € HT ; 7 EH → modèle 8 EH
+          const POSE_HT = 1500;
+          const modele = ehRetenu <= 6 ? ehRetenu : 8;
+          lignesPL = [
+            { label: `Filtre compact GRAF easyRock ${modele} EH – fourniture et livraison`, description: "Fosse + unité de traitement, sortie basse gravitaire, avec rallonges", prix_ht: prixBaseHT - POSE_HT },
+            { label: "Terrassement et pose des éléments avec gravier", description: "Fouille, lit de pose et calage en gravier, mise en place, remblaiement", prix_ht: POSE_HT },
+          ];
+          if (donneesEtude && donneesEtude.eauFaibleProfondeur) {
+            lignesPL.push({ label: "Pose en nappe phréatique (kit d'ancrage et mise en œuvre adaptée)", prix_ht: 900 });
+          }
+        } else {
+          lignesPL = [{
+            label: `${filiere.label} – ${ehRetenu} EH`,
+            description: (filiere.composantsInclus || []).join(" ; "),
+            prix_ht: prixBaseHT,
+          }];
+        }
         for (const c of detailComplements) {
           if (c.montantHT > 0) {
             const opt = options[c.poste] || {};
@@ -289,7 +303,7 @@ export default async function handler(req, res) {
             client: { prenom, email, telephone, adresse: adresseProjet },
             lignes: lignesPL,
             lien_doc: etudePdfUrl || null,
-            mention: "ESTIMATION NON CONTRACTUELLE établie à partir de l'étude de sol transmise : prix à confirmer avec un technicien (accès chantier, roche, métrés définitifs, évacuation des déblais). Options possibles non incluses : brise-roche hydraulique, évacuation des terres excédentaires.",
+            mention: "ESTIMATION NON CONTRACTUELLE établie à partir de l'étude de sol transmise : prix à confirmer avec un technicien (accès chantier, roche, métrés définitifs). Options possibles, non incluses : rehausse de 20 cm (120 € HT l'unité), évacuation des déblais (950 € HT), brise-roche hydraulique (1 250 € HT par jour).",
           } }),
         });
       }

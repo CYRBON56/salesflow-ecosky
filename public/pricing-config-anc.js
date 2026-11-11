@@ -100,15 +100,16 @@
       },
 
       filtreCompact: {
-        label: "Filière compacte (média filtrant)",
+        label: "Filtre compact GRAF easyRock",
         composantsInclus: [
-          "Fourniture et pose du filtre compact",
-          "Terrassement",
+          "Fourniture et livraison du filtre compact GRAF easyRock",
+          "Terrassement et pose des éléments avec gravier (1 500 € HT)",
           "Remblaiement",
         ],
         prixParEH: {
-          4: 9000, 5: 10000, 6: 11000, 7: 12000, 8: 13000, 9: 14000, 10: 15000,
-          11: null, 12: null, 13: null, 14: null, 15: null, 16: null, 17: null, 18: null, 19: null,
+          // station easyRock (tarif GRAF + 50 %) + 1 500 € HT de terrassement/pose avec gravier ; 7 EH → modèle 8 EH ; au-delà de 8 EH : sur étude
+          4: 6750, 5: 7350, 6: 7800, 7: 8985, 8: 8985,
+          9: null, 10: null, 11: null, 12: null, 13: null, 14: null, 15: null, 16: null, 17: null, 18: null, 19: null,
         },
       },
 
@@ -349,7 +350,7 @@
       evacuationDeblais: {
         label: "Évacuation des déblais terrigènes (terrassement fosse/cuve/filtres)",
         unite: "€ HT / camion de 10 t, transport inclus",
-        prixHT: 450,
+        prixHT: 950,
         tonnesParCamion: 10,
       },
 
