@@ -763,6 +763,42 @@ export default async function handler(req, res) {
       pdfFilename: `estimation-${numero}.pdf`,
     });
 
+    // Estimation Pennylane (devis marqué ESTIMATION, à valider avec un technicien). Best effort.
+    try {
+      if (estimation.chiffrable && inZone && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+        const a = answers || {};
+        const surface = parseFloat(a.surface);
+        const carrossable = a.usage === "carrossable";
+        const lignesPL = [{
+          label: carrossable
+            ? `Revêtement résine carrossable (granulats quartz, granit ou marbre) – ${surface} m²`
+            : `Revêtement résine de gomme EcoSky'Gum – ${surface} m²`,
+          description: buildDesignationLines(a).join(" ").replace(/\s+/g, " ").slice(0, 900),
+          quantite: surface,
+          prix_ht: estimation.prixM2,
+        }];
+        if (carrossable && a.bordure === "oui" && parseFloat(a.bordure_metres) > 0) {
+          lignesPL.push({ label: "Bordures (mètre linéaire)", quantite: parseFloat(a.bordure_metres), prix_ht: 45 });
+        }
+        await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/estimation_pennylane`, {
+          method: "POST",
+          headers: { apikey: process.env.SUPABASE_SERVICE_KEY, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ body: {
+            titre: carrossable ? `Résine carrossable ${surface} m²` : `Résine de gomme ${surface} m²`,
+            origine: `estimateur résine en ligne (n° ${numero})`,
+            tva: estimation.tauxTVA === "10%" ? "FR_100" : "FR_200",
+            client: { prenom: prenom || "", nom, email, telephone: phoneE164 || telephone, adresse: [adresse_projet, code_postal].filter(Boolean).join(" ") },
+            lignes: lignesPL,
+            lien_doc: pdfUrl || null,
+            lien_doc_label: "PDF de l'estimation en ligne",
+            mention: `ESTIMATION NON CONTRACTUELLE (estimateur en ligne n° ${numero}) : prix à confirmer avec un technicien selon l'état réel du support. Options possibles après visite : réparation de dalle, filet de renfort, baguettes de finition. Remise de ${estimation.remisePourcent} % possible selon le volume, à valider avec le technicien.`,
+          } }),
+        });
+      }
+    } catch (erreurPennylane) {
+      console.error("Estimation Pennylane impossible :", erreurPennylane.message);
+    }
+
     await declencherAgentLeads(lead?.[0]?.id);
 
     return res.status(200).json({ success: true, estimation, lead_id: lead?.[0]?.id, numero, pdf_url: pdfUrl });
