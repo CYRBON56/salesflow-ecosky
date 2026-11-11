@@ -746,7 +746,9 @@ function authView(){
   return `<h1 style="margin-top:6px">${up?'Créer mon espace pilote':'Connexion'}</h1>
   <p class="sub">${up?'Pour l’architecte, le maître d’œuvre ou le constructeur qui pilote ses chantiers. 3 mois offerts, sans carte bancaire.':'Accédez à vos chantiers.'}</p>
   <form onsubmit="event.preventDefault();doAuth()">
-    ${up?`<label class="lb">Votre nom</label><input class="inp" id="aNom" autocomplete="name" required>
+    ${up?`<label class="lb">N° SIRET <span style="font-weight:400;color:var(--mute)">(facultatif : remplit le reste pour vous)</span></label><input class="inp" id="aSiret" inputmode="numeric" autocomplete="off" placeholder="14 chiffres, ex. 123 456 789 00012" oninput="siretSaisi(this.value)">
+    <div id="aSiretInfo" class="note" style="margin-top:6px">Pas de SIRET sous la main ? Remplissez simplement les champs ci-dessous.</div>
+    <label class="lb">Votre nom</label><input class="inp" id="aNom" autocomplete="name" required>
     <label class="lb">Entreprise / cabinet</label><input class="inp" id="aEnt" autocomplete="organization">
     <label class="lb">Téléphone</label><input class="inp" id="aTel" type="tel" autocomplete="tel">`:''}
     <label class="lb">E-mail</label><input class="inp" id="aMail" type="email" autocomplete="email" required>
@@ -756,11 +758,40 @@ function authView(){
   <p class="note" style="text-align:center;margin-top:16px">${up?'Déjà inscrit ? <a href="#/connexion">Se connecter</a>':'Pas encore de compte ? <a href="#/connexion/inscription">Créer mon espace</a>'}</p>
   ${!up?'<p class="note" style="text-align:center">Mot de passe oublié : écrivez à infos@ecosky.fr.</p>':''}`;
 }
+/* Recherche automatique dans l'annuaire officiel des entreprises (recherche-entreprises.api.gouv.fr, gratuit, sans clé). */
+let SIRET = {ok:false};
+const NAF_PILOTES = {'71.11Z':'Activités d’architecture','71.12B':'Ingénierie, études techniques (BE / maîtrise d’œuvre)','71.12A':'Géomètre-expert','41.20A':'Construction de maisons individuelles','41.20B':'Construction d’autres bâtiments','41.10A':'Promotion immobilière de logements','41.10B':'Promotion immobilière de bureaux','41.10C':'Promotion immobilière d’autres bâtiments','41.10D':'Supports juridiques de programmes','74.10Z':'Activités spécialisées de design'};
+const capi = t => String(t||'').toLowerCase().replace(/(^|[\s-])([a-zà-ÿ])/g, (m,a,b)=>a+b.toUpperCase());
+let siretTimer;
+function siretSaisi(v){
+  const n = String(v||'').replace(/\D/g,''); const info = $('#aSiretInfo'); SIRET = {ok:false};
+  clearTimeout(siretTimer);
+  if(!n){ info.innerHTML = 'Pas de SIRET sous la main ? Remplissez simplement les champs ci-dessous.'; return; }
+  if(n.length !== 14 && n.length !== 9){ info.innerHTML = n.length < 14 ? `${n.length} chiffre${n.length>1?'s':''} sur 14…` : 'Le SIRET fait 14 chiffres.'; return; }
+  info.innerHTML = 'Recherche de votre entreprise…';
+  siretTimer = setTimeout(async () => {
+    try{
+      const r = await fetch('https://recherche-entreprises.api.gouv.fr/search?q=' + n + '&per_page=1');
+      const d = await r.json(); const e = d && d.results && d.results[0];
+      if(!e || (n.length === 14 && !String(JSON.stringify(e)).includes(n))){ info.innerHTML = 'Numéro introuvable dans l’annuaire officiel. Vérifiez-le, ou remplissez les champs à la main.'; return; }
+      const et = (e.matching_etablissements||[]).find(x => x.siret === n) || e.siege || {};
+      const nom = e.nom_raison_sociale || e.nom_complet || '';
+      const dir = (e.dirigeants||[]).find(x => x.type_dirigeant === 'personne physique' && x.nom);
+      const naf = et.activite_principale || e.activite_principale || '';
+      SIRET = {ok:true, siret: et.siret || n, adresse: et.adresse || '', naf: naf + (NAF_PILOTES[naf] ? ' – ' + NAF_PILOTES[naf] : '')};
+      if($('#aEnt')) $('#aEnt').value = capi(nom);
+      if($('#aNom') && !$('#aNom').value && dir) $('#aNom').value = capi(String(dir.prenoms||'').split(' ')[0] + ' ' + dir.nom);
+      const ferme = (e.etat_administratif === 'C' || et.etat_administratif === 'F');
+      info.innerHTML = `<span style="color:${ferme?'var(--signal,#E5484D)':'#2F8F5B'};font-weight:700">${ferme?'⚠️ Établissement fermé':'✓ Entreprise trouvée'}</span> : <b>${esc(capi(nom))}</b>${et.adresse?'<br>'+esc(et.adresse):''}${NAF_PILOTES[naf]?'<br>'+esc(NAF_PILOTES[naf]):''}<br><span style="color:var(--mute)">Vérifiez ou corrigez les champs ci-dessous.</span>`;
+    }catch(err){ info.innerHTML = 'Recherche impossible pour le moment : remplissez les champs à la main.'; }
+  }, 300);
+}
 async function doAuth(){
   const b = $('#aBtn'); b.disabled = true;
   try{
     const up = S.authMode==='up';
-    const r = up ? await rpc('cc_inscription', {p_email:$('#aMail').value, p_mdp:$('#aMdp').value, p_nom:$('#aNom').value, p_entreprise:$('#aEnt').value, p_tel:$('#aTel').value})
+    const r = up ? await rpc('cc_inscription', {p_email:$('#aMail').value, p_mdp:$('#aMdp').value, p_nom:$('#aNom').value, p_entreprise:$('#aEnt').value, p_tel:$('#aTel').value,
+                                                p_siret: SIRET.ok ? SIRET.siret : (($('#aSiret')||{}).value||'').replace(/\D/g,'') || null, p_adresse: SIRET.ok ? SIRET.adresse : null, p_naf: SIRET.ok ? SIRET.naf : null})
                  : await rpc('cc_connexion', {p_email:$('#aMail').value, p_mdp:$('#aMdp').value});
     if(r && r.erreur) throw new Error(r.erreur);
     LS.set('cc_compte', r.token); if(up){ S.etab='marque'; MQ=null; } toast(up?'Espace créé ! Commencez par votre image':'Bonjour '+r.nom.split(' ')[0]); location.hash = '#/espace';
