@@ -744,9 +744,14 @@ async function mqSave(){
 function authView(){
   const up = S.authMode==='up';
   return `<h1 style="margin-top:6px">${up?'Créer mon espace pilote':'Connexion'}</h1>
-  <p class="sub">${up?'Pour l’architecte, le maître d’œuvre ou le constructeur qui pilote ses chantiers. 3 mois offerts, sans carte bancaire.':'Accédez à vos chantiers.'}</p>
+  <p class="sub">${up?'Pour l’architecte, le maître d’œuvre, le constructeur ou l’artisan qui pilote ses chantiers. 3 mois offerts, sans carte bancaire.':'Accédez à vos chantiers.'}</p>
   <form onsubmit="event.preventDefault();doAuth()">
-    ${up?`<label class="lb">N° SIRET <span style="font-weight:400;color:var(--mute)">(facultatif : remplit le reste pour vous)</span></label><input class="inp" id="aSiret" inputmode="numeric" autocomplete="off" placeholder="14 chiffres, ex. 123 456 789 00012" oninput="siretSaisi(this.value)">
+    ${up?`<label class="lb">Vous êtes…</label>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <label class="chip" style="flex:1;min-width:150px;padding:12px;cursor:pointer;display:flex;gap:8px;align-items:flex-start;white-space:normal"><input type="radio" name="aMode" value="pilote" ${S.aMode!=='equipes'?'checked':''} onchange="S.aMode=this.value" style="margin-top:3px;accent-color:var(--acc)"><span><b>Je pilote des artisans</b><br><span style="font-weight:400;font-size:13px;color:var(--mute)">Architecte, maître d’œuvre, constructeur</span></span></label>
+      <label class="chip" style="flex:1;min-width:150px;padding:12px;cursor:pointer;display:flex;gap:8px;align-items:flex-start;white-space:normal"><input type="radio" name="aMode" value="equipes" ${S.aMode==='equipes'?'checked':''} onchange="S.aMode=this.value" style="margin-top:3px;accent-color:var(--acc)"><span><b>Je dirige mes équipes</b><br><span style="font-weight:400;font-size:13px;color:var(--mute)">Artisan, entreprise du bâtiment ou paysagiste</span></span></label>
+    </div>
+    <label class="lb">N° SIRET <span style="font-weight:400;color:var(--mute)">(facultatif : remplit le reste pour vous)</span></label><input class="inp" id="aSiret" inputmode="numeric" autocomplete="off" placeholder="14 chiffres, ex. 123 456 789 00012" oninput="siretSaisi(this.value)">
     <div id="aSiretInfo" class="note" style="margin-top:6px">Pas de SIRET sous la main ? Remplissez simplement les champs ci-dessous.</div>
     <label class="lb">Votre nom</label><input class="inp" id="aNom" autocomplete="name" required>
     <label class="lb">Entreprise / cabinet</label><input class="inp" id="aEnt" autocomplete="organization">
@@ -791,7 +796,7 @@ async function doAuth(){
   try{
     const up = S.authMode==='up';
     const r = up ? await rpc('cc_inscription', {p_email:$('#aMail').value, p_mdp:$('#aMdp').value, p_nom:$('#aNom').value, p_entreprise:$('#aEnt').value, p_tel:$('#aTel').value,
-                                                p_siret: SIRET.ok ? SIRET.siret : (($('#aSiret')||{}).value||'').replace(/\D/g,'') || null, p_adresse: SIRET.ok ? SIRET.adresse : null, p_naf: SIRET.ok ? SIRET.naf : null})
+                                                p_siret: SIRET.ok ? SIRET.siret : (($('#aSiret')||{}).value||'').replace(/\D/g,'') || null, p_adresse: SIRET.ok ? SIRET.adresse : null, p_naf: SIRET.ok ? SIRET.naf : null, p_mode: S.aMode==='equipes' ? 'equipes' : 'pilote'})
                  : await rpc('cc_connexion', {p_email:$('#aMail').value, p_mdp:$('#aMdp').value});
     if(r && r.erreur) throw new Error(r.erreur);
     LS.set('cc_compte', r.token); if(up){ S.etab='marque'; MQ=null; } toast(up?'Espace créé ! Commencez par votre image':'Bonjour '+r.nom.split(' ')[0]); location.hash = '#/espace';
@@ -829,7 +834,11 @@ function espaceView(){
 let SAUV = {fichiers:true, enCours:false, etat:''};
 function securiteView(){
   const pt = (t, d) => `<div style="display:flex;gap:10px;margin-top:10px"><span style="color:#2F9E6A;font-weight:900">&#10003;</span><div><b>${t}</b><div class="meta" style="margin-top:2px">${d}</div></div></div>`;
-  return `<div class="card" style="margin-top:12px"><b style="font-size:17px">Comment vos données sont protégées</b>
+  const md = (S.espace && S.espace.compte && S.espace.compte.mode) || 'pilote';
+  return `<div class="card" style="margin-top:12px"><b style="font-size:17px">Type de compte</b>
+    <p class="meta" style="margin-top:6px">Le vocabulaire de l’appli s’adapte : lots et artisans, ou équipes et chefs d’équipe.</p>
+    <div class="seg" style="margin-top:10px"><button class="${md!=='equipes'?'on':''}" onclick="changerMode('pilote')">Je pilote des artisans</button><button class="${md==='equipes'?'on':''}" onclick="changerMode('equipes')">Je dirige mes équipes</button></div></div>
+  <div class="card"><b style="font-size:17px">Comment vos données sont protégées</b>
     ${pt('Hébergées en Europe', 'Vos chantiers sont stockés à Francfort (Allemagne), chez Supabase, sur l’infrastructure Amazon Web Services. Vos données restent dans l’Union européenne.')}
     ${pt('Chiffrées pendant le transfert', 'Tous les échanges entre votre appareil et nos serveurs passent par une connexion sécurisée HTTPS (TLS), comme sur le site de votre banque.')}
     ${pt('Chiffrées sur les serveurs', 'Les données enregistrées sont chiffrées sur les disques de l’hébergeur (chiffrement AES-256).')}
@@ -866,6 +875,9 @@ async function deconnecterPartout(){
 const csvCell = v => { if(v==null) return ''; if(typeof v==='object') v = JSON.stringify(v); v = String(v); return /[";\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
 function toCsv(rows){ if(!rows || !rows.length) return ''; const cols = [...new Set(rows.flatMap(r=>Object.keys(r)))]; return '﻿'+[cols.join(';'), ...rows.map(r=>cols.map(c=>csvCell(r[c])).join(';'))].join('\r\n'); }
 const nomFichier = s => String(s||'sans-nom').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w.-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60) || 'sans-nom';
+async function changerMode(md){
+  try{ await rpc('cc_mode_changer',{p_token:compteToken(), p_mode:md}); S.espace.compte.mode = md; toast(md==='equipes'?'Mode équipes activé':'Mode pilote d’artisans activé'); render(); }catch(e){ fail(e); }
+}
 async function sauvegarder(){
   SAUV.enCours = true; SAUV.etat = 'Récupération de vos données…'; render();
   try{
@@ -980,13 +992,16 @@ const D = () => S.data;
 const me = () => D().moi;
 const isMoe = () => me().role==='moe';
 const isArt = () => me().role==='artisan';
+// Mode « équipes » : l'artisan dirige ses propres équipes (au lieu d'un architecte qui pilote des artisans)
+const EQ = () => !!(S.data && S.data.chantier && S.data.chantier.mode==='equipes');
+const PILOTE = () => EQ() ? 'le chef d’entreprise' : 'l’architecte';
 const M = id => D().membres.find(x=>x.id===id) || {nom:'Ancien membre'};
 const mediasOf = (k,v) => D().medias.filter(x=>x[k]===v);
 const lotKey = t => norm(t).replace(/œ/g,'oe').slice(0,5);
 const sameLot = (a,b) => !!a && !!b && lotKey(a)===lotKey(b);
 const lotsOf = p => (p.lots && p.lots.length) ? p.lots : (p.lot ? [p.lot] : []);
 function unreadDocs(){ return D().documents.filter(d=>!d.lus.includes(me().id)).length; }
-function defaultTab(){ return isMoe() ? 'avancement' : isArt() ? 'taches' : 'msg'; }
+function defaultTab(){ return isMoe() ? 'avancement' : isArt() ? 'taches' : me().role==='client' ? 'suivi' : 'msg'; }
 function chantierView(){
   const c = D().chantier, m = me();
   const nbOuv = D().problemes.filter(p=>p.statut==='ouvert'||p.statut==='en cours').length;
@@ -994,6 +1009,7 @@ function chantierView(){
   const tabs = [];
   if(isMoe()) tabs.push(['avancement','Avancement', et.filter(e=>e.statut==='déclaré').length]);
   if(isArt()) tabs.push(['taches','Mes tâches', et.filter(e=>e.statut==='à faire'||e.statut==='en cours').length]);
+  if(m.role==='client') tabs.push(['suivi','Mon chantier',0]);
   if(m.role!=='client') tabs.push(['prob','Problèmes',nbOuv]);
   tabs.push(['msg','Messages',0],['photos','Photos',0],['docs','Documents',unreadDocs()],['equipe','Équipe',0]);
   if(isMoe()) tabs.push(['cr','Compte rendu',0]);
@@ -1001,11 +1017,12 @@ function chantierView(){
   const bandeau = (S.tab===defaultTab() || S.tab==='') && S.marque ? marqueHtml(S.marque, {mini: isMoe(), sansMot: isMoe()}) : '';
   let h = bandeau + `<div class="row" style="align-items:flex-start;gap:12px">${isArt()?vignette(m.lot||'Autre',58):vignette('',58,m.role)}
     <div style="min-width:0;flex:1"><h1>${esc(c.nom)}</h1><p class="sub">${esc(c.adresse||'')}${c.debut||c.fin?` · ${esc(c.debut||'?')} → ${esc(c.fin||'?')}`:''}</p>
-    <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><span class="pill p-mute">${isMoe()?'Architecte · administrateur':m.role==='client'?'Client':'Votre lot : '+esc(m.lot||'—')}</span></div></div></div>
+    <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><span class="pill p-mute">${isMoe()?(EQ()?'Chef d’entreprise · administrateur':'Architecte · administrateur'):m.role==='client'?'Client':(EQ()?'Votre équipe : ':'Votre lot : ')+esc(m.lot||'—')}</span></div></div></div>
     ${c.avancement!==null && c.avancement!==undefined?`<div class="row between" style="margin-top:12px"><span class="meta" style="margin:0">Avancement</span><b style="font-size:13px">${c.avancement}%</b></div><div class="bar" style="margin:4px 0 12px"><i style="width:${c.avancement}%"></i></div>`:'<div style="height:12px"></div>'}
   <div class="tabs">${tabs.map(([k,l,n])=>`<button class="tab ${S.tab===k?'on':''}" onclick="setTab('${k}')">${l}${n?`<span class="dot">${n}</span>`:''}</button>`).join('')}</div>`;
   if(S.tab==='avancement') h += avancementView();
   if(S.tab==='taches') h += tachesView();
+  if(S.tab==='suivi') h += suiviView();
   if(S.tab==='prob') h += probList();
   if(S.tab==='msg') h += msgView();
   if(S.tab==='photos') h += photosView();
@@ -1018,6 +1035,25 @@ function setTab(t){ S.tab=t; if(t==='msg') S.conv=null; render(); if(t!=='msg') 
 function allLots(){ const s = new Set(D().chantier.lots||[]); D().membres.forEach(x=>x.lot&&s.add(x.lot)); return [...s]; }
 const ET = {'à faire':['À faire','p-mute'],'en cours':['En cours','p-blue'],'déclaré':['À vérifier','p-acc'],'validé':['Fait ✓','p-ok'],'sans objet':['Sans objet','p-mute']};
 
+/* ---------- SUIVI (client, lecture seule) ---------- */
+function suiviView(){
+  const et = (D().etapes||[]).filter(e=>e.statut!=='sans objet');
+  if(!et.length) return `<div class="empty">Les étapes de votre chantier apparaîtront ici dès qu’elles seront planifiées.</div>`;
+  const ok = et.filter(e=>e.statut==='validé').length;
+  let h = `<div class="card"><div class="row between"><div><div class="meta" style="margin:0">Étapes terminées</div><b style="font-size:24px">${ok}<span style="font-size:15px;color:var(--mute)"> / ${et.length}</span></b></div></div>
+    <div class="bar" style="margin-top:8px"><i style="width:${Math.round(ok*100/et.length)}%"></i></div>
+    <p class="note" style="margin-top:8px">Chaque étape est cochée par l’équipe sur le chantier, puis vérifiée par l’entreprise. Vous recevez un e-mail à chaque avancée si votre adresse a été donnée.</p></div>`;
+  [...new Set(et.map(e=>e.phase))].forEach(ph=>{
+    h += `<h2>${esc(String(ph||'').replace(/^Devis · /,''))}</h2><div class="card" style="padding:4px 14px">`;
+    et.filter(e=>e.phase===ph).forEach(e=>{
+      const fait = e.statut==='validé', cours = e.statut==='en cours'||e.statut==='déclaré';
+      h += `<div class="row" style="gap:10px;padding:10px 0;border-top:1px solid var(--line);align-items:flex-start"><span style="font-size:18px;line-height:1.2">${fait?'✅':cours?'🔨':'⬜'}</span><div style="flex:1;min-width:0"><div style="font-weight:${fait?700:500}">${esc(e.nom)}</div><div class="meta" style="margin:2px 0 0">${fait?'Terminé'+(e.valide_le?' le '+new Date(e.valide_le).toLocaleDateString('fr-FR'):''):cours?'En cours':'À venir'}</div></div></div>`;
+    });
+    h += `</div>`;
+  });
+  return h;
+}
+
 /* ---------- AVANCEMENT (architecte) ---------- */
 function miseEnRoute(){
   const arts = D().membres.filter(x=>x.role==='artisan'), docs = D().documents.length, jamais = arts.filter(x=>!x.last_seen).length;
@@ -1026,7 +1062,7 @@ function miseEnRoute(){
   return `<div class="card" style="border-color:#F6C9A8"><b>Mise en route du chantier</b>
     ${st(true,1,'Chantier créé','')}
     ${st(docs>0,2,'Déposer les documents (pour tous ou par corps de métier)',`<button class="chip" onclick="setTab('docs');newDoc()">Ajouter</button>`)}
-    ${st(arts.length>0,3,'Ajouter les professionnels',`<button class="chip" onclick="invite()">Ajouter</button>`)}
+    ${st(arts.length>0,3,EQ()?'Ajouter vos équipes (un chef d’équipe par équipe)':'Ajouter les professionnels',`<button class="chip" onclick="invite()">Ajouter</button>`)}
     ${st(arts.length>0&&!jamais,4,jamais?`Envoyer les liens SMS (${jamais} pas encore connecté${jamais>1?'s':''})`:'Envoyer les liens SMS',arts.length?`<button class="chip" onclick="setTab('equipe')">Voir</button>`:'')}</div>`;
 }
 function avancementView(){
@@ -1036,16 +1072,16 @@ function avancementView(){
   if(!F[S.efiltre]) S.efiltre = 'toutes';
   const list = et.filter(F[S.efiltre]);
   const aCctp = et.some(e=>e.source==='cctp');
-  let h = miseEnRoute() + (aCctp ? '' : `<div class="card" style="background:var(--ink);color:#fff;border-color:var(--ink)"><div class="row" style="gap:12px;align-items:flex-start"><div class="lv" style="width:46px;height:46px;background:var(--acc)">${I.doc.replace('width="20" height="20"','width="24" height="24"').replace('stroke="currentColor"','stroke="#fff"')}</div><div style="flex:1"><b style="font-size:16px">Importez votre CCTP</b><p style="font-size:13.5px;line-height:1.45;margin-top:4px;color:#C9CFD5">Chaque article est envoyé au corps de métier concerné. L’artisan coche ce qu’il a fait, vous validez.</p></div></div><button class="btn pri full" style="margin-top:12px" onclick="cctpOuvrir()">Importer le CCTP (PDF ou Word)</button><button class="btn full" style="margin-top:8px;background:transparent;color:#fff;border-color:#5B6670" onclick="devisOuvrir()">Artisan ? Importer votre devis (les prix sont retirés)</button></div>`) + `<div class="card"><div class="row between"><div><div class="meta" style="margin:0">Étapes validées</div><b style="font-size:24px">${ok}<span style="font-size:15px;color:var(--mute)"> / ${actifs.length}</span></b></div>
+  let h = miseEnRoute() + (aCctp ? '' : `<div class="card" style="background:var(--ink);color:#fff;border-color:var(--ink)"><div class="row" style="gap:12px;align-items:flex-start"><div class="lv" style="width:46px;height:46px;background:var(--acc)">${I.doc.replace('width="20" height="20"','width="24" height="24"').replace('stroke="currentColor"','stroke="#fff"')}</div><div style="flex:1">${EQ()?`<b style="font-size:16px">Importez votre devis</b><p style="font-size:13.5px;line-height:1.45;margin-top:4px;color:#C9CFD5">Les prix sont retirés : chaque ligne de travaux devient une tâche, confiée à une de vos équipes. Le chef d’équipe coche ce qui est fait, vous validez, et votre client suit l’avancement.</p>`:`<b style="font-size:16px">Importez votre CCTP</b><p style="font-size:13.5px;line-height:1.45;margin-top:4px;color:#C9CFD5">Chaque article est envoyé au corps de métier concerné. L’artisan coche ce qu’il a fait, vous validez.</p>`}</div></div>${EQ()?`<button class="btn pri full" style="margin-top:12px" onclick="devisOuvrir()">Importer le devis (PDF ou Word)</button><button class="btn full" style="margin-top:8px;background:transparent;color:#fff;border-color:#5B6670" onclick="cctpOuvrir()">Importer plutôt un CCTP</button>`:`<button class="btn pri full" style="margin-top:12px" onclick="cctpOuvrir()">Importer le CCTP (PDF ou Word)</button><button class="btn full" style="margin-top:8px;background:transparent;color:#fff;border-color:#5B6670" onclick="devisOuvrir()">Artisan ? Importer votre devis (les prix sont retirés)</button>`}</div>`) + `<div class="card"><div class="row between"><div><div class="meta" style="margin:0">Étapes validées</div><b style="font-size:24px">${ok}<span style="font-size:15px;color:var(--mute)"> / ${actifs.length}</span></b></div>
     <div style="text-align:right"><div class="meta" style="margin:0">À vérifier</div><b style="font-size:24px;color:${decl?'var(--acc)':'var(--ink)'}">${decl}</b></div></div>
-    <p class="note">Les artisans voient seulement leurs propres étapes. Quand l’un d’eux coche « c’est fait », l’étape passe en « à vérifier » : à vous de valider.</p></div>
+    <p class="note">${EQ()?'Chaque équipe voit seulement ses propres tâches. Quand le chef d’équipe coche':'Les artisans voient seulement leurs propres étapes. Quand l’un d’eux coche'} « c’est fait », l’étape passe en « à vérifier » : à vous de valider.</p></div>
   <div class="filters">${[['toutes','Toutes'],['verifier','À vérifier · '+decl],['cours','En cours · '+enc],['faire','À faire'],['faites','Faites']].map(([k,l])=>`<button class="chip ${S.efiltre===k?'on':''}" onclick="S.efiltre='${k}';render()">${l}</button>`).join('')}</div>`;
   if(!list.length) h += `<div class="empty">Aucune étape ici.</div>`;
   const phases = [...new Set(list.map(e=>e.phase))];
   phases.forEach(ph=>{
     const all = et.filter(e=>e.phase===ph && e.statut!=='sans objet'), okp = all.filter(e=>e.statut==='validé').length;
     const lotPh = (all.find(e=>e.lot)||{}).lot, sansArt = lotPh && !D().membres.some(x=>x.role==='artisan' && sameLot(x.lot,lotPh));
-    h += `<div class="row between" style="margin:18px 0 8px;gap:8px"><b style="font-size:15.5px">${esc(ph)}</b><div class="row" style="gap:6px">${sansArt?`<button class="chip on" onclick="choisirArtisan(${esc(JSON.stringify(lotPh))})">Choisir l’artisan</button>`:''}<span class="pill ${okp===all.length&&all.length?'p-ok':'p-mute'}">${okp}/${all.length}</span></div></div>`;
+    h += `<div class="row between" style="margin:18px 0 8px;gap:8px"><b style="font-size:15.5px">${esc(ph)}</b><div class="row" style="gap:6px">${sansArt?`<button class="chip on" onclick="choisirArtisan(${esc(JSON.stringify(lotPh))})">${EQ()?'Choisir le chef d’équipe':'Choisir l’artisan'}</button>`:''}<span class="pill ${okp===all.length&&all.length?'p-ok':'p-mute'}">${okp}/${all.length}</span></div></div>`;
     list.filter(e=>e.phase===ph).forEach(e=> h += etapeRow(e, true));
   });
   h += `<div class="btns" style="margin-top:16px"><button class="btn" onclick="addEtape()">${I.plus} Ajouter une étape</button><button class="btn" onclick="cctpOuvrir()">${I.doc} ${aCctp?'Importer un autre CCTP':'Importer le CCTP'}</button><button class="btn" onclick="devisOuvrir()">${I.doc} Importer un devis</button></div>`;
@@ -1571,17 +1607,17 @@ function bienvenue(){
 }
 function tachesView(){
   const et = D().etapes||[], m = me(), st = (D().membres.find(x=>x.id===m.id)||{}).statut_lot;
-  let h = bienvenue() + `<div class="card row" style="gap:12px">${vignette(m.lot||'Autre',52)}<div style="flex:1"><b>Lot ${esc(m.lot||'—')}</b><div class="meta">Statut de votre lot : ${esc(st||'à venir')}</div></div></div>
-  <div class="quick">${st!=='en cours'&&st!=='terminé'?`<button class="chip" onclick="lotStatut('en cours')">▶️ Je démarre mon lot</button>`:''}${st!=='terminé'?`<button class="chip" onclick="lotStatut('terminé')">✅ J’ai terminé mon lot</button>`:''}</div>`;
-  if(!et.length) return h + `<div class="empty">Aucune étape attribuée à votre lot pour l’instant.</div>`;
+  let h = bienvenue() + `<div class="card row" style="gap:12px">${vignette(m.lot||'Autre',52)}<div style="flex:1"><b>${EQ()?'':'Lot '}${esc(m.lot||'—')}</b><div class="meta">${EQ()?'Statut de votre équipe':'Statut de votre lot'} : ${esc(st||'à venir')}</div></div></div>
+  <div class="quick">${st!=='en cours'&&st!=='terminé'?`<button class="chip" onclick="lotStatut('en cours')">▶️ ${EQ()?'On démarre':'Je démarre mon lot'}</button>`:''}${st!=='terminé'?`<button class="chip" onclick="lotStatut('terminé')">✅ ${EQ()?'Tout est terminé':'J’ai terminé mon lot'}</button>`:''}</div>`;
+  if(!et.length) return h + `<div class="empty">Aucune tâche attribuée ${EQ()?'à votre équipe':'à votre lot'} pour l’instant.</div>`;
   const okA = et.filter(e=>e.statut==='validé').length, declA = et.filter(e=>e.statut==='déclaré').length;
-  h += `<div class="card"><div class="row between"><b>${okA} / ${et.length} validées par l’architecte</b>${declA?`<span class="pill p-acc">${declA} en vérification</span>`:''}</div><div class="bar"><i style="width:${et.length?Math.round(okA*100/et.length):0}%"></i></div></div>
-  <p class="note" style="margin:0 0 10px">Cochez « C’est fait » quand une étape ou un article du CCTP est terminé : l’architecte vérifiera et validera.</p>`;
+  h += `<div class="card"><div class="row between"><b>${okA} / ${et.length} validées par ${PILOTE()}</b>${declA?`<span class="pill p-acc">${declA} en vérification</span>`:''}</div><div class="bar"><i style="width:${et.length?Math.round(okA*100/et.length):0}%"></i></div></div>
+  <p class="note" style="margin:0 0 10px">${EQ()?'Cochez « C’est fait » au fur et à mesure : le chef d’entreprise vérifie et valide.':'Cochez « C’est fait » quand une étape ou un article du CCTP est terminé : l’architecte vérifiera et validera.'}</p>`;
   [...new Set(et.map(e=>e.phase))].forEach(ph=>{
     h += `<h2>${esc(ph)}</h2>`;
     et.filter(e=>e.phase===ph).forEach(e=>{
       const s = ET[e.statut]||ET['à faire'];
-      h += `<div class="card"><div class="row" style="gap:12px">${vignette(e.lot||'Autre',44)}<div style="flex:1;min-width:0"><div class="ptitle">${esc(e.nom)}</div>${e.note?`<div class="meta" style="color:var(--bad)">Note de l’architecte : ${esc(e.note)}</div>`:''}</div><span class="pill ${s[1]}">${e.statut==='déclaré'?'En vérification':s[0]}</span></div>
+      h += `<div class="card"><div class="row" style="gap:12px">${vignette(e.lot||'Autre',44)}<div style="flex:1;min-width:0"><div class="ptitle">${esc(e.nom)}</div>${e.note?`<div class="meta" style="color:var(--bad)">Note ${EQ()?'du chef d’entreprise':'de l’architecte'} : ${esc(e.note)}</div>`:''}</div><span class="pill ${s[1]}">${e.statut==='déclaré'?'En vérification':s[0]}</span></div>
       ${e.detail?`<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700;font-size:13.5px;color:var(--blue)">Lire l’article du CCTP</summary><p style="white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:6px;background:#F8F6F2;border-radius:10px;padding:10px">${esc(e.detail)}</p></details>`:''}
       ${e.statut==='à faire'||e.statut==='en cours'?`<div class="btns" style="margin-top:10px">${e.statut==='à faire'?`<button class="btn" onclick="tache('${e.id}','en cours')">Je commence</button>`:''}<button class="btn ok" onclick="tache('${e.id}','déclaré')">✅ C’est fait</button></div>`:''}</div>`;
     });
@@ -1863,11 +1899,11 @@ function openDoc(id){ const d = D().documents.find(x=>x.id===id); window.open(d.
 /* ---------- EQUIPE ---------- */
 function lotsGrid(){
   const lots = allLots(); if(!lots.length && !isMoe()) return '';
-  const add = isMoe() ? `<div class="lcell tap" style="border-style:dashed;justify-content:center;cursor:pointer" onclick="addMetier()"><div class="lv" style="width:72px;height:72px;background:#EAE5DD;color:var(--acc)">${I.plus}</div><div class="ptitle" style="font-size:13.5px;margin-top:6px;color:var(--acc)">Ajouter un métier</div></div>` : '';
-  return `<h2 style="margin-top:4px">Les corps de métier du chantier</h2><div class="lgrid">${add}${lots.map(l=>{
+  const add = isMoe() ? `<div class="lcell tap" style="border-style:dashed;justify-content:center;cursor:pointer" onclick="addMetier()"><div class="lv" style="width:72px;height:72px;background:#EAE5DD;color:var(--acc)">${I.plus}</div><div class="ptitle" style="font-size:13.5px;margin-top:6px;color:var(--acc)">${EQ()?'Ajouter une équipe':'Ajouter un métier'}</div></div>` : '';
+  return `<h2 style="margin-top:4px">${EQ()?'Les équipes du chantier':'Les corps de métier du chantier'}</h2><div class="lgrid">${add}${lots.map(l=>{
     const who = D().membres.filter(x=>x.role==='artisan' && sameLot(x.lot,l)), st = who[0] ? who[0].statut_lot : '';
     const ouv = D().problemes.filter(p=>lotsOf(p).some(x=>sameLot(x,l)) && (p.statut==='ouvert'||p.statut==='en cours')).length;
-    return `<div class="lcell${!who.length&&isMoe()?' tap':''}" ${!who.length&&isMoe()?`style="cursor:pointer" onclick="choisirArtisan(${esc(JSON.stringify(l))})"`:''}>${vignette(l,72)}<div class="ptitle" style="font-size:13.5px;margin-top:6px">${esc(l)}</div><div class="meta" style="margin-top:2px">${who.length?esc(who.map(x=>x.nom.split(' ')[0]).join(', ')):(isMoe()?'<b style="color:var(--acc)">Choisir l’artisan</b>':'à inviter')}</div><div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;justify-content:center">${st?`<span class="pill ${LST[st]||'p-mute'}">${esc(st)}</span>`:''}${ouv?`<span class="pill p-acc">${ouv} pb</span>`:''}</div></div>`;
+    return `<div class="lcell${!who.length&&isMoe()?' tap':''}" ${!who.length&&isMoe()?`style="cursor:pointer" onclick="choisirArtisan(${esc(JSON.stringify(l))})"`:''}>${vignette(l,72)}<div class="ptitle" style="font-size:13.5px;margin-top:6px">${esc(l)}</div><div class="meta" style="margin-top:2px">${who.length?esc(who.map(x=>x.nom.split(' ')[0]).join(', ')):(isMoe()?'<b style="color:var(--acc)">'+(EQ()?'Choisir le chef d’équipe':'Choisir l’artisan')+'</b>':'à inviter')}</div><div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;justify-content:center">${st?`<span class="pill ${LST[st]||'p-mute'}">${esc(st)}</span>`:''}${ouv?`<span class="pill p-acc">${ouv} pb</span>`:''}</div></div>`;
   }).join('')}</div><h2>Intervenants</h2>`;
 }
 function addMetier(){
@@ -1886,16 +1922,16 @@ async function saveMetier(m){
 function equipeView(){
   let h = '';
   if(isMoe()){
-    h += `<div class="btns" style="margin:0 0 12px"><button class="btn pri" onclick="invite()">${I.plus} Ajouter un professionnel</button><button class="btn" onclick="visioChantier()">🎥 Visio de chantier</button><button class="btn" onclick="editChantier()">Modifier le chantier</button></div>`;
+    h += `<div class="btns" style="margin:0 0 12px"><button class="btn pri" onclick="invite()">${I.plus} ${EQ()?'Ajouter un chef d’équipe':'Ajouter un professionnel'}</button><button class="btn" onclick="visioChantier()">🎥 Visio de chantier</button><button class="btn" onclick="editChantier()">Modifier le chantier</button></div>`;
   }
   h += lotsGrid();
   D().membres.forEach(x=>{
-    const role = x.role==='moe'?'Architecte · administrateur':x.role==='client'?'Client':(x.lot||'Intervenant');
+    const role = x.role==='moe'?(EQ()?'Chef d’entreprise · administrateur':'Architecte · administrateur'):x.role==='client'?'Client'+(isMoe()?(x.email?' · mails d’avancement activés':' · sans e-mail : pas de mails d’avancement'):''):(x.lot||'Intervenant');
     const canMsg = x.id!==me().id && me().role!=='client' && x.role!=='client';
     h += `<div class="card"><div class="person">${vignette(x.lot||'Autre', 48, x.role)}
       <div style="flex:1;min-width:0"><div class="ptitle">${esc(x.nom)}${x.id===me().id?' (vous)':''}</div><div class="meta">${esc(role)}${x.entreprise?' · '+esc(x.entreprise):''}${x.last_seen?' · vu '+ago(x.last_seen):' · pas encore connecté'}</div>${isMoe()&&(x.email||x.adresse||x.tel)?`<div class="meta">${[x.tel,x.email,x.adresse].filter(Boolean).map(esc).join(' · ')}</div>`:''}</div>
       ${x.role==='artisan'?(isMoe()?`<select class="pill ${LST[x.statut_lot]||'p-mute'}" style="border:none" onchange="lotStatut(this.value,'${x.id}')">${['à venir','en cours','terminé'].map(s=>`<option ${x.statut_lot===s?'selected':''}>${s}</option>`).join('')}</select>`:`<span class="pill ${LST[x.statut_lot]||'p-mute'}">${esc(x.statut_lot)}</span>`):''}</div>
-      ${x.tel||canMsg||(isMoe()&&x.role!=='moe')?`<div class="btns" style="margin-top:10px">${canMsg?`<button class="btn" onclick="ecrireA('${x.id}')">💬 Message</button>`:''}${x.tel?`<a class="btn" href="tel:${esc(x.tel)}">📞 Appeler</a>`:''}${x.id!==me().id && me().role!=='client' && (isMoe() || x.role==='moe')?`<button class="btn" onclick="visio('${x.id}')">🎥 Visio</button>`:''}${isMoe()&&x.email?`<a class="btn" href="mailto:${esc(x.email)}">✉️ E-mail</a>`:''}${isMoe()&&x.role!=='moe'?`<button class="btn ${x.last_seen?'':'pri'}" onclick="showInvite('${x.id}')">${x.last_seen?'Lien':'📩 Envoyer le lien SMS'}</button>`:''}</div>`:''}</div>`;
+      ${x.tel||canMsg||(isMoe()&&x.role!=='moe')?`<div class="btns" style="margin-top:10px">${canMsg?`<button class="btn" onclick="ecrireA('${x.id}')">💬 Message</button>`:''}${x.tel?`<a class="btn" href="tel:${esc(x.tel)}">📞 Appeler</a>`:''}${x.id!==me().id && me().role!=='client' && (isMoe() || x.role==='moe')?`<button class="btn" onclick="visio('${x.id}')">🎥 Visio</button>`:''}${isMoe()&&x.email?`<a class="btn" href="mailto:${esc(x.email)}">✉️ E-mail</a>`:''}${isMoe()&&x.role==='client'?`<button class="btn" onclick="emailClient('${x.id}')">✉️ Mails d’avancement</button>`:''}${isMoe()&&x.role!=='moe'?`<button class="btn ${x.last_seen?'':'pri'}" onclick="showInvite('${x.id}')">${x.last_seen?'Lien':'📩 Envoyer le lien SMS'}</button>`:''}</div>`:''}</div>`;
   });
   return h;
 }
@@ -1920,7 +1956,7 @@ async function invite(){
   const dispo = PROS.filter(p=>!deja.has(p.id));
   const lots = allLots();
   const tri = dispo.slice().sort((a,b)=> (lots.some(l=>sameLot(l,b.metier))?1:0) - (lots.some(l=>sameLot(l,a.metier))?1:0));
-  sheet(`<h1 style="font-size:19px">Ajouter un professionnel</h1><p class="sub">Il recevra un lien par SMS : pas de compte, pas de mot de passe. Il ne verra que sa partie du chantier.</p>
+  sheet(`<h1 style="font-size:19px">${EQ()?'Ajouter un chef d’équipe':'Ajouter un professionnel'}</h1><p class="sub">Il recevra un lien par SMS : pas de compte, pas de mot de passe. Il ne verra que sa partie du chantier.</p>
   <div class="btns"><button class="btn pri" onclick="editPro(null,'invite')">${I.plus} Nouveau professionnel</button><button class="btn" onclick="prosImport()">Importer ma liste</button></div>
   ${tri.length?`<h2>Depuis mon carnet</h2>${tri.map(p=>`<div class="card tap person" onclick="inviterPro('${p.id}')">${vignette(p.metier||'Autre',44)}<div style="flex:1;min-width:0"><div class="ptitle">${esc(p.nom)}</div><div class="meta">${esc([p.metier,p.entreprise,p.tel].filter(Boolean).join(' · '))}</div></div><span class="pill p-acc">Ajouter</span></div>`).join('')}`:`<p class="note" style="margin-top:12px">${PROS.length?'Tous les professionnels de votre carnet sont déjà sur ce chantier.':'Votre carnet est vide : créez la fiche du professionnel, elle servira pour vos prochains chantiers.'}</p>`}
   <h2>Client</h2><button class="btn full" onclick="inviteClient()">Inviter le client (lecture seule)</button>`);
@@ -1929,14 +1965,25 @@ async function inviterPro(proId, lot){
   try{ const r = await rpc('cc_inviter_pro',{p_token:S.token,p_pro:proId,p_lot:lot||null}); S.lotCible = null; await loadChantier(false); render(); showInvite(r.id, true); }catch(e){ fail(e); }
 }
 function inviteClient(){
-  sheet(`<h1 style="font-size:19px">Inviter le client</h1><p class="sub">Il voit l’avancement, les messages du fil général, les photos et les documents « tout le monde ».</p>
+  sheet(`<h1 style="font-size:19px">Inviter le client</h1><p class="sub">Il suit son chantier : les étapes terminées et l’avancement, les messages du fil général, les photos et les documents « tout le monde ». Jamais les prix ni vos échanges avec les équipes.</p>
   <label class="lb">Nom</label><input class="inp" id="iNom" placeholder="M. et Mme Le Dantec">
   <label class="lb">Téléphone portable</label><input class="inp" id="iTel" type="tel">
+  <label class="lb">E-mail <span style="font-weight:400;color:var(--mute)">(pour lui envoyer un mail à chaque étape terminée)</span></label><input class="inp" id="iMail" type="email" placeholder="client@exemple.fr">
   <div class="btns"><button class="btn" onclick="closeSheet()">Annuler</button><button class="btn pri" id="iBtn" onclick="saveClient()">Créer l’accès</button></div>`);
 }
 async function saveClient(){
   const b=$('#iBtn'); b.disabled=true;
-  try{ const r = await rpc('cc_inviter',{p_token:S.token,p_nom:$('#iNom').value,p_lot:null,p_tel:$('#iTel').value,p_entreprise:null,p_role:'client'}); await loadChantier(false); render(); showInvite(r.id, true); }catch(e){ fail(e); b.disabled=false; }
+  try{ const r = await rpc('cc_inviter',{p_token:S.token,p_nom:$('#iNom').value,p_lot:null,p_tel:$('#iTel').value,p_entreprise:null,p_role:'client',p_email:($('#iMail')||{}).value||null}); await loadChantier(false); render(); showInvite(r.id, true); }catch(e){ fail(e); b.disabled=false; }
+}
+function emailClient(id){
+  const x = D().membres.find(y=>y.id===id) || {};
+  sheet(`<h1 style="font-size:19px">E-mail de ${esc(x.nom||'')}</h1><p class="sub">Un mail lui est envoyé à chaque étape validée, avec l’avancement et le lien de suivi. Laissez vide pour ne plus rien envoyer.</p>
+  <label class="lb">E-mail</label><input class="inp" id="cMail" type="email" value="${esc(x.email||'')}">
+  <div class="btns"><button class="btn" onclick="closeSheet()">Annuler</button><button class="btn pri" id="cBtn" onclick="saveEmailClient('${id}')">Enregistrer</button></div>`);
+}
+async function saveEmailClient(id){
+  const b=$('#cBtn'); b.disabled=true;
+  try{ await rpc('cc_membre_email',{p_token:S.token,p_membre:id,p_email:$('#cMail').value}); closeSheet(); await loadChantier(false); render(); toast('E-mail enregistré'); }catch(e){ fail(e); b.disabled=false; }
 }
 function showInvite(id, nouveau){
   const x = D().membres.find(z=>z.id===id); if(!x||!x.token) return;
