@@ -256,6 +256,47 @@ export default async function handler(req, res) {
       console.error("Échec envoi email notification owner :", erreurEmailOwner);
     }
 
+    // --- Estimation Pennylane (devis marqué ESTIMATION, à valider avec un technicien) ---
+    // Best effort : un échec ne bloque jamais la demande du client.
+    try {
+      if (typeof prixBaseHT === "number" && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+        const lignesPL = [{
+          label: `${filiere.label} – ${ehRetenu} EH`,
+          description: (filiere.composantsInclus || []).join(" ; "),
+          prix_ht: prixBaseHT,
+        }];
+        for (const c of detailComplements) {
+          if (c.montantHT > 0) {
+            const opt = options[c.poste] || {};
+            lignesPL.push({
+              label: opt.label || c.poste,
+              description: c.metresLineaires ? `${c.metresLineaires} ml` : undefined,
+              prix_ht: Math.round(c.montantHT * 100) / 100,
+            });
+          }
+        }
+        await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/estimation_pennylane`, {
+          method: "POST",
+          headers: {
+            apikey: process.env.SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ body: {
+            titre: `Assainissement ${ehRetenu} EH`,
+            origine: "formulaire ANC avec étude de sol (salesflow-ecosky.vercel.app/estimation-anc.html)",
+            tva: "FR_100",
+            client: { prenom, email, telephone, adresse: adresseProjet },
+            lignes: lignesPL,
+            lien_doc: etudePdfUrl || null,
+            mention: "ESTIMATION NON CONTRACTUELLE établie à partir de l'étude de sol transmise : prix à confirmer avec un technicien (accès chantier, roche, métrés définitifs, évacuation des déblais). Options possibles non incluses : brise-roche hydraulique, évacuation des terres excédentaires.",
+          } }),
+        });
+      }
+    } catch (erreurPennylane) {
+      console.error("Estimation Pennylane impossible :", erreurPennylane);
+    }
+
     res.status(200).json({
       ok: true,
       leadId: leadEnregistre.id,
