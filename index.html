@@ -582,6 +582,7 @@ function homeView(){
       <a class="l-brand" href="#/"><i>${I.tri}</i>Contact Chantier</a>
       <nav><a class="hide-m" href="#perso" onclick="event.preventDefault();document.getElementById('perso').scrollIntoView({behavior:'smooth'})">Votre image</a>
       <a class="hide-m" href="#comment" onclick="event.preventDefault();document.getElementById('comment').scrollIntoView({behavior:'smooth'})">Comment ça marche</a>
+      ${estInstallee()?'':`<a href="#" style="white-space:nowrap" onclick="event.preventDefault();installerAppli()" title="Installer l’appli sur votre téléphone ou ordinateur">📲 Appli</a>`}
       <a href="#/connexion">Connexion</a>
       <a class="l-btn j sm" href="#/connexion/inscription">Essayer gratuitement</a></nav>
     </div>
@@ -2078,22 +2079,24 @@ let PWA_EVT = null;
 function estInstallee(){ return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }
 function estIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
 function boutonInstaller(){
-  if(estInstallee() || (S.route!=='chantier' && S.route!=='espace')) return '';
-  if(!PWA_EVT && !estIOS()) return '';
-  return `<button class="hbtn" style="background:#FFC72C;color:#0E1822;border-color:#FFC72C;font-weight:800" onclick="installerAppli()">📲 Installer</button>`;
+  if(estInstallee() || S.route==='auth') return '';
+  return `<button class="hbtn" style="background:#FFC72C;color:#0E1822;border-color:#FFC72C;font-weight:800;margin-right:6px" onclick="installerAppli()">📲 Installer l’appli</button>`;
 }
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); PWA_EVT = e; if(S.route==='chantier' || S.route==='espace') render(); });
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); PWA_EVT = e; });
 window.addEventListener('appinstalled', () => { PWA_EVT = null; toast('Appli installée : retrouvez Contact Chantier sur votre écran d’accueil'); if(S.route==='chantier' || S.route==='espace') render(); });
 async function installerAppli(){
   if(PWA_EVT){ const e = PWA_EVT; PWA_EVT = null; e.prompt(); try{ await e.userChoice; }catch(_){} render(); return; }
+  const ua = navigator.userAgent, ios = estIOS(), android = /android/i.test(ua), mac = /Macintosh/.test(ua) && !ios, safari = /Safari/.test(ua) && !/Chrome|CriOS|Edg|Firefox|FxiOS/.test(ua);
+  const cadre = (t) => `<span style="display:inline-block;border:1.5px solid currentColor;border-radius:6px;padding:0 6px;font-size:14px">${t}</span>`;
+  let etapes;
+  if(ios) etapes = `<li>Touchez le bouton <b>Partager</b> ${cadre('⬆︎')} en bas de Safari (en haut sur iPad)</li><li>Faites défiler et touchez <b>« Sur l’écran d’accueil »</b></li><li>Touchez <b>« Ajouter »</b> en haut à droite</li>`;
+  else if(android) etapes = `<li>Touchez le menu ${cadre('⋮')} en haut à droite de Chrome</li><li>Touchez <b>« Installer l’application »</b> (ou « Ajouter à l’écran d’accueil »)</li><li>Confirmez avec <b>« Installer »</b></li>`;
+  else if(mac && safari) etapes = `<li>Dans Safari, ouvrez le menu <b>Fichier</b></li><li>Cliquez sur <b>« Ajouter au Dock »</b></li><li>Confirmez avec <b>« Ajouter »</b></li>`;
+  else etapes = `<li>Dans Chrome ou Edge, cliquez sur l’icône ${cadre('⊕')} à droite de la barre d’adresse</li><li>Ou ouvrez le menu ${cadre('⋮')} puis <b>« Caster, enregistrer et partager » › « Installer la page en tant qu’application »</b></li><li>Confirmez avec <b>« Installer »</b></li>`;
   sheet(`<h1 style="font-size:20px">📲 Installer Contact Chantier</h1>
-    <p class="note" style="margin-top:6px">Une icône sur votre écran d’accueil, comme une vraie appli. Elle ouvre directement ${S.route==='chantier'?'ce chantier':'votre espace'}.</p>
-    <ol style="margin:16px 0 0 20px;line-height:1.9;font-size:16px">
-      <li>Touchez le bouton <b>Partager</b> <span style="display:inline-block;border:1.5px solid currentColor;border-radius:6px;padding:0 6px;font-size:14px">⬆︎</span> en bas de Safari (en haut sur iPad)</li>
-      <li>Faites défiler et touchez <b>« Sur l’écran d’accueil »</b></li>
-      <li>Touchez <b>« Ajouter »</b> en haut à droite</li>
-    </ol>
-    <p class="note" style="margin-top:14px">Le lien doit être ouvert dans Safari. S’il s’est ouvert dans une autre appli (SMS, mail…), touchez d’abord « Ouvrir dans Safari ».</p>`);
+    <p class="note" style="margin-top:6px">Une icône sur votre écran d’accueil, comme une vraie appli, sans passer par l’App Store ni le Play Store.${S.route==='chantier'?' Elle ouvrira directement ce chantier.':''}</p>
+    <ol style="margin:16px 0 0 20px;line-height:1.9;font-size:16px">${etapes}</ol>
+    ${ios ? '<p class="note" style="margin-top:14px">Le lien doit être ouvert dans Safari. S’il s’est ouvert dans une autre appli (SMS, mail…), touchez d’abord « Ouvrir dans Safari ».</p>' : ''}`);
 }
 
 /* ====================== START ====================== */
