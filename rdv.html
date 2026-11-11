@@ -23,6 +23,7 @@
   .jour,.cr{border:2px solid #d5dde6;background:#fff;border-radius:12px;cursor:pointer;font:inherit;color:#14202b}
   .jour{min-width:74px;padding:10px 6px;text-align:center;flex:0 0 auto}.jour b{display:block;font-size:22px}.jour small{display:block;font-size:12.5px;color:#5c6b7a;text-transform:capitalize}
   .crs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px}.cr{padding:11px 4px;font-weight:700;font-size:15px}
+  .modes{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mode{border:2px solid #d5dde6;background:#fff;border-radius:12px;cursor:pointer;font-family:inherit;font-size:15.5px;font-weight:800;color:#14202b;padding:12px 8px;text-align:center}.mode small{display:block;font-weight:400;font-size:12.5px;color:#5c6b7a;margin-top:4px}
   .on{border-color:#163A63;background:#163A63;color:#fff}.on small{color:#C9D6E4}
   .sep{height:1px;background:#e6ebf0;margin:18px 0}
   label{display:block;font-weight:700;font-size:14px;margin:12px 0 6px}
@@ -44,16 +45,21 @@
 <div class="wrap">
   <a class="top" href="/"><img src="/icon-192.png" alt="">Contact Chantier</a>
   <h1>Réserver une démo de 15 minutes</h1>
-  <p class="sous">Choisissez un jour et un créneau : Cyrille vous appelle et vous montre l’application sur un vrai chantier. Aucun compte à créer, sans engagement.</p>
+  <p class="sous">Choisissez un jour, un créneau, et téléphone ou visio : Cyrille vous montre l’application sur un vrai chantier. Aucun compte à créer, sans engagement.</p>
 
   <form class="card" id="f" novalidate>
     <div class="etape"><span>1.</span> Le jour</div>
     <div class="jours" id="jours"></div>
     <div class="etape" style="margin-top:16px"><span>2.</span> L’heure</div>
     <div class="crs" id="crs"></div>
+    <div class="etape" style="margin-top:16px"><span>3.</span> Comment ?</div>
+    <div class="modes">
+      <button type="button" class="mode on" data-m="téléphone">📞 Par téléphone<small>Cyrille vous appelle</small></button>
+      <button type="button" class="mode" data-m="visio">🎥 En visio<small>Avec partage d’écran, lien par mail</small></button>
+    </div>
     <div class="choix" id="choix"></div>
     <div class="sep"></div>
-    <div class="etape"><span>3.</span> Vous</div>
+    <div class="etape"><span>4.</span> Vous</div>
     <div class="profils">
       <label><input type="radio" name="profil" value="Architecte / maître d’œuvre / constructeur"><span><b>Je pilote des artisans</b><br><span style="color:#5c6b7a;font-size:14px">Architecte, maître d’œuvre, constructeur</span></span></label>
       <label><input type="radio" name="profil" value="Artisan / entreprise avec équipes"><span><b>Je dirige mes équipes</b><br><span style="color:#5c6b7a;font-size:14px">Artisan, entreprise du bâtiment ou paysagiste</span></span></label>
@@ -61,7 +67,7 @@
     <label for="nom">Votre nom</label><input id="nom" autocomplete="name" placeholder="Prénom Nom">
     <label for="ent">Entreprise / cabinet</label><input id="ent" autocomplete="organization">
     <label for="tel">Téléphone</label><input id="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="06 12 34 56 78">
-    <label for="mail">E-mail <span style="font-weight:400;color:#5c6b7a">(pour recevoir la confirmation)</span></label><input id="mail" type="email" inputmode="email" autocomplete="email">
+    <label for="mail">E-mail <span id="mailInfo" style="font-weight:400;color:#5c6b7a">(pour recevoir la confirmation)</span></label><input id="mail" type="email" inputmode="email" autocomplete="email">
     <label for="msg">Une question, un projet ? <span style="font-weight:400;color:#5c6b7a">(facultatif)</span></label><textarea id="msg"></textarea>
     <div class="err" id="err"></div>
     <button class="btn" id="go" type="submit">Réserver ma démo</button>
@@ -72,7 +78,7 @@
 <script>
 const CRS = ['9h00','10h00','11h00','12h00','14h00','15h00','16h00','17h00','18h00'];
 const JF = ['dim.','lun.','mar.','mer.','jeu.','ven.','sam.'], MF = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
-const S = {jour:null, cr:null};
+const S = {jour:null, cr:null, mode:'téléphone'};
 const q = new URLSearchParams(location.search);
 const iso = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function jours(){
@@ -89,9 +95,12 @@ function dessiner(){
   document.getElementById('jours').innerHTML = jours().map(d => `<button type="button" class="jour ${S.jour===iso(d)?'on':''}" data-j="${iso(d)}"><small>${JF[d.getDay()]}</small><b>${d.getDate()}</b><small>${MF[d.getMonth()]}</small></button>`).join('');
   document.getElementById('crs').innerHTML = CRS.filter(dispo).map(c => `<button type="button" class="cr ${S.cr===c?'on':''}" data-c="${c}">${c}</button>`).join('') || '<p class="note">Plus de créneau aujourd’hui : choisissez un autre jour.</p>';
   const ch = document.getElementById('choix');
-  if (S.jour && S.cr){ const d = new Date(S.jour+'T12:00'); ch.style.display='block'; ch.innerHTML = `📅 <b>${['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'][d.getDay()]} ${d.getDate()} ${MF[d.getMonth()]} à ${S.cr}</b>`; } else ch.style.display='none';
+  if (S.jour && S.cr){ const d = new Date(S.jour+'T12:00'); ch.style.display='block'; ch.innerHTML = (S.mode==='visio'?'🎥 ':'📞 ') + `<b>${['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'][d.getDay()]} ${d.getDate()} ${MF[d.getMonth()]} à ${S.cr}</b>` + (S.mode==='visio' ? ' · en visio' : ' · par téléphone'); } else ch.style.display='none';
+  document.querySelectorAll('.mode').forEach(b => b.classList.toggle('on', b.dataset.m === S.mode));
+  document.getElementById('mailInfo').textContent = S.mode==='visio' ? '(obligatoire : le lien de la visio y sera envoyé)' : '(pour recevoir la confirmation)';
 }
 document.getElementById('jours').addEventListener('click', e => { const b = e.target.closest('[data-j]'); if(!b) return; S.jour = b.dataset.j; if (S.cr && !dispo(S.cr)) S.cr = null; dessiner(); });
+document.querySelector('.modes').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if(!b) return; S.mode = b.dataset.m; dessiner(); });
 document.getElementById('crs').addEventListener('click', e => { const b = e.target.closest('[data-c]'); if(!b) return; S.cr = b.dataset.c; dessiner(); });
 const p = (q.get('p')||'').toLowerCase();
 if (/arch|pilote|moe/.test(p)) document.querySelector('input[name=profil]').checked = true;
@@ -108,16 +117,17 @@ document.getElementById('f').addEventListener('submit', async e => {
   if (!S.cr) return montrer('Choisissez une heure.');
   if (v('nom').length < 2) return montrer('Indiquez votre nom.');
   if (v('tel').replace(/\D/g,'').length < 10) return montrer('Indiquez votre numéro de téléphone.');
+  if (S.mode === 'visio' && !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(v('mail'))) return montrer('Pour une visio, indiquez votre e-mail : le lien vous y sera envoyé.');
   const prof = (document.querySelector('input[name=profil]:checked')||{}).value || '';
   go.disabled = true; go.textContent = 'Envoi…';
   try {
     const r = await fetch('https://wklddwumirkdjkbxvzyj.supabase.co/rest/v1/rpc/cc_demande_rdv', {method:'POST',
       headers:{'apikey':'sb_publishable_nacX-UD9ZwjpJ1C9Za8xxQ_tIhHW8nO','Content-Type':'application/json'},
-      body: JSON.stringify({p_nom:v('nom'), p_entreprise:v('ent'), p_telephone:v('tel'), p_email:v('mail'), p_profil:prof, p_jour:S.jour, p_creneau:S.cr, p_message:v('msg'), p_source:(q.get('src')||document.referrer||'direct').slice(0,120)})});
+      body: JSON.stringify({p_nom:v('nom'), p_entreprise:v('ent'), p_telephone:v('tel'), p_email:v('mail'), p_profil:prof, p_jour:S.jour, p_creneau:S.cr, p_message:v('msg'), p_source:(q.get('src')||document.referrer||'direct').slice(0,120), p_mode:S.mode})});
     const j = await r.json();
     if (!r.ok || !j || j.ok === false) throw new Error((j && (j.erreur || j.message)) || 'Erreur');
     const d = new Date(S.jour+'T12:00');
-    document.getElementById('f').innerHTML = `<div class="ok"><div style="font-size:44px">✅</div><h2>C’est noté !</h2><p>Cyrille vous appelle le <b>${['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'][d.getDay()]} ${d.getDate()} ${MF[d.getMonth()]} à ${S.cr}</b> au ${v('tel')}.</p>${v('mail') ? '<p style="margin-top:8px">Une confirmation vient de partir sur votre e-mail.</p>' : ''}<p style="margin-top:16px"><a href="/demo.html" style="color:#163A63;font-weight:800">En attendant, voir la démo vidéo ›</a></p></div>`;
+    document.getElementById('f').innerHTML = `<div class="ok"><div style="font-size:44px">✅</div><h2>C’est noté !</h2>${(() => { const quand = `<b>${['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'][d.getDay()]} ${d.getDate()} ${MF[d.getMonth()]} à ${S.cr}</b>`; return S.mode==='visio' && j.lien ? `<p>Rendez-vous en visio le ${quand}.</p><p style="margin-top:12px"><a href="${j.lien}" target="_blank" rel="noopener" style="display:inline-block;background:#163A63;color:#fff;padding:12px 18px;border-radius:10px;font-weight:800;text-decoration:none">🎥 Lien de la visio</a></p><p style="margin-top:8px;font-size:14px">Le lien vient aussi de partir sur votre e-mail. À l’heure prévue, il suffit de cliquer dessus.</p>` : `<p>Cyrille vous appelle le ${quand} au ${v('tel')}.</p>` + (v('mail') ? '<p style="margin-top:8px">Une confirmation vient de partir sur votre e-mail.</p>' : ''); })()}<p style="margin-top:16px"><a href="/demo.html" style="color:#163A63;font-weight:800">En attendant, voir la démo vidéo ›</a></p></div>`;
   } catch (x) { go.disabled = false; go.textContent = 'Réserver ma démo'; montrer(x.message === 'Erreur' ? 'L’envoi n’a pas marché. Appelez-nous au 06 45 68 83 94.' : x.message); }
 });
 </script>
