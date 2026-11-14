@@ -423,7 +423,8 @@ export default async function handler(req, res) {
     }
 
     const dejaPerso = appel.fiche && appel.fiche.perso;
-    appel.fiche = { ...(appel.fiche || {}), ...(ia.fiche || {}) };
+    const nouv = Object.fromEntries(Object.entries(ia.fiche || {}).filter(([, v]) => v !== "" && v != null));
+    appel.fiche = { ...(appel.fiche || {}), ...nouv };
     if (dejaPerso) appel.fiche.perso = true;
     appel.historique.push({ role: "assistant", content: JSON.stringify(ia) });
     const fini = ia.termine || nbTours >= MAX_TOURS;
