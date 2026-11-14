@@ -81,11 +81,19 @@ RÈGLES :
 - Oriente la personne : devis en cours (demande le nom ou la commune du chantier pour que Cyrille retrouve le dossier),
   nouveau projet (questions ci-dessus), autre demande (note-la). Dis « je transmets à Cyrille et il revient vers vous ».
 
+APPEL PERSONNEL : le numéro de Cyrille sert aussi pour sa famille et ses amis.
+- Si le premier message indique « contact personnel connu », ou si la personne dit que c'est personnel, privé,
+  qu'elle est de la famille ou une amie, ou veut juste laisser un petit message à Cyrille : ne pose AUCUNE
+  question professionnelle. Demande simplement son message (et son prénom si tu ne le connais pas), redis-le
+  en une phrase, dis que tu le transmets tout de suite à Cyrille par SMS, puis termine.
+- Dans ce cas mets "perso": true et recopie le message dans "message". Ton plus familier et chaleureux.
+
 RÉPONDS UNIQUEMENT avec un objet JSON valide, sans texte autour :
 {"reponse": "ce que tu dis à voix haute",
  "termine": true ou false,
  "fiche": {"motif": "", "type_projet": "", "details": "", "commune": "", "code_postal": "",
-           "nom": "", "telephone_rappel": "", "quand_rappeler": "", "urgent": false, "demarcheur": false}}
+           "nom": "", "telephone_rappel": "", "quand_rappeler": "", "urgent": false, "demarcheur": false,
+           "perso": false, "message": ""}}
 Dans "fiche", remets à chaque fois TOUT ce que tu sais déjà (laisse "" si inconnu).`;
 
 // ---------- utilitaires ----------
@@ -232,6 +240,18 @@ async function cloturer(appel) {
   const rappel = toE164(f.telephone_rappel) || appelant;
   const aParle = (appel.historique || []).some((m) => m.role === "user" && !String(m.content).startsWith("[silence"));
 
+  // Appel personnel (famille, amis) : pas de fiche client, juste le message par SMS à Cyrille
+  if (f.perso) {
+    const txt = aParle
+      ? `Message perso de ${f.nom || "quelqu'un"}${appelant ? ` (${appelant})` : ""} : ${f.message || f.details || "rappelle-moi"}`
+      : `Appel perso manqué de ${f.nom || appelant || "inconnu"}`;
+    await envoyerSms(TWILIO_TO_NUMBER, `Secrétaire : ${txt}`.slice(0, 600), "secretaire_ia_perso");
+    appel.notifie = true;
+    appel.termine = true;
+    await enregistrerAppel(appel);
+    return;
+  }
+
   // Lead dans SalesFlow (sauf démarcheur ou appel vide)
   let leadId = appel.lead_id || null;
   if (!leadId && aParle && !f.demarcheur) {
@@ -338,13 +358,24 @@ export default async function handler(req, res) {
 
     // Début d'appel
     if (etape === "debut") {
-      const accueil =
-        "Bonjour, R M S EcoSky, j'écoute. Cyrille n'est pas disponible pour le moment, je prends votre demande et je vais essayer de vous orienter. C'est pour un devis en cours, un nouveau projet, ou autre chose ?";
+      // Proche connu (famille, amis) ? → accueil personnel, sans questions professionnelles
+      let proche = null;
+      try {
+        const de = toE164(p.From);
+        const r = de ? await sb(`contacts_perso?telephone=eq.${encodeURIComponent(de)}&select=prenom`) : [];
+        proche = r && r[0] ? r[0].prenom : null;
+      } catch (e) {
+        console.error("voix-ia contacts_perso:", e.message);
+      }
+      const fiche0 = proche ? { perso: true, nom: proche } : {};
+      const accueil = proche
+        ? `Bonjour ${proche} ! Cyrille ne peut pas répondre pour le moment. Vous voulez que je lui laisse un message ?`
+        : "Bonjour, R M S EcoSky, j'écoute. Cyrille n'est pas disponible pour le moment. C'est pour un devis en cours, un nouveau projet, ou un message pour Cyrille ?";
       await enregistrerAppel({
         call_sid: callSid,
         appelant: p.From || null,
-        historique: [{ role: "assistant", content: JSON.stringify({ reponse: accueil, termine: false, fiche: {} }) }],
-        fiche: {},
+        historique: [{ role: "assistant", content: JSON.stringify({ reponse: accueil, termine: false, fiche: fiche0 }) }],
+        fiche: fiche0,
       });
       return res.status(200).send(twimlEcoute(req, accueil));
     }
@@ -379,7 +410,7 @@ export default async function handler(req, res) {
     try {
       // L'historique commence par l'accueil (assistant) : Claude veut un premier message utilisateur
       const msgs = appel.historique[0] && appel.historique[0].role === "assistant"
-        ? [{ role: "user", content: "[l'appel commence]" }, ...appel.historique]
+        ? [{ role: "user", content: appel.fiche && appel.fiche.perso && appel.fiche.nom ? `[l'appel commence — contact personnel connu : ${appel.fiche.nom}]` : "[l'appel commence]" }, ...appel.historique]
         : appel.historique;
       ia = await demanderAClaude(msgs);
     } catch (e) {
@@ -391,7 +422,9 @@ export default async function handler(req, res) {
       };
     }
 
+    const dejaPerso = appel.fiche && appel.fiche.perso;
     appel.fiche = { ...(appel.fiche || {}), ...(ia.fiche || {}) };
+    if (dejaPerso) appel.fiche.perso = true;
     appel.historique.push({ role: "assistant", content: JSON.stringify(ia) });
     const fini = ia.termine || nbTours >= MAX_TOURS;
     await enregistrerAppel(appel);
