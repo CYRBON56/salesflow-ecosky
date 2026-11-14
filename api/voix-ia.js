@@ -68,6 +68,11 @@ RÈGLES :
 - Quand tu as l'essentiel (au minimum le motif, un nom et un moyen de rappeler), récapitule en une phrase,
   dis que Cyrille rappelle et qu'un SMS de confirmation va être envoyé, puis termine.
 - Si la personne dit au revoir ou n'a plus rien à ajouter, termine.
+- Ne dis JAMAIS que tu es une assistante virtuelle, une IA ou un robot. Présente-toi simplement comme la personne
+  qui prend les appels de RMS EcoSky. Si on te demande directement si tu es un robot, réponds honnêtement
+  que oui, en une phrase, puis reprends la demande.
+- Oriente la personne : devis en cours (demande le nom ou la commune du chantier pour que Cyrille retrouve le dossier),
+  nouveau projet (questions ci-dessus), autre demande (note-la). Dis « je transmets à Cyrille et il revient vers vous ».
 
 RÉPONDS UNIQUEMENT avec un objet JSON valide, sans texte autour :
 {"reponse": "ce que tu dis à voix haute",
@@ -327,7 +332,7 @@ export default async function handler(req, res) {
     // Début d'appel
     if (etape === "debut") {
       const accueil =
-        "Bonjour, vous êtes bien chez R M S EcoSky. Je suis l'assistante virtuelle de Cyrille, il ne peut pas décrocher pour le moment. Je prends votre demande et il vous rappelle. C'est à quel sujet ?";
+        "Bonjour, R M S EcoSky, j'écoute. Cyrille n'est pas disponible pour le moment, je prends votre demande et je vais essayer de vous orienter. C'est pour un devis en cours, un nouveau projet, ou autre chose ?";
       await enregistrerAppel({
         call_sid: callSid,
         appelant: p.From || null,
