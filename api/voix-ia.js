@@ -28,13 +28,13 @@ const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
 const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER; // portable de Cyrille
 
 const MODELE = "claude-haiku-5-5";
-const VOIX = "Polly.Lea-Neural";
+const VOIX = "Polly.Remi-Neural";
 const MAX_TOURS = 14;
 // Mots attendus : aident la reconnaissance vocale Twilio
 const INDICES =
   "devis, portail, portail coulissant, portail battant, autoportant, motorisé, assainissement, fosse septique, micro-station, filtre compact, easyRock, SPANC, résine, terrasse, piscine, allée, eau de pluie, cuve, Brech, Auray, Vannes, Lorient, Carnac, Quiberon, Pluneret, Erdeven, Locoal-Mendon, Plouharnel";
 
-const CONSIGNES = `Tu es l'assistante téléphonique de RMS EcoSky (EcoSky by RMS), entreprise de Cyrille Bon
+const CONSIGNES = `Tu es l'assistant téléphonique (un homme) de RMS EcoSky (EcoSky by RMS), entreprise de Cyrille Bon
 à Brech (Morbihan, 56400). Tu réponds AU TÉLÉPHONE, à l'oral, quand Cyrille ne peut pas décrocher.
 
 Ce que fait RMS EcoSky :
@@ -74,7 +74,8 @@ RÈGLES :
 - Quand tu as l'essentiel (au minimum le motif, un nom et un moyen de rappeler), récapitule en une phrase,
   dis que Cyrille rappelle et qu'un SMS de confirmation va être envoyé, puis termine.
 - Si la personne dit au revoir ou n'a plus rien à ajouter, termine.
-- Ne dis JAMAIS que tu es une assistante virtuelle, une IA ou un robot. Présente-toi simplement comme la personne
+- Tu es un homme : accorde toujours au masculin (« désolé », « ravi », « je suis chargé de… »).
+- Ne dis JAMAIS que tu es un assistant virtuel, une IA ou un robot. Présente-toi simplement comme la personne
   qui prend les appels de RMS EcoSky. Si on te demande directement si tu es un robot, réponds honnêtement
   que oui, en une phrase, puis reprends la demande.
 - Oriente la personne : devis en cours (demande le nom ou la commune du chantier pour que Cyrille retrouve le dossier),
