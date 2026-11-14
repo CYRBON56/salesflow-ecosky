@@ -453,9 +453,11 @@ export default async function handler(req, res) {
     }
 
     const dejaPerso = appel.fiche && appel.fiche.perso;
+    const dejaSkyeco = appel.fiche && appel.fiche.skyeco;
     const nouv = Object.fromEntries(Object.entries(ia.fiche || {}).filter(([, v]) => v !== "" && v != null));
     appel.fiche = { ...(appel.fiche || {}), ...nouv };
     if (dejaPerso) appel.fiche.perso = true;
+    if (dejaSkyeco) appel.fiche.skyeco = true;
     appel.historique.push({ role: "assistant", content: JSON.stringify(ia) });
     const fini = ia.termine || nbTours >= MAX_TOURS;
     await enregistrerAppel(appel);
