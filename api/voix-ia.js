@@ -81,6 +81,19 @@ RÈGLES :
 - Oriente la personne : devis en cours (demande le nom ou la commune du chantier pour que Cyrille retrouve le dossier),
   nouveau projet (questions ci-dessus), autre demande (note-la). Dis « je transmets à Cyrille et il revient vers vous ».
 
+APPEL SKYECO : Cyrille édite aussi des applications pour les artisans et les entreprises, sur skyeco.fr :
+- Mon Assistant Pro : un assistant qui répond au téléphone quand l'artisan ne peut pas, prépare les devis à la voix,
+  relance les clients, trie les mails, range les documents et publie sur les réseaux. À partir de 89 € HT par mois.
+- Contact Chantier : le suivi de chantier partagé entre artisans, équipes et client. À partir de 39 € HT par mois, 3 mois offerts.
+Des artisans appellent après avoir reçu un mail à ce sujet. Si l'appelant parle de Skyeco, de Mon Assistant Pro,
+de Contact Chantier, d'un mail reçu, d'une « secrétaire », d'une appli ou d'un abonnement :
+- ce n'est PAS un client RMS : ne parle ni de résine, ni de portail, ni d'assainissement ;
+- réponds simplement à sa question en une ou deux phrases avec les infos ci-dessus (rien d'autre, pas de promesse) ;
+- puis note : son nom, son entreprise, son métier, sa ville, ce qui l'intéresse et quand Cyrille peut le rappeler ;
+- dis que Cyrille le rappelle pour lui faire une démonstration, et qu'il peut déjà voir la vidéo sur skyeco.fr ;
+- mets "skyeco": true, l'entreprise dans "entreprise", le métier dans "details", l'appli dans "motif".
+- Tu peux dire, si on te le demande, que c'est justement un assistant de ce type qui répond en ce moment.
+
 APPEL PERSONNEL : le numéro de Cyrille sert aussi pour sa famille et ses amis.
 - Si le premier message indique « contact personnel connu », ou si la personne dit que c'est personnel, privé,
   qu'elle est de la famille ou une amie, ou veut juste laisser un petit message à Cyrille : ne pose AUCUNE
@@ -93,7 +106,7 @@ RÉPONDS UNIQUEMENT avec un objet JSON valide, sans texte autour :
  "termine": true ou false,
  "fiche": {"motif": "", "type_projet": "", "details": "", "commune": "", "code_postal": "",
            "nom": "", "telephone_rappel": "", "quand_rappeler": "", "urgent": false, "demarcheur": false,
-           "perso": false, "message": ""}}
+           "perso": false, "message": "", "skyeco": false, "entreprise": ""}}
 Dans "fiche", remets à chaque fois TOUT ce que tu sais déjà (laisse "" si inconnu).`;
 
 // ---------- utilitaires ----------
@@ -246,6 +259,23 @@ async function cloturer(appel) {
       ? `Message perso de ${f.nom || "quelqu'un"}${appelant ? ` (${appelant})` : ""} : ${f.message || f.details || "rappelle-moi"}`
       : `Appel perso manqué de ${f.nom || appelant || "inconnu"}`;
     await envoyerSms(TWILIO_TO_NUMBER, `Secrétaire : ${txt}`.slice(0, 600), "secretaire_ia_perso");
+    appel.notifie = true;
+    appel.termine = true;
+    await enregistrerAppel(appel);
+    return;
+  }
+
+  // Prospect Skyeco (artisan intéressé par Mon Assistant Pro / Contact Chantier) : pas un client RMS
+  if (f.skyeco && !f.perso) {
+    const txt = [
+      `Prospect SKYECO${f.motif ? " – " + f.motif : ""}`,
+      f.nom || f.entreprise ? `${f.nom || ""}${f.entreprise ? " (" + f.entreprise + ")" : ""}` : null,
+      f.details || null,
+      f.commune || null,
+      `Tél : ${f.telephone_rappel || appelant || "?"}`,
+      f.quand_rappeler ? `Rappel : ${f.quand_rappeler}` : null,
+    ].filter(Boolean).join(" · ");
+    await envoyerSms(TWILIO_TO_NUMBER, `Secrétaire : ${txt}`.slice(0, 600), "secretaire_ia_skyeco");
     appel.notifie = true;
     appel.termine = true;
     await enregistrerAppel(appel);
