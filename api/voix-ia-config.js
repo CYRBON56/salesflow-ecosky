@@ -26,6 +26,21 @@ export default async function handler(req, res) {
   const host = req.headers["x-forwarded-host"] || req.headers.host;
   const base = `https://${host}`;
 
+  if (req.method === "GET" && req.query && req.query.appels) {
+    const r = await twilio("/Calls.json?PageSize=20");
+    return res.status(200).json(
+      (r.data.calls || []).map((c) => ({
+        date: c.date_created,
+        de: c.from,
+        vers: c.to,
+        renvoye_par: c.forwarded_from,
+        statut: c.status,
+        duree: c.duration,
+        sens: c.direction,
+      }))
+    );
+  }
+
   if (req.method === "GET") {
     const compte = await twilio(".json");
     const numeros = await twilio("/IncomingPhoneNumbers.json?PageSize=50");
