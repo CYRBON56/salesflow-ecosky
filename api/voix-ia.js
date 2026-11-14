@@ -30,6 +30,9 @@ const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER; // portable de Cyrille
 const MODELE = "claude-haiku-5-5";
 const VOIX = "Polly.Lea-Neural";
 const MAX_TOURS = 14;
+// Mots attendus : aident la reconnaissance vocale Twilio
+const INDICES =
+  "devis, portail, portail coulissant, portail battant, autoportant, motorisé, assainissement, fosse septique, micro-station, filtre compact, easyRock, SPANC, résine, terrasse, piscine, allée, eau de pluie, cuve, Brech, Auray, Vannes, Lorient, Carnac, Quiberon, Pluneret, Erdeven, Locoal-Mendon, Plouharnel";
 
 const CONSIGNES = `Tu es l'assistante téléphonique de RMS EcoSky (EcoSky by RMS), entreprise de Cyrille Bon
 à Brech (Morbihan, 56400). Tu réponds AU TÉLÉPHONE, à l'oral, quand Cyrille ne peut pas décrocher.
@@ -52,6 +55,9 @@ TON RÔLE : prendre la demande pour que Cyrille rappelle. Recueille, une questio
 6. quand la rappeler et si c'est urgent.
 
 RÈGLES :
+- La transcription de la voix peut contenir des erreurs (mots mal entendus). Devine le sens le plus probable.
+  Ne repose JAMAIS deux fois la même question : si la réponse reste floue, note ce que tu as compris dans
+  "details" et passe à la question suivante (commune, nom, rappel). Cyrille précisera en rappelant.
 - Phrases très courtes et naturelles (c'est lu à voix haute) : 1 à 2 phrases, 30 mots maximum.
 - Vouvoiement, ton chaleureux d'une petite entreprise bretonne. Pas de listes, pas d'émojis, pas d'abréviations.
 - Ne donne JAMAIS de prix, de délai ferme ou d'engagement : « Cyrille vous fera une proposition précise ».
@@ -190,7 +196,7 @@ function twimlEcoute(req, texte) {
   const action = `${baseUrl(req)}/api/voix-ia?etape=tour`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Gather input="speech" language="fr-FR" speechTimeout="auto" timeout="7" action="${xml(action)}" method="POST">
+  <Gather input="speech" language="fr-FR" speechTimeout="auto" timeout="7" hints="${xml(INDICES)}" action="${xml(action)}" method="POST">
     <Say voice="${VOIX}" language="fr-FR">${xml(texte)}</Say>
   </Gather>
   <Redirect method="POST">${xml(action)}</Redirect>
@@ -227,22 +233,41 @@ async function cloturer(appel) {
       ]
         .filter(Boolean)
         .join("\n");
-      const rows = await sb("leads", {
-        method: "POST",
-        body: JSON.stringify({
-          nom: f.nom || "Appel téléphonique",
-          telephone: rappel,
-          source: "telephone_ia",
-          statut: "nouveau",
-          type_projet: f.type_projet || null,
-          code_postal: f.code_postal || null,
-          adresse_projet: f.commune || null,
-          notes,
-          callback_demande: true,
-          callback_demande_le: new Date().toISOString(),
-        }),
-      });
-      leadId = rows && rows[0] && rows[0].id;
+      // Le numéro est peut-être déjà connu (client qui rappelle) : on complète sa fiche
+      const existants = rappel
+        ? await sb(`leads?telephone=eq.${encodeURIComponent(rappel)}&select=id,notes`)
+        : [];
+      if (existants && existants[0]) {
+        const ancien = existants[0];
+        await sb(`leads?id=eq.${ancien.id}`, {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: JSON.stringify({
+            notes: [ancien.notes, notes].filter(Boolean).join("\n\n"),
+            callback_demande: true,
+            callback_demande_le: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }),
+        });
+        leadId = ancien.id;
+      } else {
+        const rows = await sb("leads", {
+          method: "POST",
+          body: JSON.stringify({
+            nom: f.nom || "Appel téléphonique",
+            telephone: rappel,
+            source: "telephone_ia",
+            statut: "nouveau",
+            type_projet: f.type_projet || null,
+            code_postal: f.code_postal || null,
+            adresse_projet: f.commune || null,
+            notes,
+            callback_demande: true,
+            callback_demande_le: new Date().toISOString(),
+          }),
+        });
+        leadId = rows && rows[0] && rows[0].id;
+      }
     } catch (e) {
       console.error("voix-ia lead:", e.message);
     }
