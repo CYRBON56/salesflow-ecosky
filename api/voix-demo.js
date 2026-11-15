@@ -216,6 +216,13 @@ async function cloturer(appel) {
 
 // ---------- handler ----------
 export default async function handler(req, res) {
+  // Test interne (sans téléphone) : GET ?test=texte avec Authorization: Bearer CRON_SECRET
+  if (req.method === "GET" && req.query && req.query.test && process.env.CRON_SECRET && req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`) {
+    try {
+      const r = await demanderAClaude([{ role: "user", content: "[l'appel commence]" }, { role: "assistant", content: JSON.stringify({ reponse: ACCUEIL, termine: false, fiche: {} }) }, { role: "user", content: String(req.query.test) }]);
+      return res.status(200).json(r);
+    } catch (e) { return res.status(500).json({ erreur: e.message }); }
+  }
   if (req.method !== "POST") return res.status(405).send("Méthode non autorisée");
   if (!signatureValide(req)) return res.status(403).send("Signature invalide");
   const etape = (req.query && req.query.etape) || "debut";
