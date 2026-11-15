@@ -18,6 +18,11 @@
 
 import crypto from "crypto";
 import { logSms } from "./_sms-log.js";
+import demoHandler from "./voix-demo.js";
+
+// Lignes renvoyées vers ce numéro Twilio qui doivent tomber sur l'agent de DÉMO Mon Assistant Pro
+// (Twilio indique la ligne d'origine dans ForwardedFrom). 15/11/2026 : 2e ligne de Cyrille.
+const LIGNES_DEMO = ["+33659805046"];
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -375,6 +380,7 @@ export default async function handler(req, res) {
   const etape = (req.query && req.query.etape) || "debut";
   const p = req.body || {};
   const callSid = p.CallSid;
+  if (LIGNES_DEMO.includes(p.ForwardedFrom)) return demoHandler(req, res);
   res.setHeader("Content-Type", "text/xml; charset=utf-8");
 
   try {
