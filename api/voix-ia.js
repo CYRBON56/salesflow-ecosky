@@ -388,7 +388,12 @@ export default async function handler(req, res) {
     if (etape === "fin") {
       const appel = await lireAppel(callSid);
       if (appel) await cloturer(appel);
-      else if (p.From) await cloturer({ call_sid: callSid, appelant: p.From, historique: [], fiche: {} });
+      else {
+        // Appel de la ligne de démo (si Twilio n'a pas renvoyé ForwardedFrom) : déjà traité par voix-demo
+        const demo = await sb(`appels_demo?call_sid=eq.${encodeURIComponent(callSid)}&select=call_sid`).catch(() => []);
+        if (demo && demo[0]) return demoHandler(req, res);
+        if (p.From) await cloturer({ call_sid: callSid, appelant: p.From, historique: [], fiche: {} });
+      }
       return res.status(200).send("<Response/>");
     }
 
