@@ -31,28 +31,129 @@ export const config = {
     "/api/dashboard-data",
   ],
 };
-export default function middleware(request) {
-  const authHeader = request.headers.get("authorization");
+// --- Connexion par page + cookie (ajouté le 19/11/2026) -------------------
+// Sur iPhone, une appli installée sur l'écran d'accueil (PWA) ne sait PAS
+// afficher la fenêtre de mot de passe "Basic" du navigateur : l'écran restait
+// noir. On affiche donc une vraie page de connexion ; une fois le mot de passe
+// validé, un cookie (valable 1 an) garde la session ouverte. L'ancienne
+// authentification Basic reste acceptée si le navigateur l'envoie encore.
+const COOKIE_NAME = "sf_session";
+
+async function sessionToken(user, password) {
+  const data = new TextEncoder().encode(`${user}:${password}:salesflow-session`);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function readCookie(request, name) {
+  const raw = request.headers.get("cookie") || "";
+  for (const part of raw.split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) return v.join("=");
+  }
+  return null;
+}
+
+function safeNext(value) {
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? value : "/mobile";
+}
+
+function loginPage(next, erreur) {
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#2e7d32">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Connexion — SalesFlow</title>
+<style>
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f4f7f4;font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif;color:#1b1b1b}
+form{background:#fff;width:min(340px,88vw);padding:28px 24px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+img{display:block;width:140px;margin:0 auto 16px}
+h1{font-size:20px;text-align:center;margin:0 0 20px}
+label{display:block;font-size:14px;margin:12px 0 6px}
+input{width:100%;box-sizing:border-box;font-size:17px;padding:12px;border:1px solid #ccc;border-radius:10px}
+button{width:100%;margin-top:20px;padding:14px;font-size:17px;font-weight:600;color:#fff;background:#2e7d32;border:0;border-radius:10px}
+.err{color:#c62828;font-size:14px;text-align:center;margin:0 0 8px}
+</style></head><body>
+<form method="post" action="/connexion">
+<img src="/icon-192.png" alt="EcoSky">
+<h1>SalesFlow</h1>
+${erreur ? `<p class="err">${esc(erreur)}</p>` : ""}
+<input type="hidden" name="next" value="${esc(next)}">
+<label for="u">Identifiant</label>
+<input id="u" name="user" autocomplete="username" autocapitalize="none" required>
+<label for="p">Mot de passe</label>
+<input id="p" name="password" type="password" autocomplete="current-password" required>
+<button type="submit">Se connecter</button>
+</form></body></html>`;
+  return new Response(html, { status: erreur ? 401 : 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+}
+
+export default async function middleware(request) {
+  const url = new URL(request.url);
   const expectedUser = process.env.DASHBOARD_USER || "cyrille";
   const expectedPassword = process.env.DASHBOARD_PASSWORD;
   if (!expectedPassword) {
     // Si le mot de passe n'est pas configuré, on laisse passer plutôt que de
-    // bloquer tout le monde par erreur — mais il FAUT le configurer (voir
-    // instructions ci-dessous).
+    // bloquer tout le monde par erreur — mais il FAUT le configurer.
     return;
   }
-  if (authHeader) {
-    const base64Credentials = authHeader.split(" ")[1] || "";
-    const credentials = atob(base64Credentials);
-    const [user, password] = credentials.split(":");
+  const goodToken = await sessionToken(expectedUser, expectedPassword);
+
+  // Envoi du formulaire de connexion
+  if (url.pathname === "/connexion" && request.method === "POST") {
+    let user = "", password = "", next = "/mobile";
+    try {
+      const form = await request.formData();
+      user = String(form.get("user") || "").trim();
+      password = String(form.get("password") || "");
+      next = safeNext(form.get("next"));
+    } catch (e) {}
     if (user === expectedUser && password === expectedPassword) {
-      return; // accès autorisé
+      return new Response(null, {
+        status: 303,
+        headers: {
+          Location: next,
+          "Set-Cookie": `${COOKIE_NAME}=${goodToken}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax`,
+        },
+      });
     }
+    return loginPage(next, "Identifiant ou mot de passe incorrect.");
   }
-  return new Response("Authentification requise.", {
-    status: 401,
-    headers: {
-      "WWW-Authenticate": 'Basic realm="SalesFlow System"',
-    },
-  });
+
+  // Déconnexion
+  if (url.pathname === "/deconnexion") {
+    return new Response(null, {
+      status: 303,
+      headers: { Location: "/connexion", "Set-Cookie": `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax` },
+    });
+  }
+
+  // Session déjà ouverte (cookie)
+  if (readCookie(request, COOKIE_NAME) === goodToken) {
+    if (url.pathname === "/connexion") return Response.redirect(new URL("/mobile", url), 303);
+    return; // accès autorisé
+  }
+
+  // Ancienne méthode (Basic) toujours acceptée
+  const authHeader = request.headers.get("authorization");
+  if (authHeader && authHeader.startsWith("Basic ")) {
+    try {
+      const [user, ...rest] = atob(authHeader.slice(6)).split(":");
+      if (user === expectedUser && rest.join(":") === expectedPassword) return;
+    } catch (e) {}
+  }
+
+  // Non connecté : page de connexion pour les pages, 401 simple pour l'API
+  if (url.pathname.startsWith("/api/")) {
+    return new Response(JSON.stringify({ error: "Authentification requise." }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    });
+  }
+  const next = url.pathname === "/connexion" ? "/mobile" : url.pathname + url.search;
+  return loginPage(next, null);
 }
