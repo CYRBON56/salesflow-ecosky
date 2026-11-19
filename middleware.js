@@ -23,7 +23,7 @@ export const config = {
     // /details-projet.html, /signature-devis.html, /devis-manuel.html,
     // les fichiers statiques (images, css, js compilés par Vite), et les
     // routes internes Next/Vercel.
-    "/((?!api/|estimation\\.html|estimation-anc\\.html|pub-choix\\.html|details-projet\\.html|signature-devis\\.html|devis-manuel\\.html|assets/|favicon|manifest\\.webmanifest|.*\\.(?:png|jpg|jpeg|svg|css|js|ico)$).*)",
+    "/((?!api/|estimation\\.html|estimation-anc\\.html|pub-choix\\.html|details-projet\\.html|signature-devis\\.html|devis-manuel\\.html|confidentialite\\.html|assets/|favicon|manifest\\.webmanifest|.*\\.(?:png|jpg|jpeg|svg|css|js|ico)$).*)",
     // Protège spécifiquement ces routes admin, même si elles sont sous /api/.
     "/api/leads-admin",
     "/api/leads-anc-en-attente",
