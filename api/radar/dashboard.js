@@ -18,6 +18,7 @@
 //      /api/radar/dashboard?statut=email_envoye&ville=Mauron
 
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'crypto';
 
 const CAMPAGNE = 'refonte_batiment';
 
@@ -28,8 +29,9 @@ const supabase = createClient(
 
 export default async function handler(req, res) {
   if (!verifierAuth(req)) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Skyeco Radar"');
-    return res.status(401).send('Authentification requise.');
+    // Renvoie vers la page de connexion SalesFlow (avec l'œil pour voir le mot de passe)
+    res.writeHead(302, { Location: '/connexion?next=/api/radar/dashboard' });
+    return res.end();
   }
 
   const statutFiltre = req.query.statut || null;
@@ -68,15 +70,21 @@ export default async function handler(req, res) {
 }
 
 function verifierAuth(req) {
-  const user = process.env.DASHBOARD_USER;
+  const user = process.env.DASHBOARD_USER || 'cyrille';
   const pass = process.env.DASHBOARD_PASSWORD;
-  if (!user || !pass) return true; // pas de protection configurée, on laisse passer
+  if (!pass) return true; // pas de protection configurée, on laisse passer
 
+  // Session ouverte via la page de connexion SalesFlow (cookie sf_session)
+  const jeton = createHash('sha256').update(`${user}:${pass}:salesflow-session`).digest('hex');
+  const cookies = req.headers['cookie'] || '';
+  if (cookies.split(';').some((c) => c.trim() === `sf_session=${jeton}`)) return true;
+
+  // Ancienne méthode (Basic) toujours acceptée
   const header = req.headers['authorization'] || '';
   if (!header.startsWith('Basic ')) return false;
   const decoded = Buffer.from(header.slice(6), 'base64').toString('utf-8');
-  const [u, p] = decoded.split(':');
-  return u === user && p === pass;
+  const [u, ...p] = decoded.split(':');
+  return u === user && p.join(':') === pass;
 }
 
 const LIBELLES_STATUT = {

@@ -29,6 +29,7 @@ export const config = {
     "/api/leads-anc-en-attente",
     "/api/valider-estimation-anc",
     "/api/dashboard-data",
+    "/api/radar/dashboard",
   ],
 };
 // --- Connexion par page + cookie (ajouté le 19/11/2026) -------------------
@@ -77,6 +78,9 @@ label{display:block;font-size:14px;margin:12px 0 6px}
 input{width:100%;box-sizing:border-box;font-size:17px;padding:12px;border:1px solid #ccc;border-radius:10px}
 button{width:100%;margin-top:20px;padding:14px;font-size:17px;font-weight:600;color:#fff;background:#2e7d32;border:0;border-radius:10px}
 .err{color:#c62828;font-size:14px;text-align:center;margin:0 0 8px}
+.mdp{position:relative}
+.mdp input{padding-right:52px}
+.oeil{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:44px;height:44px;margin:0;padding:0;background:none;border:0;font-size:22px;line-height:1;cursor:pointer}
 </style></head><body>
 <form method="post" action="/connexion">
 <img src="/icon-192.png" alt="EcoSky">
@@ -86,9 +90,12 @@ ${erreur ? `<p class="err">${esc(erreur)}</p>` : ""}
 <label for="u">Identifiant</label>
 <input id="u" name="user" autocomplete="username" autocapitalize="none" required>
 <label for="p">Mot de passe</label>
-<input id="p" name="password" type="password" autocomplete="current-password" required>
+<div class="mdp"><input id="p" name="password" type="password" autocomplete="current-password" required><button type="button" class="oeil" id="oeil" aria-label="Afficher le mot de passe">👁️</button></div>
 <button type="submit">Se connecter</button>
-</form></body></html>`;
+</form>
+<script>
+document.getElementById("oeil").addEventListener("click",function(){var p=document.getElementById("p");var v=p.type==="password";p.type=v?"text":"password";this.textContent=v?"🙈":"👁️";this.setAttribute("aria-label",v?"Masquer le mot de passe":"Afficher le mot de passe");});
+</script></body></html>`;
   return new Response(html, { status: erreur ? 401 : 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
 }
 
@@ -148,12 +155,12 @@ export default async function middleware(request) {
   }
 
   // Non connecté : page de connexion pour les pages, 401 simple pour l'API
-  if (url.pathname.startsWith("/api/")) {
+  if (url.pathname.startsWith("/api/") && url.pathname !== "/api/radar/dashboard") {
     return new Response(JSON.stringify({ error: "Authentification requise." }), {
       status: 401,
       headers: { "content-type": "application/json" },
     });
   }
-  const next = url.pathname === "/connexion" ? "/mobile" : url.pathname + url.search;
+  const next = url.pathname === "/connexion" ? safeNext(url.searchParams.get("next")) : url.pathname + url.search;
   return loginPage(next, null);
 }
