@@ -11,6 +11,14 @@
     {
       "path": "/api/agent-pub",
       "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/cron/scan-sites-batiment",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/generer-maquette",
+      "schedule": "30 6 * * *"
     }
   ],
   "rewrites": [
