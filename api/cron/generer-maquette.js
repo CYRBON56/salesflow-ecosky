@@ -41,7 +41,9 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const BATCH_SIZE = Number(process.env.MAQUETTE_BATCH_SIZE || 5);
+const BATCH_SIZE = Number(process.env.MAQUETTE_BATCH_SIZE || 100);
+
+export const config = { maxDuration: 300 };
 const CAMPAGNE = 'refonte_batiment';
 const BUCKET = 'maquettes-sites';
 
@@ -74,8 +76,8 @@ export default async function handler(req, res) {
     for (const candidat of candidats) {
       resultats.traites++;
       try {
-        // 1) La nouvelle maquette "après" (générée par Claude)
-        const htmlApres = await genererHtmlMaquette(candidat);
+        // 1) La nouvelle maquette "après" (modèle gratuit, sans appel IA)
+        const htmlApres = genererHtmlMaquette(candidat);
         const cheminApres = `${CAMPAGNE}/${candidat.siren}-apres.html`;
 
         const { error: errUploadApres } = await supabase.storage
@@ -144,52 +146,93 @@ function appSkyecoPour(categorie) {
   };
 }
 
-async function genererHtmlMaquette(candidat) {
+// --- Maquette "après" construite à partir d'un modèle (0 €, instantané).
+//     Seuls le nom, le métier et la ville de l'entreprise sont utilisés. ---
+function servicesPour(categorie) {
+  const c = (categorie || '').toLowerCase();
+  if (c.includes('architecte')) return [
+    ['Conception sur mesure', 'Des plans pensés pour votre terrain, votre budget et votre façon de vivre.'],
+    ['Permis de construire', 'Montage complet du dossier et suivi auprès de la mairie.'],
+    ['Suivi de chantier', 'Un regard attentif à chaque étape, jusqu\'à la réception.'],
+  ];
+  if (c.includes('constructeur') || c.includes('maison')) return [
+    ['Maisons neuves', 'Plain-pied ou étage, une maison construite selon vos envies.'],
+    ['Accompagnement complet', 'Du choix du terrain à la remise des clés, un seul interlocuteur.'],
+    ['Garanties', 'Contrat de construction encadré et garanties légales incluses.'],
+  ];
+  if (c.includes('promoteur')) return [
+    ['Programmes neufs', 'Appartements et maisons dans des emplacements choisis.'],
+    ['Accompagnement acquéreurs', 'Conseils, visites et suivi jusqu\'à la livraison.'],
+    ['Qualité de construction', 'Des logements performants et durables.'],
+  ];
+  return [
+    ['Construction & gros œuvre', 'Fondations, maçonnerie, structure : un travail solide et durable.'],
+    ['Rénovation', 'Remise à neuf, extension, transformation de vos espaces.'],
+    ['Gestion de chantier', 'Coordination des corps de métier, délais tenus, chantier propre.'],
+  ];
+}
+
+function genererHtmlMaquette(candidat) {
   const app = appSkyecoPour(candidat.categorie);
+  const nom = escapeHtml(candidat.nom || 'Votre entreprise');
+  const metier = escapeHtml(candidat.categorie || 'Entreprise du bâtiment');
+  const ville = escapeHtml(candidat.ville || 'votre région');
+  const services = servicesPour(candidat.categorie).map(([t, d], i) => `
+      <div class="service">
+        <div class="ico">${['🏗️', '🔨', '📐'][i]}</div>
+        <h3>${t}</h3><p>${d}</p>
+      </div>`).join('');
 
-  const prompt = `Tu es designer web. Génère une page HTML unique, complète et autonome (tout le CSS inline dans une balise <style>, aucun fichier externe sauf une police Google Fonts si tu veux), pour servir de MAQUETTE DE DÉMONSTRATION "avant/après" à envoyer par email à un artisan du bâtiment, afin de lui proposer une refonte de son site.
-
-Informations connues sur l'entreprise (n'invente rien d'autre de factuel) :
-- Nom : ${candidat.nom}
-- Métier : ${candidat.categorie || 'entreprise du bâtiment'}
-- Ville : ${candidat.ville || 'France'}
-- Signaux relevés sur leur site actuel : ${(candidat.signaux || []).join(', ') || 'site daté'}
-
-Contraintes IMPORTANTES :
-- N'utilise JAMAIS de vraie photo ni de texte copié du site actuel de l'entreprise. Zéro image réelle : utilise uniquement des dégradés CSS, des formes géométriques simples (div stylées) ou des icônes en SVG inline génériques (silhouette de maison, outils, casque de chantier stylisé) — jamais de <img> pointant vers une vraie photo.
-- Rédige un contenu générique mais crédible pour ce métier et cette ville (accroche, 3 services types, une section "pourquoi nous", coordonnées factices du type "contact@exemple.fr" / "02 XX XX XX XX" clairement en exemple).
-- Design moderne 2026 : responsive mobile, typographie soignée, une section héro avec un bon contraste, des boutons d'appel à l'action clairs ("Demander un devis").
-- Tout en haut de la page (avant le header), ajoute un bandeau discret mais visible avec le texte : "Maquette de démonstration réalisée par EcoSky — illustration du potentiel de votre futur site, aucune donnée réelle de votre entreprise n'a été utilisée hormis son nom et son secteur."
-- En bas de page, ajoute un encart présentant en 2-3 lignes l'application "${app.nom}" de Skyeco Pro (skyeco.fr) : ${app.pitch}.
-- Réponds UNIQUEMENT avec le code HTML complet, sans explication avant ou après, sans balises markdown \`\`\`.`;
-
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 8000,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-
-  if (!r.ok) {
-    throw new Error(`Appel API Claude échoué (${r.status}) : ${await r.text()}`);
-  }
-
-  const data = await r.json();
-  let html = data.content?.[0]?.text || '';
-  html = html.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
-
-  if (!/<html/i.test(html)) {
-    throw new Error('La réponse ne ressemble pas à une page HTML complète.');
-  }
-
-  return html;
+  return `<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${nom} — ${metier} à ${ville}</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,system-ui,Segoe UI,Roboto,Arial,sans-serif;color:#1d2a24;background:#fff;line-height:1.55}
+.demo{background:#fff8e1;color:#6d5400;font-size:12px;text-align:center;padding:6px 12px}
+nav{display:flex;justify-content:space-between;align-items:center;padding:16px 6vw}
+.logo{font-weight:800;font-size:20px;color:#14532d}
+nav a.btn{padding:10px 18px}
+.hero{background:linear-gradient(135deg,#14532d 0%,#1f7a4c 55%,#e3a008 140%);color:#fff;padding:90px 6vw 100px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-80px;bottom:-80px;width:340px;height:340px;border-radius:50%;background:rgba(255,255,255,.08)}
+.hero h1{font-size:clamp(30px,5vw,52px);margin:0 0 14px;max-width:720px;line-height:1.1}
+.hero p{font-size:18px;max-width:560px;opacity:.92;margin:0 0 28px}
+.btn{display:inline-block;background:#e3a008;color:#1d2a24;font-weight:700;text-decoration:none;border-radius:10px;padding:14px 26px}
+.btn.clair{background:#fff;color:#14532d;margin-left:8px}
+section{padding:70px 6vw}
+h2{font-size:30px;margin:0 0 30px;color:#14532d}
+.services{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:20px}
+.service{background:#f4f7f5;border-radius:14px;padding:26px}
+.service .ico{font-size:32px}.service h3{margin:10px 0 6px}
+.pourquoi{background:#14532d;color:#fff}.pourquoi h2{color:#fff}
+.atouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px}
+.atout b{display:block;font-size:34px;color:#e3a008}
+.contact{text-align:center}.contact p{color:#555}
+.skyeco{margin:0 6vw 50px;background:#f4f7f5;border-left:4px solid #1f7a4c;border-radius:10px;padding:18px 22px;font-size:14px}
+footer{text-align:center;font-size:13px;color:#777;padding:24px}
+@media(max-width:600px){.btn.clair{margin:10px 0 0}nav a.btn{display:none}}
+</style></head><body>
+<div class="demo">Maquette de démonstration réalisée par EcoSky — illustration du potentiel de votre futur site, aucune donnée réelle de votre entreprise n'a été utilisée hormis son nom et son secteur.</div>
+<nav><span class="logo">${nom}</span><a class="btn" href="#contact">Demander un devis</a></nav>
+<header class="hero">
+  <h1>${metier} à ${ville}, un travail soigné et dans les délais</h1>
+  <p>${nom} vous accompagne dans tous vos projets, avec un interlocuteur unique et des devis clairs.</p>
+  <a class="btn" href="#contact">Demander un devis gratuit</a><a class="btn clair" href="#services">Nos services</a>
+</header>
+<section id="services"><h2>Nos services</h2><div class="services">${services}</div></section>
+<section class="pourquoi"><h2>Pourquoi nous choisir ?</h2><div class="atouts">
+  <div class="atout"><b>✓</b>Artisans qualifiés et assurés</div>
+  <div class="atout"><b>✓</b>Devis détaillé sous 48 h</div>
+  <div class="atout"><b>✓</b>Interventions autour de ${ville}</div>
+  <div class="atout"><b>✓</b>Suivi de chantier transparent</div>
+</div></section>
+<section class="contact" id="contact"><h2>Parlons de votre projet</h2>
+  <p>contact@exemple.fr · 02 XX XX XX XX (coordonnées d'exemple)</p>
+  <a class="btn" href="#contact">Demander un devis</a>
+</section>
+<div class="skyeco"><strong>${app.nom}</strong> par Skyeco Pro (skyeco.fr) : ${app.pitch}.</div>
+<footer>© ${new Date().getFullYear()} ${nom} — maquette de démonstration</footer>
+</body></html>`;
 }
 
 // --- Construit la page de comparaison "avant / après" avec curseur à glisser.
@@ -304,4 +347,10 @@ function genererHtmlComparaison(candidat, urlMaquetteApres) {
 </script>
 </body>
 </html>`;
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
 }

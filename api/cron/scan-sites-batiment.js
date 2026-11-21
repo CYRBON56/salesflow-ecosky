@@ -67,7 +67,10 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const BATCH_SIZE = Number(process.env.SCAN_BATCH_SIZE || 25);
+const BATCH_SIZE = Number(process.env.SCAN_BATCH_SIZE || 60);
+const PARALLELE = 5; // sites analysés en même temps
+
+export const config = { maxDuration: 300 };
 const USER_AGENT = 'Mozilla/5.0 (compatible; EcoSkyBot/1.0; +https://skyeco.fr/a-propos-bot)';
 const CAMPAGNE = 'refonte_batiment';
 
@@ -88,31 +91,34 @@ export default async function handler(req, res) {
   const resultats = { traites: 0, qualifies: 0, rejetes: 0, a_verifier: 0, erreurs: 0 };
 
   try {
-    // 1) Candidats ayant un site connu (site_web, sinon ml_site en secours)
-    const { data: candidatsBruts, error: errCandidats } = await supabase
-      .from('prospects_construction')
-      .select('siren, nom, ville, departement, categorie, site_web, ml_site, email, ml_emails')
-      .or('site_web.not.is.null,ml_site.not.is.null')
-      .limit(BATCH_SIZE * 4); // marge car certains seront déjà traités / vides après nettoyage
-
-    if (errCandidats) throw errCandidats;
-
-    // 2) Exclure les siren déjà présents dans prospection_sites_obsoletes
+    // 1) Exclure les siren déjà présents dans prospection_sites_obsoletes
     const { data: deja, error: errDeja } = await supabase
       .from('prospection_sites_obsoletes')
       .select('siren')
       .eq('campagne', CAMPAGNE);
     if (errDeja) throw errDeja;
     const sirensDejaTraites = new Set((deja || []).map((r) => r.siren));
+    // On reprend là où le dernier passage s'est arrêté (ordre des siren)
+    const dernierSiren = [...sirensDejaTraites].sort().pop() || '';
 
-    const aTraiter = candidatsBruts
+    // 2) Candidats suivants ayant un site connu (site_web, sinon ml_site)
+    let req2 = supabase
+      .from('prospects_construction')
+      .select('siren, nom, ville, departement, categorie, site_web, ml_site, email, ml_emails')
+      .or('site_web.not.is.null,ml_site.not.is.null')
+      .order('siren', { ascending: true })
+      .limit(BATCH_SIZE * 2);
+    if (dernierSiren) req2 = req2.gt('siren', dernierSiren);
+    const { data: candidatsBruts, error: errCandidats } = await req2;
+    if (errCandidats) throw errCandidats;
+
+    const aTraiter = (candidatsBruts || [])
       .map((c) => ({ ...c, site_web: premierSite(c.site_web, c.ml_site) }))
       .filter((c) => c.site_web && !sirensDejaTraites.has(c.siren))
       .slice(0, BATCH_SIZE);
 
-    // 3) Traitement un par un (volontairement séquentiel pour rester poli avec
-    //    les sites visés et avec l'API gouv — pas la peine de paralléliser ça)
-    for (const candidat of aTraiter) {
+    // 3) Traitement par petits groupes de 5 en parallèle
+    const traiter = async (candidat) => {
       try {
         const verif = await verifierEntrepriseActive(candidat.siren);
         const analyse = await analyserSite(candidat.site_web);
@@ -147,6 +153,10 @@ export default async function handler(req, res) {
         console.error(`Erreur sur ${candidat.siren} (${candidat.nom}) :`, e.message);
         resultats.erreurs++;
       }
+    };
+
+    for (let i = 0; i < aTraiter.length; i += PARALLELE) {
+      await Promise.all(aTraiter.slice(i, i + PARALLELE).map(traiter));
     }
 
     return res.status(200).json(resultats);
