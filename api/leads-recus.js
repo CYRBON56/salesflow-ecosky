@@ -77,6 +77,7 @@ export default async function handler(req, res) {
       "adresse_projet", "code_postal", "surface_m2", "type_projet",
       "delai_souhaite", "source", "statut", "formulaire_complete",
       "callback_demande", "estimation_numero", "estimation_pdf_url",
+      "canal", "utm_campaign", "meta_form_name", "notes",
     ].join(",");
     const url =
       `${SUPABASE_URL}/rest/v1/leads?select=${colonnes}&order=created_at.desc&limit=${limit}`;

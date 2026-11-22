@@ -65,6 +65,14 @@
     align-items: center;
     font-weight: 600;
   }
+  .badge-canal { display:inline-block; padding:3px 8px; border-radius:999px; font-size:0.72rem; font-weight:700; color:white; white-space:nowrap; }
+  .canal-meta { background:#1877f2; }
+  .canal-google { background:#ea4335; }
+  .canal-site { background:#1e6f4c; }
+  .canal-autre { background:#6b7280; }
+  .source-detail { display:block; font-size:0.7rem; color:#6b7280; margin-top:3px; max-width:180px; }
+  tr.ligne-nouvelle { animation: flashNouveau 3s ease-out; }
+  @keyframes flashNouveau { from { background:#fff3c4; } to { background:transparent; } }
   .onglets {
     display: flex;
     gap: 4px;
@@ -424,6 +432,13 @@
   <div class="controles">
     <span id="compteurClicsPub" style="color:white; font-size:0.85rem; font-weight:600; padding:8px 12px; border:1px solid rgba(255,255,255,0.35); border-radius:8px;">🖱️ …</span>
     <select id="filtreType"></select>
+    <select id="filtreCanal" style="display:none">
+      <option value="">Toutes les origines</option>
+      <option value="Meta">Meta (Facebook/Instagram)</option>
+      <option value="Google Ads">Google Ads</option>
+      <option value="Site">Site / direct</option>
+      <option value="autre">Autres (téléphone, manuel…)</option>
+    </select>
     <a href="/devis-manuel.html" target="_blank" rel="noopener" class="secondaire" style="padding:8px 12px;border-radius:8px;font-size:0.85rem;">➕ Devis (client hors base)</a>
     <button class="principal" id="btnActualiser">🔄 Actualiser</button>
   </div>
@@ -734,7 +749,19 @@
       <div class="stat-carte"><div class="valeur">${total}</div><div class="libelle">Total affiché</div></div>
       <div class="stat-carte"><div class="valeur">${completes}</div><div class="libelle">Formulaires complétés</div></div>
       <div class="stat-carte"><div class="valeur">${rappels}</div><div class="libelle">Rappels demandés</div></div>
+      <div class="stat-carte"><div class="valeur">${lignes.filter(l => l.canal === "Meta").length}</div><div class="libelle">🔵 Meta</div></div>
+      <div class="stat-carte"><div class="valeur">${lignes.filter(l => l.canal === "Google Ads").length}</div><div class="libelle">🔴 Google Ads</div></div>
+      <div class="stat-carte"><div class="valeur">${lignes.filter(l => l.canal === "Site").length}</div><div class="libelle">🟢 Site</div></div>
     `;
+  }
+
+  function badgeCanal(l) {
+    const c = l.canal || "";
+    const cls = c === "Meta" ? "canal-meta" : c === "Google Ads" ? "canal-google" : c === "Site" ? "canal-site" : "canal-autre";
+    const detail = l.meta_form_name || l.utm_campaign || l.source || "";
+    const tip = l.notes ? ` title="${echapper(l.notes)}"` : "";
+    return `<span class="badge-canal ${cls}"${tip}>${echapper(c || "Autre")}</span>` +
+      (detail ? `<span class="source-detail">${echapper(detail)}</span>` : "");
   }
 
   function badgeStatut(statut) {
@@ -754,14 +781,14 @@
       const peutRelancer = l.formulaire_complete !== true && l.telephone;
       const peutProposerRdv = l.formulaire_complete === true && l.telephone;
       return `
-      <tr>
+      <tr${idsLeadsConnus && !idsLeadsConnus.has(l.id) ? ' class="ligne-nouvelle"' : ""}>
         <td>${formatDate(l.created_at)}</td>
         <td class="editable" data-lead-id="${l.id}" data-champ="nom" contenteditable="true" spellcheck="false">${echapper(l.nom) || ""}</td>
         <td class="editable" data-lead-id="${l.id}" data-champ="telephone" contenteditable="true" spellcheck="false">${echapper(l.telephone) || ""}</td>
         <td>${echapper(l.email) || "—"}</td>
         <td>${echapper(l.type_projet) || "—"}</td>
         <td class="editable" data-lead-id="${l.id}" data-champ="adresse_projet" contenteditable="true" spellcheck="false">${echapper(l.adresse_projet) || ""}</td>
-        <td>${echapper(l.source) || "—"}</td>
+        <td>${badgeCanal(l)}</td>
         <td>${badgeStatut(l.statut)}</td>
         <td>${l.formulaire_complete === true ? '<span class="badge badge-ok">Complet</span>' : '<span class="badge badge-ko">Incomplet</span>'}</td>
         <td>${l.callback_demande === true ? "📞 Oui" : "—"}</td>
@@ -789,7 +816,7 @@
             <th>Email</th>
             <th>Projet</th>
             <th>Adresse / CP</th>
-            <th>Source</th>
+            <th>Origine</th>
             <th>Statut</th>
             <th>Formulaire</th>
             <th>Rappel</th>
@@ -1376,19 +1403,33 @@
 
   function appliquerFiltreLeads() {
     const statut = document.getElementById("filtreType").value;
-    const lignes = statut ? toutesLignesLeads.filter(l => l.statut === statut) : toutesLignesLeads;
+    const canal = document.getElementById("filtreCanal").value;
+    const lignes = toutesLignesLeads.filter(l =>
+      (!statut || l.statut === statut) &&
+      (!canal || (canal === "autre" ? !["Meta", "Google Ads", "Site"].includes(l.canal) : l.canal === canal))
+    );
     renderStatsLeads(lignes);
     renderTableLeads(lignes);
   }
 
-  async function chargerLeads() {
-    document.getElementById("conteneurTableau").innerHTML = `<div class="chargement">Chargement…</div>`;
+  // Ids déjà affichés : sert à surligner les nouvelles demandes arrivées
+  // pendant que la page est ouverte (actualisation automatique).
+  let idsLeadsConnus = null;
+  async function chargerLeads(silencieux = false) {
+    if (!silencieux) document.getElementById("conteneurTableau").innerHTML = `<div class="chargement">Chargement…</div>`;
     try {
       const res = await fetch(API_LEADS);
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Erreur inconnue");
-      toutesLignesLeads = data.rows || [];
+      const rows = data.rows || [];
+      const nouveaux = idsLeadsConnus ? rows.filter(r => !idsLeadsConnus.has(r.id)).length : 0;
+      toutesLignesLeads = rows;
       appliquerFiltreLeads();
+      idsLeadsConnus = new Set(rows.map(r => r.id));
+      if (nouveaux > 0) {
+        document.title = `(${nouveaux}) Nouvelle demande – SalesFlow`;
+        try { navigator.vibrate && navigator.vibrate(200); } catch (e) {}
+      }
     } catch (err) {
       document.getElementById("conteneurTableau").innerHTML =
         `<div class="vide">Erreur de chargement : ${err.message}</div>`;
@@ -1399,12 +1440,14 @@
 
   function remplirFiltreSelonOnglet() {
     const select = document.getElementById("filtreType");
+    document.getElementById("filtreCanal").style.display = "none";
     if (ongletActif === "sms") {
       select.style.display = "";
       select.innerHTML = `<option value="">Tous les types</option>` +
         Object.entries(LIBELLES_TYPE_SMS).map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
     } else if (ongletActif === "leads") {
       select.style.display = "";
+      document.getElementById("filtreCanal").style.display = "";
       select.innerHTML = `<option value="">Tous les statuts</option>` +
         Object.entries(LIBELLES_STATUT_LEAD).map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
     } else if (ongletActif === "tous-devis") {
@@ -1489,7 +1532,21 @@
 
   // Ouverture directe d'un onglet via l'adresse, ex. /sms-recus.html?onglet=tous-devis
   const ongletDemande = new URLSearchParams(location.search).get("onglet");
-  activerOnglet(["sms", "leads", "tous-devis", "devis-signes"].includes(ongletDemande) ? ongletDemande : "sms");
+  activerOnglet(["sms", "leads", "tous-devis", "devis-signes"].includes(ongletDemande) ? ongletDemande : "leads");
+
+  document.getElementById("filtreCanal").addEventListener("change", appliquerFiltreLeads);
+  // Actualisation automatique de l'onglet Demandes toutes les 60 s, sauf si
+  // une cellule est en cours d'édition ou une fenêtre (devis…) est ouverte.
+  setInterval(() => {
+    if (ongletActif !== "leads" || document.hidden) return;
+    const actif = document.activeElement;
+    if (actif && actif.isContentEditable) return;
+    if (document.querySelector(".overlay-modale.visible, .overlay-modale.ouvert, .overlay-modale[style*='flex']")) return;
+    chargerLeads(true);
+  }, 60000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) { document.title = "SalesFlow – Demandes"; if (ongletActif === "leads") chargerLeads(true); }
+  });
   chargerCompteurClicsPub();
 </script>
 

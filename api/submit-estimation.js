@@ -681,6 +681,15 @@ export default async function handler(req, res) {
       `leads?telephone=eq.${encodeURIComponent(phoneE164 || telephone)}`
     );
 
+    // Origine (Meta / Google Ads / Site) : on ne l'écrase que si la nouvelle
+    // vient d'une pub, ou si l'ancienne était vide.
+    const canal = body.canal || "Site";
+    if (canal !== "Site" || !(existing && existing[0] && existing[0].canal)) {
+      leadPayload.canal = canal;
+      leadPayload.click_id = body.click_id || null;
+      leadPayload.utm_campaign = body.utm_campaign || null;
+    }
+
     let lead;
     if (existing && existing.length > 0) {
       lead = await supabaseRequest(`leads?telephone=eq.${encodeURIComponent(phoneE164 || telephone)}`, {

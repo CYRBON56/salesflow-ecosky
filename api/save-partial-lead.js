@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).send("Method not allowed");
 
   try {
-    const { nom, prenom, telephone, type_projet } = req.body || {};
+    const { nom, prenom, telephone, type_projet, canal, click_id, utm_campaign } = req.body || {};
     if (!nom || !telephone) {
       return res.status(400).json({ success: false, error: "Nom et téléphone requis." });
     }
@@ -54,7 +54,11 @@ export default async function handler(req, res) {
       // on ne l'écrase pas complètement, juste les infos de base.
       lead = await supabaseRequest(`leads?telephone=eq.${encodeURIComponent(phoneE164)}`, {
         method: "PATCH",
-        body: JSON.stringify({ nom, prenom: prenom || null, type_projet: type_projet || null }),
+        body: JSON.stringify({
+          nom, prenom: prenom || null, type_projet: type_projet || null,
+          // On ne remplace l'origine que si elle vient d'une pub ou si elle était vide
+          ...((canal && canal !== "Site") || !existing[0].canal ? { canal: canal || "Site", click_id: click_id || null, utm_campaign: utm_campaign || null } : {}),
+        }),
       });
     } else {
       lead = await supabaseRequest("leads", {
@@ -65,6 +69,9 @@ export default async function handler(req, res) {
           telephone: phoneE164,
           type_projet: type_projet || null,
           source: "Formulaire estimation détaillée",
+          canal: canal || "Site",
+          click_id: click_id || null,
+          utm_campaign: utm_campaign || null,
           statut: "nouveau",
           formulaire_complete: false,
           notes: "",

@@ -399,6 +399,27 @@
   const SMS_NOUVEAU_CLIC_URL = "https://salesflow-ecosky.vercel.app/api/sms-nouveau-clic";
   const SMS_CATALOGUE_DOWNLOAD_URL = "https://salesflow-ecosky.vercel.app/api/sms-catalogue-download";
 
+  // ---------- Origine de la demande (Meta / Google Ads / Site) ----------
+  // Mémorisée dès l'arrivée sur la page (sessionStorage) pour que l'info
+  // survive aux étapes du formulaire, puis envoyée avec le lead.
+  function getOrigine() {
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      const src = (qs.get("utm_source") || "").toLowerCase();
+      let o = null;
+      if (qs.get("gclid") || qs.get("gbraid") || qs.get("wbraid") || src.includes("google")) {
+        o = { canal: "Google Ads", click_id: qs.get("gclid") || qs.get("gbraid") || qs.get("wbraid"), utm_campaign: qs.get("utm_campaign") };
+      } else if (qs.get("fbclid") || qs.get("ad_id") || src.includes("facebook") || src.includes("meta") || src.includes("instagram")) {
+        o = { canal: "Meta", click_id: qs.get("fbclid") || qs.get("ad_id"), utm_campaign: qs.get("utm_campaign") };
+      }
+      if (o) { sessionStorage.setItem("ecosky_origine", JSON.stringify(o)); return o; }
+      const saved = sessionStorage.getItem("ecosky_origine");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return { canal: "Site", click_id: null, utm_campaign: null };
+  }
+  getOrigine();
+
   function notifyCatalogueDownloadEstimation() {
     try {
       const qs = new URLSearchParams(window.location.search);
@@ -1146,6 +1167,7 @@
         prenom: state.prenom,
         telephone: state.telephone,
         type_projet: state.usage,
+        ...getOrigine(),
       }),
     }).catch(() => {});
   }
@@ -1406,6 +1428,7 @@
           adresse_projet: state.ville,
           code_postal: state.code_postal,
           type_projet: state.usage,
+          ...getOrigine(),
           answers: {
             usage: state.usage,
             support_pieton: state.support_pieton,
