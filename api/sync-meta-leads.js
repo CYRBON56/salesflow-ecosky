@@ -43,9 +43,10 @@ async function sb(path, options = {}) {
   return t ? JSON.parse(t) : null;
 }
 
+let TOKEN = META_PAGE_TOKEN;
 async function graph(path) {
   const sep = path.includes("?") ? "&" : "?";
-  const res = await fetch(`${GRAPH}/${path}${sep}access_token=${encodeURIComponent(META_PAGE_TOKEN)}`);
+  const res = await fetch(`${GRAPH}/${path}${sep}access_token=${encodeURIComponent(TOKEN)}`);
   const data = await res.json();
   if (data.error) throw new Error(`Meta: ${data.error.message}`);
   return data;
@@ -122,6 +123,19 @@ export default async function handler(req, res) {
   const rapport = { ok: true, formulaires: 0, vus: 0, nouveaux: 0, mis_a_jour: 0, erreurs: [] };
 
   try {
+    // Le jeton de l'utilisateur système sert à obtenir le jeton propre à la
+    // Page (indispensable pour lire formulaires et prospects).
+    TOKEN = META_PAGE_TOKEN;
+    try {
+      const p = await graph(`${META_PAGE_ID}?fields=access_token`);
+      if (p.access_token) TOKEN = p.access_token;
+    } catch (e) {
+      try {
+        const acc = await graph(`me/accounts?fields=id,access_token&limit=100`);
+        const pg = (acc.data || []).find((x) => x.id === META_PAGE_ID);
+        if (pg && pg.access_token) TOKEN = pg.access_token;
+      } catch (e2) {}
+    }
     const forms = await graph(`${META_PAGE_ID}/leadgen_forms?fields=id,name,status&limit=100`);
     for (const form of forms.data || []) {
       rapport.formulaires++;
