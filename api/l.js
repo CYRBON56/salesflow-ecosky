@@ -1,6 +1,7 @@
 // api/l.js — lien court envoyé aux prospects Meta : /api/l?i=<lead_id>
 // Note le clic (lien_clique_at) puis redirige vers le bon formulaire,
 // pré-rempli avec le nom / téléphone / email du prospect.
+// Avec &p=1 : redirige vers la page photos + adresse (photos.html).
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -16,6 +17,10 @@ export default async function handler(req, res) {
     if (!lead) return res.redirect(302, resine);
     if (!lead.lien_clique_at) {
       await fetch(`${SUPABASE_URL}/rest/v1/leads?id=eq.${id}`, { method: "PATCH", headers: H(), body: JSON.stringify({ lien_clique_at: new Date().toISOString() }) });
+    }
+    // Lien "photos" (&p=1) : page d'envoi de photos + adresse du chantier
+    if (req.query.p === "1") {
+      return res.redirect(302, `https://salesflow-ecosky.vercel.app/photos.html?lead_id=${id}`);
     }
     if (lead.type_projet === "portail") {
       const tel = String(lead.telephone || "").replace(/^\+33/, "0");
