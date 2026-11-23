@@ -62,7 +62,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).send("Method not allowed");
 
   try {
-    const { lead_id, adresse, photos } = req.body || {};
+    const { lead_id, adresse, commentaire, photos } = req.body || {};
 
     if (!lead_id) {
       return res.status(400).json({ success: false, error: "Lien invalide (lead manquant)." });
@@ -91,7 +91,7 @@ export default async function handler(req, res) {
       });
       lead = updated?.[0] || null;
     } else {
-      const existing = await supabaseRequest(`leads?id=eq.${lead_id}&select=nom,prenom,telephone`);
+      const existing = await supabaseRequest(`leads?id=eq.${lead_id}&select=nom,prenom,telephone,type_projet`);
       lead = existing?.[0] || null;
     }
 
@@ -107,8 +107,11 @@ export default async function handler(req, res) {
       subject: `📍 Adresse et photos reçues — ${fullName}`,
       html:
         `<p>${fullName}${lead?.telephone ? " — " + lead.telephone : ""}</p>` +
+        `<p><strong>Type de projet :</strong> ${lead?.type_projet || "non précisé"}</p>` +
         `<p><strong>Adresse du chantier :</strong> ${adresse || "non renseignée"}</p>` +
-        photosHtml,
+        (commentaire ? `<p><strong>Commentaire du client :</strong> ${String(commentaire).replace(/</g, "&lt;")}</p>` : "") +
+        photosHtml +
+        photoUrls.map((u) => `<p><img src="${u}" style="max-width:420px;border-radius:8px"></p>`).join(""),
     });
 
     return res.status(200).json({ success: true, photo_urls: photoUrls });

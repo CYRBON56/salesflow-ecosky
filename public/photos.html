@@ -3,186 +3,234 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RMS EcoSky — Adresse et photos de votre chantier</title>
+<title>EcoSky by RMS — Transformez votre estimation en devis</title>
 <style>
-  :root{
-    --pine: #1e6f4c;
-    --pine-dark: #14312a;
-    --paper: #f4f1e6;
-    --line: #e2e0d5;
-  }
+  :root{ --pine:#1e6f4c; --pine-dark:#14312a; --paper:#f4f1e6; --line:#e2e0d5; }
   *{box-sizing:border-box; margin:0; padding:0;}
-  body{
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--paper);
-    color: var(--pine-dark);
-    padding: 24px 16px 60px;
-  }
-  .wrap{max-width: 480px; margin: 0 auto;}
-  h1{font-size: 21px; margin: 18px 0 8px;}
-  p.lead{font-size: 14.5px; color: #4a5a54; line-height: 1.5; margin-bottom: 24px;}
-  .card{
-    background: #fff;
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 22px 20px;
-  }
-  label{display:block; font-size: 13.5px; font-weight: 600; margin: 16px 0 6px;}
-  label:first-of-type{margin-top:0;}
-  input[type="text"]{
-    width: 100%;
-    padding: 11px 12px;
-    border-radius: 9px;
-    border: 1px solid #d4d0c4;
-    font-size: 14px;
-    font-family: inherit;
-  }
-  .photo-input{
-    border: 2px dashed #c9c4b4;
-    border-radius: 10px;
-    padding: 20px 14px;
-    text-align: center;
-    font-size: 13.5px;
-    color: #6b7b74;
-    cursor: pointer;
-  }
-  .photo-input input{display:none;}
-  #preview{
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 12px;
-  }
-  #preview img{
-    width: 72px; height: 72px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid var(--line);
-  }
-  button{
-    width: 100%;
-    margin-top: 22px;
-    padding: 13px;
-    border: none;
-    border-radius: 999px;
-    background: var(--pine);
-    color: #fff;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  button:disabled{opacity: 0.6; cursor: default;}
-  #status{
-    margin-top: 16px;
-    font-size: 13.5px;
-    text-align: center;
-  }
-  #status.success{color: var(--pine);}
-  #status.error{color: #b82621;}
+  body{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+        background:var(--paper); color:var(--pine-dark); padding:24px 16px 60px; }
+  .wrap{max-width:480px; margin:0 auto;}
+  h1{font-size:22px; margin:12px 0 8px; line-height:1.25;}
+  p.lead{font-size:14.5px; color:#4a5a54; line-height:1.5; margin-bottom:20px;}
+  .card{background:#fff; border:1px solid var(--line); border-radius:14px; padding:22px 20px; margin-bottom:14px;}
+  .step{font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--pine); margin-bottom:6px;}
+  label{display:block; font-size:13.5px; font-weight:600; margin:14px 0 6px;}
+  input[type="text"], textarea{ width:100%; padding:11px 12px; border-radius:9px; border:1px solid #d4d0c4;
+        font-size:15px; font-family:inherit; }
+  textarea{min-height:70px; resize:vertical;}
+  ul.conseils{margin:8px 0 4px 18px; font-size:14px; line-height:1.6; color:#33443d;}
+  .btns{display:flex; gap:10px; margin-top:14px;}
+  .pick{ flex:1; border:2px dashed #c9c4b4; border-radius:10px; padding:16px 8px; text-align:center;
+         font-size:14px; font-weight:600; color:var(--pine-dark); cursor:pointer; background:#fbfaf5; }
+  .pick input{display:none;}
+  #preview{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;}
+  .thumb{position:relative;}
+  .thumb img{width:74px; height:74px; object-fit:cover; border-radius:8px; border:1px solid var(--line);}
+  .thumb button{position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%;
+         border:none; background:#b82621; color:#fff; font-size:13px; line-height:22px; padding:0; margin:0; cursor:pointer;}
+  .count{font-size:12.5px; color:#6b7b74; margin-top:8px;}
+  button.submit{ width:100%; margin-top:6px; padding:14px; border:none; border-radius:999px;
+         background:var(--pine); color:#fff; font-size:16px; font-weight:700; cursor:pointer; }
+  button.submit:disabled{opacity:.6; cursor:default;}
+  #status{margin-top:14px; font-size:14px; text-align:center; line-height:1.5;}
+  #status.success{color:var(--pine);} #status.error{color:#b82621;}
+  .foot{font-size:12px; color:#7b857f; text-align:center; margin-top:18px; line-height:1.5;}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Une dernière étape</h1>
-  <p class="lead">
-    Pour affiner votre estimation, indiquez-nous l'adresse exacte du chantier et,
-    si possible, quelques photos de la zone concernée.
+  <h1 id="titre">Transformez votre estimation en devis précis</h1>
+  <p class="lead" id="intro">
+    Avec quelques photos et l'adresse exacte du chantier, nous pouvons vous donner un prix plus juste,
+    sans déplacement inutile. Ça prend 2 minutes depuis votre téléphone.
   </p>
 
-  <div class="card">
-    <form id="photoForm">
-      <label for="adresse">Adresse exacte du chantier</label>
-      <input type="text" id="adresse" placeholder="12 rue des Lilas, 56400 Brech" required>
+  <form id="photoForm">
+    <div class="card">
+      <div class="step">1 · Vos photos</div>
+      <div id="conseilsTitre" style="font-size:14px;font-weight:600;">Ce qui nous aide le plus :</div>
+      <ul class="conseils" id="conseils"></ul>
 
-      <label>Photos (facultatif, plusieurs possibles)</label>
-      <label class="photo-input" for="photos">
-        📷 Appuyez pour ajouter des photos
-        <input type="file" id="photos" accept="image/*" multiple>
-      </label>
+      <div class="btns">
+        <label class="pick" for="camera">📷 Prendre une photo
+          <input type="file" id="camera" accept="image/*" capture="environment">
+        </label>
+        <label class="pick" for="galerie">🖼️ Choisir dans la galerie
+          <input type="file" id="galerie" accept="image/*" multiple>
+        </label>
+      </div>
       <div id="preview"></div>
+      <div class="count" id="count">Aucune photo pour l'instant (jusqu'à 8).</div>
+    </div>
 
-      <button type="submit" id="submitBtn">Envoyer</button>
-      <div id="status"></div>
-    </form>
-  </div>
+    <div class="card">
+      <div class="step">2 · Adresse exacte du chantier</div>
+      <input type="text" id="adresse" placeholder="N°, rue, code postal, ville" autocomplete="street-address" required>
+
+      <label for="commentaire">Un détail à nous signaler ? (facultatif)</label>
+      <textarea id="commentaire" placeholder="Ex. : accès étroit, dimensions, pente, couleur souhaitée…"></textarea>
+    </div>
+
+    <button type="submit" class="submit" id="submitBtn">Envoyer pour recevoir mon devis</button>
+    <div id="status"></div>
+  </form>
+
+  <p class="foot">EcoSky by RMS · 23 route de Corn er Hoet, 56400 Brech · 06 45 68 83 94<br>
+  Vos photos servent uniquement à préparer votre devis.</p>
 </div>
 
 <script>
+  const MAX_PHOTOS = 8;
   const params = new URLSearchParams(window.location.search);
   const leadId = params.get('lead_id');
 
-  const form = document.getElementById('photoForm');
-  const photosInput = document.getElementById('photos');
-  const preview = document.getElementById('preview');
-  const statusEl = document.getElementById('status');
-  const submitBtn = document.getElementById('submitBtn');
+  const CONSEILS = {
+    portail: {
+      titre: "Transformez votre estimation de portail en devis précis",
+      liste: [
+        "Une vue d'ensemble de l'ouverture, prise depuis la rue",
+        "Chaque poteau ou pilier, de près (matériau, état, aplomb)",
+        "Le sol entre les poteaux et sur le côté où le portail coulisse",
+        "Si possible, un mètre déroulé entre les deux poteaux"
+      ]
+    },
+    resine: {
+      titre: "Transformez votre estimation en devis précis",
+      liste: [
+        "Une vue d'ensemble de la terrasse ou de la zone à couvrir",
+        "Un gros plan du sol actuel (fissures, carrelage, état de la dalle)",
+        "Les bordures, marches, seuils de porte et évacuations d'eau",
+        "L'accès au chantier (portillon, passage)"
+      ]
+    },
+    assainissement: {
+      titre: "Transformez votre estimation en devis précis",
+      liste: [
+        "Une vue d'ensemble du terrain où sera l'installation",
+        "La sortie des eaux usées de la maison",
+        "L'accès pour une mini-pelle (largeur du passage)",
+        "L'installation existante si il y en a une (fosse, regards)"
+      ]
+    },
+    autre: {
+      titre: "Transformez votre estimation en devis précis",
+      liste: [
+        "Une vue d'ensemble de la zone du chantier",
+        "Quelques gros plans des points importants",
+        "L'accès au chantier"
+      ]
+    }
+  };
 
-  let selectedFiles = [];
+  function categorie(t) {
+    t = (t || '').toLowerCase();
+    if (t.includes('portail')) return 'portail';
+    if (t.includes('assainissement') || t.includes('anc')) return 'assainissement';
+    if (!t || t.includes('resine') || t.includes('résine') || t.includes('pieton') || t.includes('carrossable')) return 'resine';
+    return 'autre';
+  }
 
-  photosInput.addEventListener('change', () => {
-    selectedFiles = Array.from(photosInput.files);
-    preview.innerHTML = '';
-    selectedFiles.forEach(file => {
-      const img = document.createElement('img');
-      img.src = URL.createObjectURL(file);
-      preview.appendChild(img);
-    });
-  });
+  function afficherConseils(cat, prenom) {
+    const c = CONSEILS[cat] || CONSEILS.autre;
+    document.getElementById('titre').textContent = (prenom ? prenom + ', ' : '') + c.titre.charAt(0).toLowerCase() + c.titre.slice(1);
+    if (!prenom) document.getElementById('titre').textContent = c.titre;
+    document.getElementById('conseils').innerHTML = c.liste.map(x => '<li>' + x + '</li>').join('');
+  }
 
-  function fileToBase64(file) {
+  afficherConseils('resine', '');
+  if (leadId) {
+    fetch('/api/lookup-lead-by-id?lead_id=' + encodeURIComponent(leadId))
+      .then(r => r.json())
+      .then(d => {
+        if (!d.found) return;
+        afficherConseils(categorie(d.type_projet), d.prenom || '');
+        const adr = [d.adresse_projet, d.code_postal].filter(Boolean).join(', ');
+        if (adr && !document.getElementById('adresse').value) document.getElementById('adresse').value = adr;
+      })
+      .catch(() => {});
+  }
+
+  // --- Photos : compression côté téléphone (évite les envois trop lourds) ---
+  let photos = []; // { name, dataUrl }
+
+  function compresser(file) {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const max = 1400;
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if (w > max || h > max) { const r = Math.min(max / w, max / h); w = Math.round(w * r); h = Math.round(h * r); }
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(cv.toDataURL('image/jpeg', 0.72));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image illisible')); };
+      img.src = url;
     });
   }
 
+  function rafraichir() {
+    const pv = document.getElementById('preview');
+    pv.innerHTML = '';
+    photos.forEach((p, i) => {
+      const d = document.createElement('div'); d.className = 'thumb';
+      d.innerHTML = '<img src="' + p.dataUrl + '"><button type="button" aria-label="Retirer">×</button>';
+      d.querySelector('button').onclick = () => { photos.splice(i, 1); rafraichir(); };
+      pv.appendChild(d);
+    });
+    document.getElementById('count').textContent = photos.length
+      ? photos.length + ' photo(s) prête(s)' + (photos.length < MAX_PHOTOS ? ' — vous pouvez en ajouter.' : ' (maximum atteint).')
+      : "Aucune photo pour l'instant (jusqu'à 8).";
+  }
+
+  async function ajouter(files) {
+    for (const f of Array.from(files)) {
+      if (photos.length >= MAX_PHOTOS) break;
+      try { photos.push({ name: f.name || 'photo.jpg', dataUrl: await compresser(f) }); } catch (e) {}
+    }
+    rafraichir();
+  }
+
+  ['camera', 'galerie'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('change', async () => { await ajouter(el.files); el.value = ''; });
+  });
+
+  // --- Envoi ---
+  const form = document.getElementById('photoForm');
+  const statusEl = document.getElementById('status');
+  const btn = document.getElementById('submitBtn');
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    statusEl.textContent = '';
-    statusEl.className = '';
+    statusEl.textContent = ''; statusEl.className = '';
+    if (!leadId) { statusEl.textContent = "Lien invalide — merci de nous appeler au 06 45 68 83 94."; statusEl.className = 'error'; return; }
+    if (!photos.length && !confirm("Vous n'avez ajouté aucune photo. Envoyer quand même l'adresse seule ?")) return;
 
-    if (!leadId) {
-      statusEl.textContent = "Lien invalide — merci de nous contacter directement.";
-      statusEl.className = 'error';
-      return;
-    }
-
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Envoi en cours...';
-
+    btn.disabled = true; btn.textContent = 'Envoi en cours…';
     try {
-      const photos = await Promise.all(
-        selectedFiles.map(async (file) => ({
-          filename: file.name,
-          dataUrl: await fileToBase64(file),
-        }))
-      );
-
       const res = await fetch('/api/submit-photos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           lead_id: leadId,
-          adresse: document.getElementById('adresse').value,
-          photos,
+          adresse: document.getElementById('adresse').value.trim(),
+          commentaire: document.getElementById('commentaire').value.trim(),
+          photos: photos.map(p => ({ filename: p.name.replace(/\.[^.]+$/, '') + '.jpg', dataUrl: p.dataUrl })),
         }),
       });
       const data = await res.json();
-
-      if (data.success) {
-        statusEl.textContent = 'Merci ! Vos informations ont bien été transmises.';
-        statusEl.className = 'success';
-        form.querySelectorAll('input, button').forEach(el => el.disabled = true);
-      } else {
-        throw new Error(data.error || 'Erreur inconnue');
-      }
+      if (!data.success) throw new Error(data.error || 'Erreur');
+      form.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
+      statusEl.innerHTML = '<strong>Merci, c\'est bien reçu !</strong><br>Nous préparons votre devis et revenons vers vous rapidement.';
+      statusEl.className = 'success';
+      btn.textContent = 'Envoyé ✓';
     } catch (err) {
-      statusEl.textContent = "Une erreur est survenue. Merci de réessayer ou de nous appeler directement.";
+      statusEl.textContent = "L'envoi n'a pas abouti. Réessayez, ou appelez-nous au 06 45 68 83 94.";
       statusEl.className = 'error';
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Envoyer';
+      btn.disabled = false; btn.textContent = 'Envoyer pour recevoir mon devis';
     }
   });
 </script>

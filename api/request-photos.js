@@ -4,7 +4,7 @@
 // son adresse déjà connue si disponible, et un lien vers la page
 // photos.html pour confirmer/compléter l'adresse et envoyer des photos.
 
-import { sendSms } from "./_sms.js";
+import { envoyerDemandePhotos } from "./_photos-sms.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     }
 
     const rows = await supabaseRequest(
-      `leads?id=eq.${lead_id}&select=id,nom,prenom,telephone,adresse_projet,code_postal`
+      `leads?id=eq.${lead_id}&select=id,nom,prenom,telephone,adresse_projet,code_postal,type_projet`
     );
     const lead = rows?.[0];
     if (!lead) {
@@ -52,23 +52,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: "Ce lead n'a pas de numéro de téléphone." });
     }
 
-    const photosUrl = `https://salesflow-ecosky.vercel.app/photos.html?lead_id=${lead.id}`;
-    const nomComplet = `${lead.prenom || ""} ${lead.nom || ""}`.trim();
-    const adresseConnue = [lead.adresse_projet, lead.code_postal].filter(Boolean).join(", ");
-
-    const smsBody = adresseConnue
-      ? `Bonjour ${nomComplet}, ici RMS ECOSKY. Pouvez-vous confirmer l'adresse exacte du chantier (${adresseConnue}) et nous envoyer quelques photos ? C'est ici, ça prend 2 minutes : ${photosUrl}`
-      : `Bonjour ${nomComplet}, ici RMS ECOSKY. Pouvez-vous nous indiquer l'adresse exacte du chantier et nous envoyer quelques photos ? C'est ici, ça prend 2 minutes : ${photosUrl}`;
-
-    const sent = await sendSms(lead.telephone, smsBody);
-
-    if (sent) {
-      await supabaseRequest(`leads?id=eq.${lead.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ demande_photos_envoyee: true }),
-        prefer: "return=minimal",
-      });
-    }
+    const sent = await envoyerDemandePhotos(lead, "manuel");
 
     return res.status(200).json({ success: sent });
   } catch (err) {

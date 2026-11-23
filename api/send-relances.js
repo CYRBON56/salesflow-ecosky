@@ -7,6 +7,7 @@
 // d'estimation détaillée (donné leur téléphone) mais ne l'ont jamais terminé.
 
 import { logSms } from "./_sms-log.js";
+import { envoyerDemandePhotos } from "./_photos-sms.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -184,6 +185,31 @@ async function proposerRdvFormulairesComplets() {
   return results;
 }
 
+// Demande automatique de photos + adresse exacte (~48h après la demande),
+// pour transformer l'estimation en devis précis. Une seule fois par lead,
+// jamais si le client a déjà envoyé des photos. Fenêtre 44h-96h : décalé
+// d'un jour par rapport au SMS de proposition de RDV (~24h).
+async function demanderPhotosAuto() {
+  const results = [];
+  try {
+    const leads = await supabaseRequest(
+      "leads?or=(formulaire_complete.eq.true,type_projet.eq.portail)" +
+        "&demande_photos_envoyee=not.is.true&photos_chantier_urls=is.null" +
+        "&select=id,nom,prenom,telephone,type_projet,created_at"
+    );
+    for (const lead of leads || []) {
+      if (!lead.telephone) continue;
+      const elapsed = hoursSince(lead.created_at);
+      if (elapsed < 44 || elapsed > 96) continue;
+      const sent = await envoyerDemandePhotos(lead, "auto");
+      results.push({ telephone: lead.telephone, success: sent });
+    }
+  } catch (err) {
+    console.error("demanderPhotosAuto error:", err.message);
+  }
+  return results;
+}
+
 export default async function handler(req, res) {
   // Sécurité simple : Vercel Cron envoie ce header automatiquement.
   if (CRON_SECRET) {
@@ -238,6 +264,7 @@ export default async function handler(req, res) {
 
     const estimationResults = await relancerFormulairesAbandonnes();
     const rdvResults = await proposerRdvFormulairesComplets();
+    const photosResults = await demanderPhotosAuto();
 
     return res.status(200).json({
       processed: results.length,
@@ -246,6 +273,8 @@ export default async function handler(req, res) {
       estimation_results: estimationResults,
       rdv_proposes: rdvResults.length,
       rdv_results: rdvResults,
+      photos_demandees: photosResults.length,
+      photos_results: photosResults,
     });
   } catch (err) {
     console.error("send-relances error:", err);
