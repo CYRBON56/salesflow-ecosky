@@ -40,10 +40,12 @@ export function estPortail(lead) {
 export function textes(lead) {
   const prenom = lead.prenom ? ` ${lead.prenom}` : "";
   const lien = `${BASE}/api/l?i=${lead.id}`;
+  const lienPhotos = `${lien}&p=1`;
   if (estPortail(lead)) {
     return {
       lien,
-      sms: `Bonjour${prenom}, merci pour votre demande de portail Portal Echo via Facebook. Obtenez votre prix exact (pose incluse) en 2 minutes, sans engagement : ${lien}\nCyrille - EcoSky by RMS - 06 45 68 83 94`,
+      sms: `Bonjour${prenom}, merci pour votre demande de portail Portal Echo via Facebook. Obtenez votre prix exact (pose incluse) en 2 minutes, sans engagement : ${lien}\nOu envoyez-nous directement des photos de vos poteaux + l'adresse : ${lienPhotos}\nCyrille - EcoSky by RMS - 06 45 68 83 94`,
+      lienPhotos,
       sujet: "Votre estimation de portail Portal Echo",
       intro: "Merci pour votre demande de portail sur Facebook. Pour vous donner un prix exact, il nous manque quelques détails : modèle, dimensions précises et options.",
       bouton: "Obtenir mon prix de portail",
@@ -51,7 +53,8 @@ export function textes(lead) {
   }
   return {
     lien,
-    sms: `Bonjour${prenom}, merci pour votre demande résine EcoSky'Gum via Facebook. Recevez votre estimation détaillée en 2 minutes, sans engagement : ${lien}\nCyrille - EcoSky by RMS - 06 45 68 83 94`,
+    sms: `Bonjour${prenom}, merci pour votre demande résine EcoSky'Gum via Facebook. Recevez votre estimation détaillée en 2 minutes, sans engagement : ${lien}\nOu envoyez-nous directement des photos de votre projet + l'adresse : ${lienPhotos}\nCyrille - EcoSky by RMS - 06 45 68 83 94`,
+    lienPhotos,
     sujet: "Votre estimation résine EcoSky'Gum",
     intro: "Merci pour votre demande de revêtement résine sur Facebook. Pour vous envoyer une estimation chiffrée, il nous manque quelques détails : surface exacte, état du support et couleur souhaitée.",
     bouton: "Recevoir mon estimation",
@@ -67,6 +70,10 @@ function htmlEmail(lead, t) {
     <p>Cela prend 2 minutes, et vous recevez aussitôt votre estimation par mail, sans engagement.</p>
     <p style="text-align:center;margin:28px 0">
       <a href="${t.lien}" style="background:#1e6f4c;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold">${t.bouton}</a>
+    </p>
+    <p>Encore plus simple : envoyez-nous quelques photos de votre projet et l'adresse exacte du chantier, depuis votre téléphone. Nous vous répondons avec un prix plus précis.</p>
+    <p style="text-align:center;margin:20px 0 28px">
+      <a href="${t.lienPhotos}" style="background:#fff;color:#1e6f4c;border:2px solid #1e6f4c;padding:12px 26px;border-radius:10px;text-decoration:none;font-weight:bold">📷 Envoyer des photos de mon projet</a>
     </p>
     <p>Vous préférez en parler de vive voix ? Appelez-moi au 06 45 68 83 94.</p>
     <table cellpadding="0" cellspacing="0" style="margin-top:24px;border-top:1px solid #e2e0d5;padding-top:14px">
