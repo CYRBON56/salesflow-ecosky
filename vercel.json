@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/generer-maquette",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/extraire-contacts-sites",
+      "schedule": "0 1 * * *"
     }
   ],
   "rewrites": [

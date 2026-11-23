@@ -104,7 +104,7 @@ export default async function handler(req, res) {
     // 2) Candidats suivants ayant un site connu (site_web, sinon ml_site)
     let req2 = supabase
       .from('prospects_construction')
-      .select('siren, nom, ville, departement, categorie, site_web, ml_site, email, ml_emails')
+      .select('siren, nom, ville, departement, categorie, site_web, ml_site, email, ml_emails, site_emails, site_telephones, telephone')
       .or('site_web.not.is.null,ml_site.not.is.null')
       .order('siren', { ascending: true })
       .limit(BATCH_SIZE * 2);
@@ -133,7 +133,8 @@ export default async function handler(req, res) {
             departement: candidat.departement,
             categorie: candidat.categorie,
             site_web: candidat.site_web,
-            email_contact: candidat.email || premierEmail(candidat.ml_emails),
+            email_contact: candidat.email || premierEmail(candidat.site_emails) || premierEmail(candidat.ml_emails),
+            telephone_contact: candidat.telephone || premierEmail(candidat.site_telephones),
             score_obsolescence: analyse.score,
             signaux: analyse.signaux,
             entreprise_active: verif.active,
