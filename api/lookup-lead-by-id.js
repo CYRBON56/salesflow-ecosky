@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ found: false });
     }
 
-    const url = `${SUPABASE_URL}/rest/v1/leads?id=eq.${encodeURIComponent(leadId)}&select=nom,prenom,email,telephone&limit=1`;
+    const url = `${SUPABASE_URL}/rest/v1/leads?id=eq.${encodeURIComponent(leadId)}&select=nom,prenom,email,telephone,type_projet,adresse_projet,code_postal&limit=1`;
     const r = await fetch(url, {
       headers: {
         apikey: SUPABASE_SERVICE_KEY,
@@ -41,6 +41,9 @@ export default async function handler(req, res) {
       prenom: lead.prenom || "",
       email: lead.email || "",
       telephone: lead.telephone || "",
+      type_projet: lead.type_projet || "",
+      adresse_projet: lead.adresse_projet || "",
+      code_postal: lead.code_postal || "",
     });
   } catch (err) {
     console.error("lookup-lead-by-id error:", err.message);
