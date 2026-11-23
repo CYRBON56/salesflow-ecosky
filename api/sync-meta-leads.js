@@ -15,6 +15,10 @@
 //   (+ SUPABASE_URL, SUPABASE_SERVICE_KEY, TWILIO_* déjà présents)
 
 import { logSms } from "./_sms-log.js";
+import { envoyerLien, rafraichirStatutsLiens } from "./_lien-estimation.js";
+// Envoi automatique du lien d'estimation aux nouveaux prospects Meta
+// (activé par la variable Vercel META_AUTO_LIEN=1)
+const AUTO_LIEN = process.env.META_AUTO_LIEN === "1";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -120,7 +124,19 @@ export default async function handler(req, res) {
 
   const jours = Math.min(parseFloat(req.query.jours) || 1, 90);
   const depuis = Math.floor(Date.now() / 1000 - jours * 86400);
-  const rapport = { ok: true, formulaires: 0, vus: 0, nouveaux: 0, mis_a_jour: 0, erreurs: [] };
+  const rapport = { ok: true, formulaires: 0, vus: 0, nouveaux: 0, mis_a_jour: 0, liens_envoyes: [], erreurs: [] };
+
+  // Mode « relancer » : envoie le lien aux prospects Meta déjà en base qui ne
+  // l'ont jamais reçu et n'ont pas complété de formulaire.
+  if (req.query.relancer === "1") {
+    try {
+      const cibles = await sb(`leads?canal=eq.Meta&meta_lead_id=not.is.null&lien_envoye_at=is.null&or=(formulaire_complete.is.null,formulaire_complete.eq.false)&select=id,prenom,nom,telephone,email,type_projet`);
+      for (const l of cibles || []) rapport.liens_envoyes.push(await envoyerLien(l));
+    } catch (e) {
+      rapport.erreurs.push(e.message);
+    }
+    return res.status(200).json(rapport);
+  }
 
   try {
     // Le jeton de l'utilisateur système sert à obtenir le jeton propre à la
@@ -175,18 +191,22 @@ export default async function handler(req, res) {
 
             let existant = null;
             if (tel) {
-              const r = await sb(`leads?telephone=eq.${encodeURIComponent(tel)}&select=id`);
+              const r = await sb(`leads?telephone=eq.${encodeURIComponent(tel)}&select=id,formulaire_complete`);
               existant = r && r[0];
             }
+            let fiche;
             if (existant) {
-              await sb(`leads?id=eq.${existant.id}`, { method: "PATCH", body: JSON.stringify(payload) });
+              fiche = (await sb(`leads?id=eq.${existant.id}`, { method: "PATCH", body: JSON.stringify(payload) }))[0];
               rapport.mis_a_jour++;
             } else {
-              await sb("leads", {
+              fiche = (await sb("leads", {
                 method: "POST",
                 body: JSON.stringify({ ...payload, telephone: tel, statut: "nouveau", created_at: lead.created_time }),
-              });
+              }))[0];
               rapport.nouveaux++;
+            }
+            if (AUTO_LIEN && jours <= 1 && fiche && !(existant && existant.formulaire_complete)) {
+              rapport.liens_envoyes.push(await envoyerLien(fiche));
             }
 
             // Pas de SMS pour un rattrapage d'historique (jours > 1)
@@ -207,6 +227,11 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error("sync-meta-leads:", e.message);
     return res.status(500).json({ ...rapport, ok: false, error: e.message });
+  }
+  try {
+    await rafraichirStatutsLiens();
+  } catch (e) {
+    rapport.erreurs.push(`statuts: ${e.message}`);
   }
   return res.status(200).json(rapport);
 }

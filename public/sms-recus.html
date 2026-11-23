@@ -760,8 +760,12 @@
     const cls = c === "Meta" ? "canal-meta" : c === "Google Ads" ? "canal-google" : c === "Site" ? "canal-site" : "canal-autre";
     const detail = l.meta_form_name || l.utm_campaign || l.source || "";
     const tip = l.notes ? ` title="${echapper(l.notes)}"` : "";
+    let suivi = "";
+    if (l.lien_envoye_at) {
+      suivi = `<span class="source-detail">📨 Lien envoyé ${formatDate(l.lien_envoye_at)}<br>SMS : ${echapper(l.lien_sms_statut || "—")}<br>Mail : ${echapper(l.lien_email_statut || "—")}<br>${l.lien_clique_at ? "👆 Lien ouvert " + formatDate(l.lien_clique_at) : "Lien pas encore ouvert"}</span>`;
+    }
     return `<span class="badge-canal ${cls}"${tip}>${echapper(c || "Autre")}</span>` +
-      (detail ? `<span class="source-detail">${echapper(detail)}</span>` : "");
+      (detail ? `<span class="source-detail">${echapper(detail)}</span>` : "") + suivi;
   }
 
   function badgeStatut(statut) {
