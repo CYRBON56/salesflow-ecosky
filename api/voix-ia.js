@@ -74,6 +74,9 @@ RÈGLES :
 - Ne donne JAMAIS de prix, de délai ferme ou d'engagement : « Cyrille vous fera une proposition précise ».
 - N'invente rien. Si on te demande quelque chose que tu ne sais pas, dis que Cyrille rappellera pour répondre.
 - Démarcheur, vendeur, sondage ou publicité : remercie poliment, dis que tu transmets, et termine l'appel.
+- Si l'objet de l'appel n'est pas clair (ex. « c'est au sujet de votre maison »), ne termine pas : demande
+  le nom, l'objet précis (qui appelle, de quelle société, pourquoi) et un numéro de rappel, puis seulement termine.
+  Mets ce que tu as compris dans "motif" (ex. « au sujet de la maison de Cyrille ») et "details".
 - Si la personne veut parler à Cyrille tout de suite ou que c'est une urgence : dis que tu le préviens
   immédiatement par SMS et qu'il rappelle dès que possible.
 - Quand tu as l'essentiel (au minimum le motif, un nom et un moyen de rappeler), récapitule en une phrase,
@@ -195,11 +198,24 @@ async function envoyerSms(to, body, type) {
 }
 
 function toE164(phone) {
-  const d = String(phone || "").replace(/\D/g, "");
+  const brut = String(phone || "").trim();
+  const d = brut.replace(/\D/g, "");
   if (!d) return null;
   if (d.startsWith("33")) return "+" + d;
   if (d.startsWith("0") && d.length === 10) return "+33" + d.slice(1);
+  // 24/11/2026 : numéro étranger (+1…, +32…) — on le garde tel quel au lieu de le perdre
+  if (brut.startsWith("+") && d.length >= 8) return "+" + d;
   return null;
+}
+
+// Numéro lisible pour le SMS à Cyrille (toujours présent, même étranger ou masqué)
+function numeroLisible(brut) {
+  const b = String(brut || "").trim();
+  if (!b || /anonymous|restricted|unknown|private/i.test(b)) return "numéro masqué";
+  const e = toE164(b);
+  if (!e) return b;
+  if (e.startsWith("+33") && e.length === 12) return "0" + e.slice(3).replace(/(\d)(?=(\d{2})+$)/g, "$1 ");
+  return e + " (étranger)";
 }
 
 function estMobile(e164) {
@@ -261,8 +277,8 @@ async function cloturer(appel) {
   // Appel personnel (famille, amis) : pas de fiche client, juste le message par SMS à Cyrille
   if (f.perso) {
     const txt = aParle
-      ? `Message perso de ${f.nom || "quelqu'un"}${appelant ? ` (${appelant})` : ""} : ${f.message || f.details || "rappelle-moi"}`
-      : `Appel perso manqué de ${f.nom || appelant || "inconnu"}`;
+      ? `Message perso de ${f.nom || "quelqu'un"} (${numeroLisible(appel.appelant)}) : ${f.message || f.details || "rappelle-moi"}`
+      : `Appel perso manqué de ${f.nom ? f.nom + " (" + numeroLisible(appel.appelant) + ")" : numeroLisible(appel.appelant)}`;
     await envoyerSms(TWILIO_TO_NUMBER, `Secrétaire : ${txt}`.slice(0, 600), "secretaire_ia_perso");
     appel.notifie = true;
     appel.termine = true;
@@ -277,7 +293,7 @@ async function cloturer(appel) {
       f.nom || f.entreprise ? `${f.nom || ""}${f.entreprise ? " (" + f.entreprise + ")" : ""}` : null,
       f.details || null,
       f.commune || null,
-      `Tél : ${f.telephone_rappel || appelant || "?"}`,
+      `Tél : ${f.telephone_rappel || numeroLisible(appel.appelant)}`,
       f.quand_rappeler ? `Rappel : ${f.quand_rappeler}` : null,
     ].filter(Boolean).join(" · ");
     await envoyerSms(TWILIO_TO_NUMBER, `Secrétaire : ${txt}`.slice(0, 600), "secretaire_ia_skyeco");
@@ -345,7 +361,9 @@ async function cloturer(appel) {
     ? [
         f.demarcheur ? "Démarcheur (rien à faire)" : f.urgent ? "URGENT – appel manqué" : "Appel manqué",
         f.nom && `de ${f.nom}`,
-        rappel && `Tél : ${rappel}`,
+        `Appelant : ${numeroLisible(appel.appelant)}`,
+        rappel && rappel !== appelant && `Rappeler au : ${numeroLisible(rappel)}`,
+        f.motif && `Objet : ${f.motif}`,
         f.type_projet && `Projet : ${f.type_projet}`,
         f.commune && `À : ${f.commune}`,
         f.details && `Détails : ${f.details}`,
@@ -353,7 +371,7 @@ async function cloturer(appel) {
       ]
         .filter(Boolean)
         .join(" – ")
-    : `Appel manqué sans message${appelant ? ` – ${appelant}` : ""}`;
+    : `Appel manqué sans message – ${numeroLisible(appel.appelant)}`;
   await envoyerSms(TWILIO_TO_NUMBER, `Secrétaire RMS : ${resume}`.slice(0, 600), "secretaire_ia_cyrille");
 
   // SMS de confirmation à l'appelant (portable uniquement, vraie demande)
@@ -469,6 +487,15 @@ export default async function handler(req, res) {
     appel.fiche = { ...(appel.fiche || {}), ...nouv };
     if (dejaPerso) appel.fiche.perso = true;
     if (dejaSkyeco) appel.fiche.skyeco = true;
+    // 24/11/2026 : ne pas raccrocher trop vite. Si l'IA veut terminer alors qu'on n'a
+    // ni nom ni objet clair (et que ce n'est ni un proche, ni un démarcheur, ni un au revoir),
+    // on pose UNE fois la question nom + objet + numéro de rappel.
+    const f2 = appel.fiche;
+    const ditAuRevoir = /au revoir|bonne (journ|soir)|c'est tout|rien d'autre|merci,? au revoir/i.test(parole);
+    if (ia.termine && !f2.perso && !f2.demarcheur && !f2.relance_faite && !ditAuRevoir && nbTours < MAX_TOURS && (!f2.nom || !(f2.motif || f2.details || f2.message))) {
+      f2.relance_faite = true;
+      ia = { ...ia, termine: false, reponse: "D'accord. Pour que Cyrille puisse vous rappeler, pouvez-vous me donner votre nom, l'objet de votre appel en quelques mots, et le numéro où vous joindre ?" };
+    }
     appel.historique.push({ role: "assistant", content: JSON.stringify(ia) });
     const fini = ia.termine || nbTours >= MAX_TOURS;
     await enregistrerAppel(appel);
