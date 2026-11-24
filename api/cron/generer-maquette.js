@@ -46,6 +46,7 @@ const BATCH_SIZE = Number(process.env.MAQUETTE_BATCH_SIZE || 100);
 export const config = { maxDuration: 300 };
 const CAMPAGNE = 'refonte_batiment';
 const BUCKET = 'maquettes-sites';
+const SITE_PUBLIC_URL = process.env.SITE_PUBLIC_URL || 'https://salesflow-ecosky.vercel.app';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -88,12 +89,14 @@ export default async function handler(req, res) {
           });
         if (errUploadApres) throw errUploadApres;
 
-        const { data: pubApres } = supabase.storage.from(BUCKET).getPublicUrl(cheminApres);
+        // Supabase Storage sert le HTML en texte brut : on passe par notre
+        // route /api/maquette/ qui le renvoie en vraie page web.
+        const urlApres = `/api/maquette/${candidat.siren}-apres.html`;
 
         // 2) La page de comparaison "avant / après" avec curseur, qui embarque
         //    une capture en direct du vrai site (service gratuit thum.io, pas
         //    de clé requise) et la nouvelle maquette dans un cadre
-        const htmlComparaison = genererHtmlComparaison(candidat, pubApres.publicUrl);
+        const htmlComparaison = genererHtmlComparaison(candidat, urlApres);
         const cheminComparaison = `${CAMPAGNE}/${candidat.siren}-comparaison.html`;
 
         const { error: errUploadComp } = await supabase.storage
@@ -104,14 +107,14 @@ export default async function handler(req, res) {
           });
         if (errUploadComp) throw errUploadComp;
 
-        const { data: pubComp } = supabase.storage.from(BUCKET).getPublicUrl(cheminComparaison);
+        const urlComparaison = `${SITE_PUBLIC_URL}/api/maquette/${candidat.siren}-comparaison.html`;
 
         // C'est la page de COMPARAISON (pas la maquette seule) qui est envoyée
         // dans l'email par envoyer-prospection-sites.js
         const { error: errUpdate } = await supabase
           .from('prospection_sites_obsoletes')
           .update({
-            maquette_url: pubComp.publicUrl,
+            maquette_url: urlComparaison,
             statut: 'maquette_prete',
             maj_le: new Date().toISOString(),
           })
@@ -320,7 +323,7 @@ function genererHtmlComparaison(candidat, urlMaquetteApres) {
 
   <div class="bas">
     <p>Cette maquette est une démonstration : aucune photo ni texte de votre site actuel n'a été réutilisé.</p>
-    <a class="cta" href="mailto:contact@ecosky.fr?subject=${encodeURIComponent('Intéressé par le nouveau site - ' + candidat.nom)}">Ça m'intéresse, on en parle</a>
+    <a class="cta" href="mailto:infos@ecosky.fr?subject=${encodeURIComponent('Intéressé par le nouveau site - ' + candidat.nom)}">Ça m'intéresse, on en parle</a>
     <div class="appli">
       Au passage, si vous gérez plusieurs chantiers en même temps, on a aussi un outil pensé pour les pros du bâtiment sur <strong>skyeco.fr</strong> — simple à prendre en main, pas de paperasse en plus.
     </div>

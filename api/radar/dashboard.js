@@ -119,7 +119,7 @@ function rendreHtml(totaux, lignes, statutFiltre, villeFiltre) {
       <td class="score score-${classeScore(l.score_obsolescence)}">${l.score_obsolescence ?? '—'}</td>
       <td><span class="badge badge-${l.statut}">${LIBELLES_STATUT[l.statut] || l.statut}</span></td>
       <td>${l.entreprise_active === true ? '✅' : l.entreprise_active === false ? '❌ fermée' : '❔ à vérifier'}</td>
-      <td>${l.maquette_url ? `<a href="${escapeAttr(l.maquette_url)}" target="_blank" rel="noopener">voir</a>` : '—'}</td>
+      <td>${l.maquette_url ? `<a href="${escapeAttr(lienMaquette(l.maquette_url))}" target="_blank" rel="noopener">voir</a>` : '—'}</td>
       <td>${escapeHtml((l.notes || '').slice(0, 140))}</td>
     </tr>`).join('');
 
@@ -204,3 +204,11 @@ function escapeHtml(s) {
   }[c]));
 }
 function escapeAttr(s) { return escapeHtml(s); }
+
+// Anciennes fiches : lien direct Supabase (affiché en texte) -> route /api/maquette/
+function lienMaquette(url) {
+  return String(url || '').replace(
+    /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/public\/maquettes-sites\/refonte_batiment\//,
+    '/api/maquette/'
+  );
+}

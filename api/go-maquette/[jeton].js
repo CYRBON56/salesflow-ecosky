@@ -55,10 +55,18 @@ export default async function handler(req, res) {
       return res.status(404).send('Maquette introuvable.');
     }
 
-    res.writeHead(302, { Location: fiche.maquette_url });
+    res.writeHead(302, { Location: lienMaquette(fiche.maquette_url) });
     return res.end();
   } catch (e) {
     console.error('Erreur go-maquette :', e);
     return res.status(500).send('Erreur serveur.');
   }
+}
+
+// Anciennes fiches : lien direct Supabase (affiché en texte) -> route /api/maquette/
+function lienMaquette(url) {
+  return String(url || '').replace(
+    /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/public\/maquettes-sites\/refonte_batiment\//,
+    '/api/maquette/'
+  );
 }
