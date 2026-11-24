@@ -43,6 +43,9 @@ export default async function handler(req, res) {
     '/api/maquette/'
   );
 
+  // Ancienne adresse de contact (inexistante) -> infos@ecosky.fr
+  html = html.replace(/mailto:contact@ecosky\.fr/g, 'mailto:infos@ecosky.fr');
+
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=300');
   return res.status(200).send(html);

@@ -323,7 +323,7 @@ function genererHtmlComparaison(candidat, urlMaquetteApres) {
 
   <div class="bas">
     <p>Cette maquette est une démonstration : aucune photo ni texte de votre site actuel n'a été réutilisé.</p>
-    <a class="cta" href="mailto:contact@ecosky.fr?subject=${encodeURIComponent('Intéressé par le nouveau site - ' + candidat.nom)}">Ça m'intéresse, on en parle</a>
+    <a class="cta" href="mailto:infos@ecosky.fr?subject=${encodeURIComponent('Intéressé par le nouveau site - ' + candidat.nom)}">Ça m'intéresse, on en parle</a>
     <div class="appli">
       Au passage, si vous gérez plusieurs chantiers en même temps, on a aussi un outil pensé pour les pros du bâtiment sur <strong>skyeco.fr</strong> — simple à prendre en main, pas de paperasse en plus.
     </div>
