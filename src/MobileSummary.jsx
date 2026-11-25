@@ -318,7 +318,7 @@ function DemandePhotos({ lead: l }) {
   );
   return (
     <button disabled={etat === "envoi"} onClick={() => setEtat("confirmer")} style={{ ...base, background: "#fff7ed", color: "#9a3412", border: "1px solid #fed7aa" }}>
-      {etat === "envoi" ? "Envoi en cours…" : etat === "erreur" ? "⚠️ Échec — réessayer l'envoi du SMS photos" : etat === "deja" ? "📷 Renvoyer le SMS « photos + adresse »" : "📷 SMS photos + adresse + catalogue"}
+      {etat === "envoi" ? "Envoi en cours…" : etat === "erreur" ? "⚠️ Échec — réessayer le SMS photos + adresse + catalogue" : etat === "deja" ? "📷 Renvoyer le SMS photos + adresse + catalogue" : "📷 SMS photos + adresse + catalogue"}
     </button>
   );
 }
