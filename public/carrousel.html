@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Carrousels TikTok — Skyeco</title>
+<meta name="theme-color" content="#0f2a4a">
+<style>
+  :root { --navy:#0f2a4a; --vert:#1e6f4c; --jaune:#ffc72c; --fond:#f1f5f2; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--fond); font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif; color:#0f172a; padding-bottom:40px; }
+  header { background:linear-gradient(135deg,var(--navy),var(--vert)); color:#fff; padding:calc(14px + env(safe-area-inset-top)) 16px 16px; }
+  header a { color:#cfe9dc; text-decoration:none; font-size:15px; }
+  header h1 { margin:8px 0 2px; font-size:22px; }
+  header p { margin:0; opacity:.85; font-size:14px; }
+  main { padding:14px; max-width:720px; margin:0 auto; }
+  .carte { background:#fff; border-radius:14px; padding:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); margin-bottom:12px; }
+  label { font-size:13px; color:#475569; font-weight:600; display:block; margin-bottom:6px; }
+  select { width:100%; font-size:16px; padding:10px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; }
+  button { font-size:16px; font-weight:700; border:0; border-radius:12px; padding:14px; width:100%; cursor:pointer; }
+  .principal { background:var(--vert); color:#fff; }
+  .secondaire { background:#fff; color:var(--navy); border:1px solid #cbd5e1; }
+  .jaune { background:var(--jaune); color:#0f172a; }
+  button:disabled { opacity:.6; }
+  .grille { display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; margin:10px 0; }
+  .grille canvas { width:100%; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,.15); cursor:pointer; }
+  .apercu canvas { width:100%; max-width:360px; display:block; margin:0 auto; border-radius:12px; }
+  .boutons { display:grid; gap:8px; }
+  textarea { width:100%; font-size:15px; padding:10px; border-radius:10px; border:1px solid #cbd5e1; min-height:110px; font-family:inherit; }
+  .petit { font-size:13px; color:#64748b; margin:6px 0 0; }
+  .erreur { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; border-radius:10px; padding:10px; font-size:14px; }
+  .angle { font-size:13px; color:#475569; margin:0 0 4px; }
+</style>
+</head>
+<body>
+<header>
+  <a href="/mobile">‹ Skyeco Admin</a>
+  <h1>🎬 Carrousels TikTok</h1>
+  <p>L'IA écrit 5 diapos à partir de la page de l'appli. Tu les enregistres et tu publies.</p>
+</header>
+<main>
+  <div class="carte">
+    <label for="appli">Appli à promouvoir</label>
+    <select id="appli">
+      <option value="mon-assistant-pro">🤖 Mon Assistant Pro</option>
+    </select>
+    <div style="height:10px"></div>
+    <button id="generer" class="principal">✨ Créer un carrousel</button>
+    <p class="petit">Environ 20 secondes. Chaque nouveau carrousel prend un autre angle.</p>
+  </div>
+
+  <div id="erreur" class="erreur" style="display:none"></div>
+
+  <div id="resultat" style="display:none">
+    <div class="carte">
+      <p class="angle" id="angle"></p>
+      <div class="apercu"><canvas id="grand" width="1080" height="1920"></canvas></div>
+      <div class="grille" id="grille"></div>
+      <p class="petit">Touche une diapo pour l'agrandir.</p>
+    </div>
+    <div class="carte boutons">
+      <button id="enregistrer" class="jaune">📲 Enregistrer les 5 images</button>
+      <button id="autre" class="secondaire">🔄 Autre version</button>
+    </div>
+    <div class="carte">
+      <label for="legende">Légende TikTok (à coller sous le carrousel)</label>
+      <textarea id="legende"></textarea>
+      <div style="height:8px"></div>
+      <button id="copier" class="secondaire">📋 Copier la légende</button>
+    </div>
+    <div class="carte">
+      <p style="margin:0 0 6px;font-weight:700">Publier sur TikTok</p>
+      <ol style="margin:0;padding-left:20px;font-size:14px;line-height:1.6;color:#334155">
+        <li>« Enregistrer les 5 images », puis « Enregistrer les images » (Photos).</li>
+        <li>Ouvre TikTok, touche « + », puis « Importer » et coche les 5 images dans l'ordre.</li>
+        <li>Choisis « Photo » (carrousel) et non « Vidéo ».</li>
+        <li>Colle la légende, ajoute un son tendance, et publie.</li>
+      </ol>
+    </div>
+  </div>
+</main>
+
+<script>
+const W = 1080, H = 1920;
+let actuel = null;
+const deja = (() => { try { return JSON.parse(localStorage.getItem("carrousel_deja") || "[]"); } catch (e) { return []; } })();
+
+function lignes(ctx, texte, largeur) {
+  const mots = String(texte || "").split(/\s+/).filter(Boolean);
+  const out = []; let l = "";
+  for (const m of mots) {
+    const essai = l ? l + " " + m : m;
+    if (ctx.measureText(essai).width > largeur && l) { out.push(l); l = m; } else l = essai;
+  }
+  if (l) out.push(l);
+  return out;
+}
+
+function ajuster(ctx, texte, largeur, taille, min, poids, maxLignes) {
+  let t = taille;
+  for (; t >= min; t -= 4) {
+    ctx.font = `${poids} ${t}px -apple-system, system-ui, "Segoe UI", Roboto, Arial, sans-serif`;
+    if (lignes(ctx, texte, largeur).length <= maxLignes) break;
+  }
+  return t;
+}
+
+function dessiner(canvas, s, i, total, d) {
+  const ctx = canvas.getContext("2d");
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, "#0f2a4a"); g.addColorStop(1, i === total - 1 ? "#1e6f4c" : "#173d5c");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // cercle décoratif
+  ctx.fillStyle = "rgba(255,255,255,0.05)";
+  ctx.beginPath(); ctx.arc(W - 120, 260, 380, 0, Math.PI * 2); ctx.fill();
+
+  const marge = 96, largeur = W - marge * 2;
+  // en-tête : compteur
+  ctx.font = "700 40px -apple-system, system-ui, Arial, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.textAlign = "left";
+  ctx.fillText(`${i + 1}/${total}`, marge, 220);
+
+  // titre
+  const premier = i === 0;
+  const tailleT = ajuster(ctx, s.titre, largeur, premier ? 124 : 96, 60, 800, premier ? 6 : 5);
+  ctx.font = `800 ${tailleT}px -apple-system, system-ui, "Segoe UI", Roboto, Arial, sans-serif`;
+  const lt = lignes(ctx, s.titre, largeur);
+  const hl = tailleT * 1.15;
+  // hauteur du bloc titre + texte, pour le centrer verticalement
+  let tailleX = 0, lx = [];
+  if (s.texte) {
+    tailleX = ajuster(ctx, s.texte, largeur, 60, 40, 500, 8);
+    ctx.font = `500 ${tailleX}px -apple-system, system-ui, "Segoe UI", Roboto, Arial, sans-serif`;
+    lx = lignes(ctx, s.texte, largeur);
+    ctx.font = `800 ${tailleT}px -apple-system, system-ui, "Segoe UI", Roboto, Arial, sans-serif`;
+  }
+  const bloc = lt.length * hl + (lx.length ? 50 + lx.length * tailleX * 1.35 : 0) + (i === total - 1 ? 230 : 0);
+  let y = Math.max(360, H * 0.46 - bloc / 2) + tailleT * 0.8;
+  for (const l of lt) {
+    if (premier) { // surlignage jaune façon marqueur
+      const w = ctx.measureText(l).width;
+      ctx.fillStyle = "#ffc72c";
+      ctx.fillRect(marge - 14, y - tailleT * 0.82, w + 28, tailleT * 1.02);
+      ctx.fillStyle = "#0f172a";
+    } else ctx.fillStyle = "#ffffff";
+    ctx.fillText(l, marge, y);
+    y += hl;
+  }
+
+  // texte
+  if (lx.length) {
+    y = (y - hl) + tailleT * 0.3 + 50 + tailleX;
+    ctx.font = `500 ${tailleX}px -apple-system, system-ui, "Segoe UI", Roboto, Arial, sans-serif`;
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    for (const l of lx) { ctx.fillText(l, marge, y); y += tailleX * 1.35; }
+  }
+
+  // dernière diapo : bouton d'appel à l'action
+  if (i === total - 1) {
+    const by = y + 40, bh = 150;
+    ctx.fillStyle = "#ffc72c";
+    ctx.beginPath(); ctx.roundRect(marge, by, largeur, bh, 34); ctx.fill();
+    ctx.fillStyle = "#0f172a"; ctx.textAlign = "center";
+    const tl = ajuster(ctx, d.lien, largeur - 60, 58, 36, 800, 1);
+    ctx.font = `800 ${tl}px -apple-system, system-ui, Arial, sans-serif`;
+    ctx.fillText(d.lien, W / 2, by + bh / 2 + tl * 0.35);
+    ctx.textAlign = "left";
+  } else if (i === 0) {
+    ctx.font = "700 44px -apple-system, system-ui, Arial, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.textAlign = "center"; ctx.fillText("Glissez →", W / 2, H - 330); ctx.textAlign = "left";
+  }
+
+  // pied
+  ctx.font = "700 38px -apple-system, system-ui, Arial, sans-serif";
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.fillText("Skyeco · " + d.appli, marge, H - 200);
+}
+
+function afficher(d) {
+  actuel = d;
+  document.getElementById("angle").textContent = "Angle : " + d.angle;
+  const grille = document.getElementById("grille");
+  grille.innerHTML = "";
+  d.slides.forEach((s, i) => {
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    dessiner(c, s, i, d.slides.length, d);
+    c.onclick = () => dessiner(document.getElementById("grand"), s, i, d.slides.length, d);
+    grille.appendChild(c);
+  });
+  dessiner(document.getElementById("grand"), d.slides[0], 0, d.slides.length, d);
+  document.getElementById("legende").value = d.legende + "\n\n" + (d.hashtags || []).map((h) => "#" + String(h).replace(/^#/, "").replace(/\s+/g, "")).join(" ");
+  document.getElementById("resultat").style.display = "block";
+}
+
+async function generer() {
+  const b1 = document.getElementById("generer"), b2 = document.getElementById("autre"), err = document.getElementById("erreur");
+  b1.disabled = b2.disabled = true; b1.textContent = "✍️ L'IA écrit le carrousel…"; err.style.display = "none";
+  try {
+    const r = await fetch("/api/carrousel", {
+      method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ appli: document.getElementById("appli").value, deja }),
+    });
+    const d = await r.json().catch(() => ({ error: "Session expirée : recharge la page." }));
+    if (!r.ok || d.error) throw new Error(d.error || "Erreur");
+    deja.push(d.slides[0].titre);
+    try { localStorage.setItem("carrousel_deja", JSON.stringify(deja.slice(-20))); } catch (e) {}
+    afficher(d);
+    document.getElementById("resultat").scrollIntoView({ behavior: "smooth" });
+  } catch (e) {
+    err.textContent = "⚠️ " + e.message; err.style.display = "block";
+  } finally {
+    b1.disabled = b2.disabled = false; b1.textContent = "✨ Créer un carrousel";
+  }
+}
+
+async function enregistrer() {
+  if (!actuel) return;
+  const canvases = [...document.querySelectorAll("#grille canvas")];
+  const fichiers = await Promise.all(canvases.map((c, i) => new Promise((ok) => c.toBlob((b) => ok(new File([b], `skyeco-${i + 1}.png`, { type: "image/png" })), "image/png"))));
+  if (navigator.canShare && navigator.canShare({ files: fichiers })) {
+    try { await navigator.share({ files: fichiers }); return; } catch (e) { if (e.name === "AbortError") return; }
+  }
+  for (const f of fichiers) {
+    const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    await new Promise((r) => setTimeout(r, 400));
+  }
+}
+
+document.getElementById("generer").onclick = generer;
+document.getElementById("autre").onclick = generer;
+document.getElementById("enregistrer").onclick = enregistrer;
+document.getElementById("copier").onclick = async () => {
+  const t = document.getElementById("legende");
+  try { await navigator.clipboard.writeText(t.value); } catch (e) { t.select(); document.execCommand("copy"); }
+  const b = document.getElementById("copier"); b.textContent = "✅ Copié"; setTimeout(() => (b.textContent = "📋 Copier la légende"), 1500);
+};
+</script>
+</body>
+</html>

@@ -648,6 +648,7 @@ const APPLIS = [
     ["💬", "Réponses réseaux", "Commentaires Facebook / Instagram", `https://www.skyeco.fr/reponses-reseaux.html?id=${RMS_DRAFT}`],
   ]],
   ["Skyeco — les applis que je vends", [
+    ["🎬", "Carrousels TikTok", "L'IA crée les pubs TikTok de mes applis", "/carrousel.html"],
     ["🏠", "skyeco.fr", "La page d'accueil de toutes les applis", "https://www.skyeco.fr/"],
     ["🤖", "Mon Assistant Pro", "Mon espace (mails, agenda, paiements, pub)", "https://www.skyeco.fr/mon-assistant-pro/inscription/"],
     ["🏗️", "Contact Chantier", "Suivi de chantier", "https://www.skyeco.fr/contact-chantier/"],

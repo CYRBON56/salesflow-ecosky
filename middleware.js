@@ -30,6 +30,7 @@ export const config = {
     "/api/valider-estimation-anc",
     "/api/dashboard-data",
     "/api/radar/dashboard",
+    "/api/carrousel",
   ],
 };
 // --- Connexion par page + cookie (ajouté le 19/11/2026) -------------------
