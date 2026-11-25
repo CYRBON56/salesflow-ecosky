@@ -286,6 +286,7 @@ function Carte({ lead: l, nbDevis, ouvrir, archiver }) {
           <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{nomComplet(l)}</div>
           <div style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>{ilYa(l.created_at)}</div>
         </div>
+        <div style={{ fontSize: 13, color: "#475569", marginTop: 1 }}>📅 Demande du {dateFr(l.created_at)}</div>
         <div style={{ fontSize: 14, color: "#334155", marginTop: 2 }}>{telAffiche(l.telephone) || <i style={{ color: "#94a3b8" }}>pas de téléphone</i>}</div>
         {details && <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{details}</div>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
@@ -518,6 +519,7 @@ function CarteAutre({ a, ouvrir, archiver }) {
           <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{a.nom}</div>
           <div style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>{ilYa(a.quand)}</div>
         </div>
+        {a.quand && <div style={{ fontSize: 13, color: "#475569", marginTop: 1 }}>📅 Demande du {dateFr(a.quand)}</div>}
         {a.sous_titre && <div style={{ fontSize: 13, color: "#475569" }}>{a.sous_titre}</div>}
         <div style={{ fontSize: 14, color: "#334155", marginTop: 2 }}>{telAffiche(a.telephone) || a.email || <i style={{ color: "#94a3b8" }}>pas de coordonnées</i>}</div>
         {a.objet && <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{a.objet}</div>}
