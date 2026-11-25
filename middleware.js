@@ -101,8 +101,10 @@ document.getElementById("oeil").addEventListener("click",function(){var p=docume
 
 export default async function middleware(request) {
   const url = new URL(request.url);
-  const expectedUser = process.env.DASHBOARD_USER || "cyrille";
-  const expectedPassword = process.env.DASHBOARD_PASSWORD;
+  // 25/11/2026 : on retire les espaces / retours à la ligne collés par erreur
+  // dans les réglages Vercel, et l'identifiant ne tient plus compte des majuscules.
+  const expectedUser = String(process.env.DASHBOARD_USER || "cyrille").trim().toLowerCase();
+  const expectedPassword = process.env.DASHBOARD_PASSWORD ? String(process.env.DASHBOARD_PASSWORD).trim() : "";
   if (!expectedPassword) {
     // Si le mot de passe n'est pas configuré, on laisse passer plutôt que de
     // bloquer tout le monde par erreur — mais il FAUT le configurer.
@@ -115,8 +117,8 @@ export default async function middleware(request) {
     let user = "", password = "", next = "/mobile";
     try {
       const form = await request.formData();
-      user = String(form.get("user") || "").trim();
-      password = String(form.get("password") || "");
+      user = String(form.get("user") || "").trim().toLowerCase();
+      password = String(form.get("password") || "").trim();
       next = safeNext(form.get("next"));
     } catch (e) {}
     if (user === expectedUser && password === expectedPassword) {
@@ -150,7 +152,7 @@ export default async function middleware(request) {
   if (authHeader && authHeader.startsWith("Basic ")) {
     try {
       const [user, ...rest] = atob(authHeader.slice(6)).split(":");
-      if (user === expectedUser && rest.join(":") === expectedPassword) return;
+      if (user.trim().toLowerCase() === expectedUser && rest.join(":").trim() === expectedPassword) return;
     } catch (e) {}
   }
 
