@@ -55,6 +55,14 @@ function toE164(phone) {
   return "+" + digits;
 }
 
+// Numéro au format 06 12 34 56 78, seul sur sa ligne, pour que l'iPhone
+// le détecte bien comme numéro cliquable.
+function telLisible(e164) {
+  const t = String(e164 || "");
+  if (/^\+33\d{9}$/.test(t)) return ("0" + t.slice(3)).replace(/(\d{2})(?=\d)/g, "$1 ");
+  return t;
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -71,7 +79,7 @@ export default async function handler(req, res) {
     const phoneE164 = toE164(telephone);
 
     if (lead_id) {
-      const patch = { statut: "contacté", notes: "Demande de rappel rapide via formulaire estimation" };
+      const patch = { statut: "nouveau", callback_demande: true, callback_demande_le: new Date().toISOString(), notes: "Demande de rappel rapide via formulaire estimation" };
       if (code_postal) patch.code_postal = code_postal;
       await supabaseRequest(`leads?id=eq.${lead_id}`, {
         method: "PATCH",
@@ -85,7 +93,7 @@ export default async function handler(req, res) {
       // que cette demande apparaisse bien dans SalesFlow System.
       const existing = await supabaseRequest(`leads?telephone=eq.${encodeURIComponent(phoneE164)}`);
       if (existing && existing.length > 0) {
-        const patch = { statut: "contacté", notes: "Demande de rappel rapide via formulaire estimation" };
+        const patch = { statut: "nouveau", callback_demande: true, callback_demande_le: new Date().toISOString(), notes: "Demande de rappel rapide via formulaire estimation" };
         if (code_postal) patch.code_postal = code_postal;
         await supabaseRequest(`leads?telephone=eq.${encodeURIComponent(phoneE164)}`, {
           method: "PATCH",
@@ -102,6 +110,8 @@ export default async function handler(req, res) {
             code_postal: code_postal || null,
             source: "Formulaire estimation détaillée",
             statut: "nouveau",
+            callback_demande: true,
+            callback_demande_le: new Date().toISOString(),
             notes: "Demande de rappel rapide via formulaire estimation (bas de page)",
           }),
           prefer: "return=minimal",
@@ -111,9 +121,10 @@ export default async function handler(req, res) {
 
     const fullName = `${prenom || ""} ${nom || ""}`.trim() || "Un client";
     const ownerMessage =
-      `📞 Demande de rappel rapide !\n${fullName} — ${telephone}\n` +
-      (estimation_texte ? `${estimation_texte}` : "") +
-      `\nÀ rappeler dès que possible.`;
+      `📞 Demande de rappel rapide !\n${fullName}\n\n` +
+      `${telLisible(phoneE164)}\n\n` +
+      (estimation_texte ? `${estimation_texte}\n` : "") +
+      `À rappeler dès que possible.\nFiche : https://salesflow-ecosky.vercel.app/mobile`;
     const sent = await sendSms(TWILIO_TO_NUMBER, ownerMessage);
     await logSms({
       sms_type: "demande_rappel",

@@ -1,217 +1,403 @@
-import React, { useState, useEffect } from "react";
-import { Phone, MousePointerClick, FileText, RefreshCw, Calendar } from "lucide-react";
+// Appli mobile SalesFlow (/mobile) — "Mes demandes"
+// Liste toutes les demandes de devis (Meta, Google, site, téléphone, manuel),
+// avec bouton Appeler direct, et une fiche détaillée : la demande du client,
+// l'estimation PDF, les devis, les photos. Données lues via
+// /api/dashboard-data?view=demandes (protégé par le mot de passe du dashboard),
+// modifications via /api/leads-admin.
+import React, { useState, useEffect, useMemo } from "react";
 
-const TEAL = "#0f5c56";
-const TEAL_DARK = "#0a3f3c";
-const SAND = "#f6f4ef";
+const VERT = "#2e7d32";
+const VERT_FONCE = "#1b5e20";
+const FOND = "#f4f7f4";
 
-function isToday(dateStr) {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return d.toDateString() === now.toDateString();
+// ---------- utilitaires ----------
+function telBrut(p) {
+  if (!p) return "";
+  let t = String(p).replace(/[^\d+]/g, "");
+  if (t.startsWith("0033")) t = "+33" + t.slice(4);
+  if (/^0\d{9}$/.test(t)) t = "+33" + t.slice(1);
+  if (/^33\d{9}$/.test(t)) t = "+" + t;
+  return t;
 }
-
-function timeAgo(dateStr) {
-  if (!dateStr) return "";
-  const diffMs = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "à l'instant";
-  if (mins < 60) return `il y a ${mins} min`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `il y a ${hours} h`;
-  const days = Math.floor(hours / 24);
-  return `il y a ${days} j`;
+function telAffiche(p) {
+  const t = telBrut(p);
+  if (/^\+33\d{9}$/.test(t)) return ("0" + t.slice(3)).replace(/(\d{2})(?=\d)/g, "$1 ");
+  return p || "";
 }
-
-function formatRdv(dateStr) {
-  if (!dateStr) return "";
+function telValide(p) {
+  const t = telBrut(p);
+  return t.length >= 10;
+}
+function ilYa(d) {
+  if (!d) return "";
+  const min = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
+  if (min < 1) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `il y a ${h} h`;
+  const j = Math.floor(h / 24);
+  return j === 1 ? "hier" : `il y a ${j} j`;
+}
+function dateFr(d, avecHeure = true) {
+  if (!d) return "";
   try {
     return new Intl.DateTimeFormat("fr-FR", {
-      weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+      weekday: "short", day: "numeric", month: "short",
+      ...(avecHeure ? { hour: "2-digit", minute: "2-digit" } : {}),
       timeZone: "Europe/Paris",
-    }).format(new Date(dateStr));
-  } catch (e) {
-    return dateStr;
-  }
+    }).format(new Date(d));
+  } catch (e) { return d; }
 }
-export default function MobileSummary() {
-  const [clicks, setClicks] = useState([]);
-  const [devisLeads, setDevisLeads] = useState([]);
-  const [callbacks, setCallbacks] = useState([]);
-  const [rdvLeads, setRdvLeads] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+function euros(n) {
+  if (n == null || n === "") return "";
+  return Number(n).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+}
+function nomComplet(l) {
+  const n = [l.prenom, l.nom].filter(Boolean).join(" ").trim();
+  return n || "Sans nom";
+}
+function estATraiter(l) {
+  return l.callback_demande || !l.statut || l.statut === "nouveau";
+}
+function couleurSource(l) {
+  const c = (l.canal || l.source || "").toLowerCase();
+  if (c.includes("meta") || c.includes("facebook")) return ["Meta", "#1877f2"];
+  if (c.includes("google")) return ["Google", "#ea4335"];
+  if (c.includes("site") || c.includes("formulaire estimation")) return ["Site", "#0d9488"];
+  if (c.includes("téléphone") || c.includes("telephone")) return ["Téléphone", "#7c3aed"];
+  if (c.includes("manuel")) return ["Manuel", "#64748b"];
+  return [l.canal || l.source || "Autre", "#64748b"];
+}
+function listePhotos(l) {
+  const out = [];
+  for (const champ of [l.photos_chantier_urls, l.photos_projet]) {
+    if (Array.isArray(champ)) champ.forEach((u) => typeof u === "string" ? out.push(u) : u?.url && out.push(u.url));
+  }
+  return out;
+}
 
-  const load = async () => {
-    setLoading(true);
-    setError("");
+const LIBELLES = {
+  usage: "Usage", surface: "Surface (m²)", support_pieton: "Support", etat_dalle: "État de la dalle",
+  enlevement_carrelage: "Enlèvement carrelage", etat_terrain_carrossable: "Terrain",
+  coloris: "Coloris", couleur_granulat: "Couleur granulat", bordure: "Bordure",
+  bordure_metres: "Bordure (ml)", age_batiment: "Âge du bâtiment", delai: "Délai",
+  ville: "Ville", code_postal: "Code postal",
+};
+function valeurLisible(v) {
+  if (v == null || v === "") return null;
+  if (Array.isArray(v)) return v.map(valeurLisible).filter(Boolean).join(", ");
+  if (typeof v === "object") return Object.values(v).map(valeurLisible).filter(Boolean).join(", ");
+  if (v === true) return "Oui";
+  if (v === false) return "Non";
+  return String(v).replace(/_/g, " ");
+}
+
+// ---------- appli ----------
+export default function MobileSummary() {
+  const [leads, setLeads] = useState([]);
+  const [devis, setDevis] = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [erreur, setErreur] = useState("");
+  const [onglet, setOnglet] = useState("traiter");
+  const [recherche, setRecherche] = useState("");
+  const [ouvertId, setOuvertId] = useState(null);
+
+  const charger = async () => {
+    setChargement(true);
     try {
-      const res = await fetch("/api/dashboard-data?view=mobile", { credentials: "same-origin" });
-      if (!res.ok) throw new Error(String(res.status));
-      const d = await res.json();
-      const clicksRes = { data: d.clicks }, devisRes = { data: d.devis }, callbacksRes = { data: d.callbacks }, rdvRes = { data: d.rdv };
-      setClicks(clicksRes.data || []);
-      setDevisLeads(devisRes.data || []);
-      setCallbacks(callbacksRes.data || []);
-      setRdvLeads(rdvRes.data || []);
+      const r = await fetch("/api/dashboard-data?view=demandes", { credentials: "same-origin", cache: "no-store" });
+      if (r.status === 401 || r.redirected) { window.location.href = "/connexion?next=/mobile"; return; }
+      if (!r.ok) throw new Error(String(r.status));
+      const d = await r.json();
+      setLeads(d.leads || []);
+      setDevis(d.devis || []);
+      setErreur("");
     } catch (e) {
-      setError("Impossible de charger les données.");
+      setErreur("Impossible de charger les demandes. Vérifie ta connexion puis appuie sur ↻.");
     }
-    setLoading(false);
+    setChargement(false);
   };
 
   useEffect(() => {
-    load();
-    const timer = setInterval(load, 30000);
-    return () => clearInterval(timer);
+    charger();
+    const t = setInterval(charger, 60000);
+    return () => clearInterval(t);
   }, []);
 
-  const clicksToday = clicks.filter((c) => isToday(c.created_at)).length;
-  const devisToday = devisLeads.filter((l) => isToday(l.created_at)).length;
+  const devisParLead = useMemo(() => {
+    const m = {};
+    devis.forEach((d) => { if (d.lead_id) (m[d.lead_id] = m[d.lead_id] || []).push(d); });
+    return m;
+  }, [devis]);
+
+  const filtres = useMemo(() => {
+    const q = recherche.trim().toLowerCase();
+    return leads.filter((l) => {
+      if (onglet === "traiter" && !estATraiter(l)) return false;
+      if (!q) return true;
+      return [l.nom, l.prenom, l.telephone, l.email, l.adresse_projet, l.adresse, l.code_postal, l.type_projet]
+        .filter(Boolean).join(" ").toLowerCase().includes(q) || telBrut(l.telephone).includes(q.replace(/\s/g, ""));
+    });
+  }, [leads, onglet, recherche]);
+
+  const nbATraiter = leads.filter(estATraiter).length;
+  const ouvert = leads.find((l) => l.id === ouvertId);
+
+  const modifier = async (id, patch) => {
+    setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+    try {
+      const r = await fetch("/api/leads-admin", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update_lead", id, patch }),
+      });
+      if (!r.ok) throw new Error();
+    } catch (e) {
+      alert("La modification n'a pas été enregistrée. Réessaie.");
+      charger();
+    }
+  };
+
+  if (ouvert) {
+    return <Fiche lead={ouvert} devis={devisParLead[ouvert.id] || []} retour={() => setOuvertId(null)} modifier={modifier} />;
+  }
 
   return (
-    <div style={{ minHeight: "100vh", background: SAND, fontFamily: "Inter, sans-serif", paddingBottom: 40 }}>
-      <div style={{ background: TEAL, color: "white", padding: "20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 5 }}>
-        <div style={{ fontWeight: 700, fontSize: 17 }}>SalesFlow — Résumé</div>
-        <button onClick={load} style={{ background: "transparent", border: "none", color: "white", padding: 6 }}>
-          <RefreshCw size={18} style={{ animation: loading ? "spin 1s linear infinite" : "none" }} />
-        </button>
+    <div style={{ minHeight: "100vh", background: FOND, fontFamily: "-apple-system, system-ui, Segoe UI, Roboto, sans-serif", paddingBottom: 40 }}>
+      <div style={{ background: VERT, color: "#fff", padding: "max(14px, env(safe-area-inset-top)) 16px 12px", position: "sticky", top: 0, zIndex: 5 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ fontWeight: 700, fontSize: 19 }}>Mes demandes</div>
+          <button onClick={charger} aria-label="Actualiser" style={{ background: "rgba(255,255,255,.15)", border: 0, color: "#fff", fontSize: 20, width: 40, height: 40, borderRadius: 20 }}>
+            <span style={{ display: "inline-block", animation: chargement ? "tourne 1s linear infinite" : "none" }}>↻</span>
+          </button>
+        </div>
+        <input
+          value={recherche} onChange={(e) => setRecherche(e.target.value)}
+          placeholder="Rechercher un nom, un numéro, une ville…"
+          style={{ width: "100%", boxSizing: "border-box", marginTop: 10, padding: "10px 12px", fontSize: 16, border: 0, borderRadius: 10 }}
+        />
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <Onglet actif={onglet === "traiter"} onClick={() => setOnglet("traiter")}>À traiter ({nbATraiter})</Onglet>
+          <Onglet actif={onglet === "toutes"} onClick={() => setOnglet("toutes")}>Toutes ({leads.length})</Onglet>
+        </div>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes tourne { to { transform: rotate(360deg); } }`}</style>
 
-      {error && <div style={{ margin: 16, padding: 12, background: "#fef2f2", color: "#991b1b", borderRadius: 8, fontSize: 14 }}>{error}</div>}
+      {erreur && <div style={{ margin: 16, padding: 12, background: "#fef2f2", color: "#991b1b", borderRadius: 10, fontSize: 14 }}>{erreur}</div>}
 
-      {/* Compteurs du jour */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "16px 16px 4px" }}>
-        <StatCard icon={<MousePointerClick size={18} />} label="Clics aujourd'hui" value={clicksToday} color={TEAL} />
-        <StatCard icon={<FileText size={18} />} label="Devis aujourd'hui" value={devisToday} color="#0d9488" />
-        <StatCard icon={<Phone size={18} />} label="À rappeler" value={callbacks.length} color="#dc2626" urgent={callbacks.length > 0} />
-        <StatCard icon={<Calendar size={18} />} label="RDV à venir" value={rdvLeads.length} color="#7c3aed" />
+      <div style={{ padding: "12px 12px 0" }}>
+        {!chargement && filtres.length === 0 && !erreur && (
+          <div style={{ textAlign: "center", color: "#64748b", padding: 30, fontSize: 15 }}>
+            {onglet === "traiter" ? "Rien à traiter 👍" : "Aucune demande trouvée"}
+          </div>
+        )}
+        {filtres.map((l) => (
+          <Carte key={l.id} lead={l} nbDevis={(devisParLead[l.id] || []).length} ouvrir={() => { setOuvertId(l.id); window.scrollTo(0, 0); }} />
+        ))}
+      </div>
+      <div style={{ textAlign: "center", marginTop: 20 }}>
+        <a href="/deconnexion" style={{ color: "#94a3b8", fontSize: 13 }}>Se déconnecter</a>
+      </div>
+    </div>
+  );
+}
+
+function Onglet({ actif, onClick, children }) {
+  return (
+    <button onClick={onClick} style={{
+      flex: 1, padding: "8px 0", fontSize: 14, fontWeight: 600, borderRadius: 8, border: 0,
+      background: actif ? "#fff" : "rgba(255,255,255,.15)", color: actif ? VERT_FONCE : "#fff",
+    }}>{children}</button>
+  );
+}
+
+function Carte({ lead: l, nbDevis, ouvrir }) {
+  const [src, coul] = couleurSource(l);
+  const details = [l.type_projet, l.surface_m2 ? `${l.surface_m2} m²` : null, l.code_postal].filter(Boolean).join(" · ");
+  return (
+    <div style={{ background: "#fff", borderRadius: 14, marginBottom: 10, boxShadow: "0 1px 4px rgba(0,0,0,.06)", borderLeft: `4px solid ${l.callback_demande ? "#dc2626" : estATraiter(l) ? VERT : "#cbd5e1"}`, overflow: "hidden" }}>
+      <div onClick={ouvrir} style={{ padding: "12px 14px", cursor: "pointer" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{nomComplet(l)}</div>
+          <div style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>{ilYa(l.created_at)}</div>
+        </div>
+        <div style={{ fontSize: 14, color: "#334155", marginTop: 2 }}>{telAffiche(l.telephone) || <i style={{ color: "#94a3b8" }}>pas de téléphone</i>}</div>
+        {details && <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{details}</div>}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+          <Badge c={coul}>{src}</Badge>
+          {l.callback_demande && <Badge c="#dc2626">📞 Veut être rappelé</Badge>}
+          {l.rdv_date && <Badge c="#7c3aed">📅 {dateFr(l.rdv_date)}</Badge>}
+          {l.estimation_pdf_url && <Badge c="#0d9488">Estimation</Badge>}
+          {nbDevis > 0 && <Badge c="#b45309">{nbDevis} devis</Badge>}
+          {l.statut && l.statut !== "nouveau" && <Badge c="#64748b">{l.statut}</Badge>}
+        </div>
+      </div>
+      <div style={{ display: "flex", borderTop: "1px solid #f1f5f9" }}>
+        {telValide(l.telephone) ? (
+          <a href={`tel:${telBrut(l.telephone)}`} style={{ ...btnBas, color: "#fff", background: VERT }}>📞 Appeler</a>
+        ) : (
+          <span style={{ ...btnBas, color: "#94a3b8" }}>📞 —</span>
+        )}
+        <button onClick={ouvrir} style={{ ...btnBas, background: "#fff", color: VERT_FONCE, border: 0 }}>Voir la demande ›</button>
+      </div>
+    </div>
+  );
+}
+
+function Badge({ c, children }) {
+  return <span style={{ fontSize: 12, fontWeight: 600, color: c, background: c + "18", padding: "3px 8px", borderRadius: 20 }}>{children}</span>;
+}
+
+function Fiche({ lead: l, devis, retour, modifier }) {
+  const tel = telBrut(l.telephone);
+  const adresse = [l.adresse_projet || l.adresse, l.code_postal].filter(Boolean).join(" ");
+  const reponses = l.reponses_estimation && typeof l.reponses_estimation === "object" ? l.reponses_estimation : null;
+  const photos = listePhotos(l);
+  const [src, coul] = couleurSource(l);
+
+  useEffect(() => {
+    const onBack = () => retour();
+    window.history.pushState({ fiche: true }, "");
+    window.addEventListener("popstate", onBack);
+    return () => window.removeEventListener("popstate", onBack);
+  }, []);
+
+  const lignesDemande = [
+    ["Projet", l.type_projet],
+    ["Surface", l.surface_m2 ? `${l.surface_m2} m²` : null],
+    ["Support existant", l.support_existant],
+    ["Couleur", l.couleur_souhaitee],
+    ["Délai", l.delai_souhaite],
+    ["Formulaire", l.meta_form_name],
+    ["Campagne", l.utm_campaign],
+  ].filter(([, v]) => v);
+
+  return (
+    <div style={{ minHeight: "100vh", background: FOND, fontFamily: "-apple-system, system-ui, Segoe UI, Roboto, sans-serif", paddingBottom: 40 }}>
+      <div style={{ background: VERT, color: "#fff", padding: "max(12px, env(safe-area-inset-top)) 12px 14px", position: "sticky", top: 0, zIndex: 5 }}>
+        <button onClick={() => window.history.back()} style={{ background: "none", border: 0, color: "#fff", fontSize: 16, padding: "4px 0" }}>‹ Retour</button>
+        <div style={{ fontWeight: 700, fontSize: 21, marginTop: 4 }}>{nomComplet(l)}</div>
+        <div style={{ fontSize: 13, opacity: .85 }}>Demande reçue {dateFr(l.created_at)} · {src}</div>
       </div>
 
-      {/* RDV Calendly à venir */}
-      <Section title="📅 Rendez-vous à venir" empty={rdvLeads.length === 0} emptyLabel="Aucun rendez-vous à venir">
-        {rdvLeads.map((lead) => (
-          <div key={lead.id} style={{ ...cardStyle, borderLeft: "4px solid #7c3aed" }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, color: TEAL_DARK, fontSize: 15 }}>{lead.nom}</div>
-              <div style={{ fontSize: 13, color: "#7c3aed", fontWeight: 600 }}>{formatRdv(lead.rdv_date)}</div>
-              <div style={{ fontSize: 12, color: "#64748b" }}>{lead.telephone}</div>
-            </div>
-            <a href={`tel:${lead.telephone}`} style={callBtnGhost}>
-              <Phone size={16} />
-            </a>
+      <div style={{ padding: 12 }}>
+        {/* Actions de contact */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {tel.length >= 10 && <a href={`tel:${tel}`} style={{ ...btnAction, background: VERT, color: "#fff", gridColumn: "1 / -1", fontSize: 18 }}>📞 Appeler {telAffiche(l.telephone)}</a>}
+          {tel.length >= 10 && <a href={`sms:${tel}`} style={btnAction}>💬 SMS</a>}
+          {l.email && <a href={`mailto:${l.email}`} style={btnAction}>✉️ Email</a>}
+          {adresse && <a href={`https://maps.apple.com/?q=${encodeURIComponent(adresse)}`} style={btnAction}>📍 Itinéraire</a>}
+        </div>
+        {l.callback_demande && (
+          <div style={{ marginTop: 10, padding: 10, background: "#fef2f2", color: "#991b1b", borderRadius: 10, fontSize: 14 }}>
+            📞 A demandé à être rappelé {ilYa(l.callback_demande_le)}
           </div>
-        ))}
-      </Section>
+        )}
+        {l.rdv_date && (
+          <div style={{ marginTop: 10, padding: 10, background: "#f5f3ff", color: "#5b21b6", borderRadius: 10, fontSize: 14 }}>
+            📅 Rendez-vous : {dateFr(l.rdv_date)}
+          </div>
+        )}
 
-      {/* Demandes de rappel en attente */}
-      <Section title="📞 Demandes de rappel en attente" empty={callbacks.length === 0} emptyLabel="Aucune demande en attente">
-        {callbacks.map((lead) => (
-          <div key={lead.id} style={{ ...cardStyle, borderLeft: "4px solid #dc2626" }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, color: TEAL_DARK, fontSize: 15 }}>{lead.nom}</div>
-              <div style={{ fontSize: 13, color: "#64748b" }}>{lead.telephone} • {timeAgo(lead.callback_demande_le)}</div>
-            </div>
-            <a href={`tel:${lead.telephone}`} style={callBtn}>
-              <Phone size={16} /> Appeler
-            </a>
-          </div>
-        ))}
-      </Section>
+        <Bloc titre="Coordonnées">
+          <Ligne k="Téléphone" v={telAffiche(l.telephone)} />
+          <Ligne k="Email" v={l.email} />
+          <Ligne k="Adresse chantier" v={adresse} />
+        </Bloc>
 
-      {/* Demandes de devis récentes */}
-      <Section title="📄 Demandes de devis récentes" empty={devisLeads.length === 0} emptyLabel="Aucune demande de devis pour l'instant">
-        {devisLeads.slice(0, 15).map((lead) => (
-          <div key={lead.id} style={cardStyle}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, color: TEAL_DARK, fontSize: 15 }}>{lead.nom}</div>
-              <div style={{ fontSize: 13, color: "#64748b" }}>
-                {lead.estimation_numero ? `Devis n°${lead.estimation_numero} • ` : ""}{timeAgo(lead.created_at)}
-              </div>
-            </div>
-            <a href={`tel:${lead.telephone}`} style={callBtnGhost}>
-              <Phone size={16} />
-            </a>
-          </div>
-        ))}
-      </Section>
+        <Bloc titre="Sa demande">
+          {lignesDemande.map(([k, v]) => <Ligne key={k} k={k} v={v} />)}
+          {reponses && Object.entries(reponses).map(([k, v]) => {
+            const val = valeurLisible(v);
+            if (!val || ["code_postal", "surface"].includes(k)) return null;
+            return <Ligne key={k} k={LIBELLES[k] || k.replace(/_/g, " ")} v={val} />;
+          })}
+          {l.estimation_texte && (
+            <div style={{ marginTop: 8, padding: 10, background: "#f8fafc", borderRadius: 8, fontSize: 14, whiteSpace: "pre-wrap", color: "#334155" }}>{l.estimation_texte}</div>
+          )}
+          {l.notes && (
+            <div style={{ marginTop: 8, padding: 10, background: "#fffbeb", borderRadius: 8, fontSize: 14, whiteSpace: "pre-wrap", color: "#78350f" }}>📝 {l.notes}</div>
+          )}
+          {!lignesDemande.length && !reponses && !l.estimation_texte && !l.notes && (
+            <div style={{ color: "#94a3b8", fontSize: 14 }}>Pas de détail : le client n'a pas encore rempli le formulaire d'estimation.</div>
+          )}
+        </Bloc>
 
-      {/* Clics récents */}
-      <Section title="🖱️ Clics récents" empty={clicks.length === 0} emptyLabel="Aucun clic pour l'instant">
-        {clicks.slice(0, 15).map((c) => (
-          <div key={c.id} style={cardStyle}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, color: TEAL_DARK, fontSize: 14 }}>
-                {c.utm_source === "direct" ? "Visite directe" : c.utm_source || "Source inconnue"}
-              </div>
-              <div style={{ fontSize: 13, color: "#64748b" }}>{timeAgo(c.created_at)}</div>
+        <Bloc titre="Estimation et devis">
+          {l.estimation_pdf_url && (
+            <a href={l.estimation_pdf_url} target="_blank" rel="noreferrer" style={lienDoc}>
+              📄 Estimation {l.estimation_numero || ""} <span style={{ color: "#94a3b8" }}>›</span>
+            </a>
+          )}
+          {devis.map((d) => (
+            <div key={d.id}>
+              <a href={d.pdf_signe_url || d.pdf_url} target="_blank" rel="noreferrer" style={lienDoc}>
+                <span>
+                  📑 {d.type_document === "facture" ? "Facture" : "Devis"} {d.numero || ""}
+                  {d.montant_ttc != null && <b> · {euros(d.montant_ttc)}</b>}
+                  <div style={{ fontSize: 12, color: d.date_signature ? VERT : "#64748b", fontWeight: 500 }}>
+                    {d.date_signature ? `✅ Signé ${dateFr(d.date_signature, false)}` :
+                      d.envoye_email_at || d.envoye_sms_at ? `Envoyé ${dateFr(d.envoye_email_at || d.envoye_sms_at, false)}` :
+                      `Créé ${dateFr(d.created_at, false)} · pas encore envoyé`}
+                  </div>
+                </span>
+                <span style={{ color: "#94a3b8" }}>›</span>
+              </a>
             </div>
+          ))}
+          {!l.estimation_pdf_url && devis.length === 0 && <div style={{ color: "#94a3b8", fontSize: 14 }}>Aucun document pour l'instant.</div>}
+          <a href={`/sms-recus.html#lead-${l.id}`} style={{ display: "block", marginTop: 10, fontSize: 14, color: VERT_FONCE }}>+ Faire / envoyer un devis (tableau de bord)</a>
+        </Bloc>
+
+        {photos.length > 0 && (
+          <Bloc titre={`Photos (${photos.length})`}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+              {photos.map((u) => (
+                <a key={u} href={u} target="_blank" rel="noreferrer">
+                  <img src={u} alt="" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8 }} />
+                </a>
+              ))}
+            </div>
+          </Bloc>
+        )}
+
+        <Bloc titre="Suivi">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {["nouveau", "contacté", "devis envoyé", "gagné", "perdu"].map((s) => (
+              <button key={s} onClick={() => modifier(l.id, { statut: s, ...(s !== "nouveau" ? { callback_demande: false } : {}) })}
+                style={{ padding: "8px 12px", fontSize: 14, borderRadius: 20, border: `1px solid ${l.statut === s ? VERT : "#cbd5e1"}`, background: l.statut === s ? VERT : "#fff", color: l.statut === s ? "#fff" : "#334155", fontWeight: 600 }}>
+                {s}
+              </button>
+            ))}
           </div>
-        ))}
-      </Section>
+          <button onClick={() => { if (confirm("Archiver cette demande ? Elle disparaîtra de la liste.")) { modifier(l.id, { archive: true }); window.history.back(); } }}
+            style={{ marginTop: 14, width: "100%", padding: 12, fontSize: 15, borderRadius: 10, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b" }}>
+            Archiver la demande
+          </button>
+        </Bloc>
+      </div>
     </div>
   );
 }
 
-function StatCard({ icon, label, value, color, urgent }) {
+function Bloc({ titre, children }) {
   return (
-    <div style={{
-      flex: 1, background: "white", borderRadius: 12, padding: "14px 10px", textAlign: "center",
-      border: urgent ? `2px solid ${color}` : "1px solid #e7e3d8",
-    }}>
-      <div style={{ color, marginBottom: 4, display: "flex", justifyContent: "center" }}>{icon}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: TEAL_DARK }}>{value}</div>
-      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{label}</div>
+    <div style={{ background: "#fff", borderRadius: 14, padding: 14, marginTop: 12, boxShadow: "0 1px 4px rgba(0,0,0,.06)" }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: .4, marginBottom: 8 }}>{titre}</div>
+      {children}
     </div>
   );
 }
-
-function Section({ title, empty, emptyLabel, children }) {
+function Ligne({ k, v }) {
+  if (!v) return null;
   return (
-    <div style={{ padding: "18px 16px 0" }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: TEAL_DARK, marginBottom: 8 }}>{title}</div>
-      {empty ? (
-        <div style={{ fontSize: 13, color: "#94a3b8", padding: "10px 4px" }}>{emptyLabel}</div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{children}</div>
-      )}
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "6px 0", borderBottom: "1px solid #f1f5f9", fontSize: 15 }}>
+      <span style={{ color: "#64748b" }}>{k}</span>
+      <span style={{ color: "#0f172a", textAlign: "right", fontWeight: 500, wordBreak: "break-word" }}>{v}</span>
     </div>
   );
 }
 
-const cardStyle = {
-  background: "white",
-  borderRadius: 10,
-  border: "1px solid #e7e3d8",
-  padding: "12px 14px",
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-};
-
-const callBtn = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  background: "#dc2626",
-  color: "white",
-  textDecoration: "none",
-  padding: "8px 12px",
-  borderRadius: 8,
-  fontSize: 13,
-  fontWeight: 600,
-  whiteSpace: "nowrap",
-};
-
-const callBtnGhost = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  color: TEAL,
-  textDecoration: "none",
-  padding: 8,
-  borderRadius: 8,
-  border: `1px solid ${TEAL}`,
-};
+const btnBas = { flex: 1, textAlign: "center", padding: "12px 0", fontSize: 15, fontWeight: 700, textDecoration: "none", cursor: "pointer" };
+const btnAction = { display: "block", textAlign: "center", padding: "14px 8px", borderRadius: 12, background: "#fff", color: VERT_FONCE, fontWeight: 700, fontSize: 15, textDecoration: "none", boxShadow: "0 1px 4px rgba(0,0,0,.08)" };
+const lienDoc = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #f1f5f9", color: "#0f172a", textDecoration: "none", fontSize: 15, fontWeight: 600 };

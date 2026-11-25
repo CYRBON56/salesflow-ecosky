@@ -52,6 +52,16 @@ export default async function handler(req, res) {
       return res.status(200).json({ clicks, devis, callbacks, rdv });
     }
 
+    // Appli mobile "Demandes" : toutes les demandes de devis non archivées
+    // + les devis rattachés (le téléphone fait la jointure).
+    if (view === "demandes") {
+      const [leads, devis] = await Promise.all([
+        sb("leads?select=*&archive=not.is.true&order=created_at.desc&limit=300"),
+        safe(sb("devis?select=id,lead_id,numero,pdf_url,pdf_signe_url,montant_ttc,statut,type_document,created_at,envoye_email_at,envoye_sms_at,date_signature&archive=not.is.true&order=created_at.desc&limit=500")),
+      ]);
+      return res.status(200).json({ leads, devis });
+    }
+
     if (view === "whatsapp") {
       const phone = encodeURIComponent(String(req.query.phone || ""));
       if (!phone) return res.status(400).json({ error: "phone requis" });
