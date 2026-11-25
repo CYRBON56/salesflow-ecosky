@@ -1,4 +1,4 @@
-// api/carrousel.js (25/11/2026) — « mini Swiply » de Skyeco Admin.
+// api/carrousel.js (25/11/2026) — Skyeco Posts, dans Skyeco Admin.
 // Lit la page d'une appli Skyeco et fait écrire par l'IA un carrousel TikTok
 // de 5 diapos (accroche, problème, solution, preuve, appel à l'action),
 // avec la légende et les hashtags. Les images sont dessinées dans la page
