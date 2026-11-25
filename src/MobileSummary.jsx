@@ -306,10 +306,10 @@ function DemandePhotos({ lead: l }) {
     } catch (e) { setEtat("erreur"); }
   };
   const base = { ...btnAction, width: "100%", marginTop: 8, boxSizing: "border-box" };
-  if (etat === "ok") return <div style={{ ...base, background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" }}>✅ SMS envoyé : le client va recevoir le lien pour ses photos et son adresse</div>;
+  if (etat === "ok") return <div style={{ ...base, background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" }}>✅ SMS envoyé : lien photos + adresse et catalogues</div>;
   if (etat === "confirmer") return (
     <div style={{ marginTop: 8, padding: 10, background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 12, fontSize: 14 }}>
-      Envoyer à {nomComplet(l)} ({telAffiche(l.telephone)}) un SMS avec le lien pour envoyer ses photos et son adresse exacte ?
+      Envoyer à {nomComplet(l)} ({telAffiche(l.telephone)}) un SMS avec le lien pour envoyer ses photos et son adresse exacte, et nos catalogues ?
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
         <button onClick={envoyer} style={{ ...btnAction, background: VERT, color: "#fff" }}>Oui, envoyer</button>
         <button onClick={() => setEtat(l.demande_photos_envoyee ? "deja" : "repos")} style={btnAction}>Annuler</button>
@@ -318,7 +318,7 @@ function DemandePhotos({ lead: l }) {
   );
   return (
     <button disabled={etat === "envoi"} onClick={() => setEtat("confirmer")} style={{ ...base, background: "#fff7ed", color: "#9a3412", border: "1px solid #fed7aa" }}>
-      {etat === "envoi" ? "Envoi en cours…" : etat === "erreur" ? "⚠️ Échec — réessayer l'envoi du SMS photos" : etat === "deja" ? "📷 Renvoyer le SMS « photos + adresse »" : "📷 Demander photos + adresse par SMS"}
+      {etat === "envoi" ? "Envoi en cours…" : etat === "erreur" ? "⚠️ Échec — réessayer l'envoi du SMS photos" : etat === "deja" ? "📷 Renvoyer le SMS « photos + adresse »" : "📷 SMS photos + adresse + catalogue"}
     </button>
   );
 }

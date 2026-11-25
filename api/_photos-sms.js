@@ -30,9 +30,19 @@ export function messageDemandePhotos(lead) {
   const quoi =
     cat === "portail" ? "vos poteaux/piliers" : cat === "resine" ? "votre terrasse" : "la zone du chantier";
 
+  // 25/11/2026 : on joint nos catalogues selon le projet
+  const cats =
+    cat === "portail"
+      ? `\nNotre catalogue portails : ${BASE_URL}/catalogues/portails.pdf`
+      : cat === "resine"
+      ? `\nNos catalogues : résine de gomme ${BASE_URL}/catalogues/resine-gomme.pdf - résine de marbre ${BASE_URL}/catalogues/resine-marbre.pdf`
+      : "";
+
   return (
     `${bonjour}, suite à votre demande : transformez votre estimation en devis précis ! ` +
-    `Envoyez-nous quelques photos de ${quoi} + l'adresse exacte (2 min) : ${lien} - EcoSky by RMS`
+    `Envoyez-nous quelques photos de ${quoi} + l'adresse exacte (2 min) : ${lien}` +
+    cats +
+    `\nEcoSky by RMS - 06 45 68 83 94`
   );
 }
 

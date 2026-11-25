@@ -49,5 +49,17 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/catalogues/resine-gomme.pdf",
+      "destination": "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/media/catalogue-ecosky-web.pdf",
+      "permanent": false
+    },
+    {
+      "source": "/catalogues/portails.pdf",
+      "destination": "https://wklddwumirkdjkbxvzyj.supabase.co/storage/v1/object/public/puv%20skyeco/catalogue-portails.pdf",
+      "permanent": false
+    }
   ]
 }
