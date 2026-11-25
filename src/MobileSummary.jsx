@@ -211,19 +211,20 @@ export default function MobileSummary() {
           style={{ width: "100%", boxSizing: "border-box", marginTop: 10, padding: "10px 12px", fontSize: 16, border: 0, borderRadius: 10 }}
         />
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-          <Onglet actif={famille === "rms"} onClick={() => choisirFamille("rms")}>🏠 Clients RMS ({compte("rms")})</Onglet>
-          <Onglet actif={famille === "skyeco"} onClick={() => choisirFamille("skyeco")}>🚀 Prospects Skyeco ({compte("skyeco")})</Onglet>
+          <Onglet actif={famille === "rms"} onClick={() => choisirFamille("rms")}>🏠 RMS ({compte("rms")})</Onglet>
+          <Onglet actif={famille === "skyeco"} onClick={() => choisirFamille("skyeco")}>🚀 Skyeco ({compte("skyeco")})</Onglet>
+          <Onglet actif={famille === "applis"} onClick={() => choisirFamille("applis")}>🧰 Applis</Onglet>
         </div>
-        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        {famille !== "applis" && <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <Onglet actif={onglet === "traiter"} onClick={() => setOnglet("traiter")}>À traiter ({nbATraiter})</Onglet>
           <Onglet actif={onglet === "toutes"} onClick={() => setOnglet("toutes")}>Toutes ({elements.length})</Onglet>
-        </div>
+        </div>}
       </div>
       <style>{`@keyframes tourne { to { transform: rotate(360deg); } }`}</style>
 
       {erreur && <div style={{ margin: 16, padding: 12, background: "#fef2f2", color: "#991b1b", borderRadius: 10, fontSize: 14 }}>{erreur}</div>}
 
-      <div style={{ padding: "12px 12px 0" }}>
+      {famille === "applis" ? <MesApplis /> : <div style={{ padding: "12px 12px 0" }}>
         {!chargement && filtres.length === 0 && !erreur && (
           <div style={{ textAlign: "center", color: "#64748b", padding: 30, fontSize: 15 }}>
             {onglet === "traiter" ? "Rien à traiter 👍" : "Aucune demande trouvée"}
@@ -234,7 +235,7 @@ export default function MobileSummary() {
         ) : (
           <CarteAutre key={e.id} a={e.a} ouvrir={() => { setOuvertId(e.id); window.scrollTo(0, 0); }} />
         ))}
-      </div>
+      </div>}
       <div style={{ textAlign: "center", marginTop: 20 }}>
         <a href="/deconnexion" style={{ color: "#94a3b8", fontSize: 13 }}>Se déconnecter</a>
       </div>
@@ -545,6 +546,61 @@ function FicheAutre({ a, retour, modifier }) {
           </button>
         </Bloc>
       </div>
+    </div>
+  );
+}
+
+
+// ---------- Mes applis : accès direct à toutes les applis (25/11/2026) ----------
+const RMS_DRAFT = "89338dcc-a009-4815-a769-f0bede180f37";
+const APPLIS = [
+  ["RMS EcoSky — mes outils", [
+    ["📊", "SalesFlow (ordinateur)", "Tableau complet des prospects RMS", "/"],
+    ["💬", "SMS reçus & devis", "Répondre, faire et envoyer un devis", "/sms-recus.html"],
+    ["🧾", "Devis manuel", "Créer un devis pour un client hors liste", "/devis-manuel.html"],
+    ["🚽", "Valider estimations ANC", "Estimations assainissement en attente", "/valider-anc.html"],
+    ["🚪", "Page portails", "Ce que voient les clients portails", "https://www.skyeco.fr/portails.html"],
+    ["🧮", "Configurateur portails", "Estimation portails en ligne", "https://www.skyeco.fr/devis-portails.html"],
+    ["💬", "Réponses réseaux", "Commentaires Facebook / Instagram", `https://www.skyeco.fr/reponses-reseaux.html?id=${RMS_DRAFT}`],
+  ]],
+  ["Skyeco — les applis que je vends", [
+    ["🏠", "skyeco.fr", "La page d'accueil de toutes les applis", "https://www.skyeco.fr/"],
+    ["🤖", "Mon Assistant Pro", "Mon espace (mails, agenda, paiements, pub)", "https://www.skyeco.fr/mon-assistant-pro/inscription/"],
+    ["🏗️", "Contact Chantier", "Suivi de chantier", "https://www.skyeco.fr/contact-chantier/"],
+    ["⭐", "Avis Pro", "Gestion des avis Google", "https://www.skyeco.fr/avis-pro/"],
+    ["📦", "Kit Pro Artisan", "Kit devis + visuels à 39 €", "https://www.skyeco.fr/kit-pro-artisan-btp.html"],
+    ["📐", "Estimateur BTP", "Démo de l'estimateur", "https://www.skyeco.fr/estimateur-btp-demo.html"],
+    ["📣", "Skyeco Ads", "Site vitrine + pub Google", "https://www.skyeco.fr/skyeco-ads-landing-nationale.html"],
+    ["🚀", "Qui veut me lancer ?", "Plateforme des porteurs de projets", "https://quiveutmelancer.fr/"],
+  ]],
+  ["Pub, banque, réseaux", [
+    ["🎯", "Google Ads", "", "https://ads.google.com/"],
+    ["📘", "Meta (Facebook / Instagram)", "Gestionnaire de publicités", "https://adsmanager.facebook.com/"],
+    ["📅", "Metricool", "Publications programmées", "https://app.metricool.com/"],
+    ["🏦", "Qonto", "Banque", "https://app.qonto.com/"],
+    ["📒", "Pennylane", "Compta, devis, factures", "https://app.pennylane.com/"],
+    ["✉️", "Gmail", "", "https://mail.google.com/"],
+  ]],
+];
+
+function MesApplis() {
+  return (
+    <div style={{ padding: "12px 12px 0" }}>
+      {APPLIS.map(([titre, liste]) => (
+        <div key={titre} style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: .4, margin: "4px 4px 8px" }}>{titre}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {liste.map(([ico, nom, desc, url]) => (
+              <a key={nom} href={url} target={url.startsWith("/") ? "_self" : "_blank"} rel="noreferrer"
+                style={{ display: "block", background: "#fff", borderRadius: 14, padding: 12, textDecoration: "none", boxShadow: "0 1px 4px rgba(0,0,0,.06)", minHeight: 74 }}>
+                <div style={{ fontSize: 24 }}>{ico}</div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a", marginTop: 4 }}>{nom}</div>
+                {desc && <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{desc}</div>}
+              </a>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

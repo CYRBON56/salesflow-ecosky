@@ -1,17 +1,32 @@
 {
-  "name": "SalesFlow — EcoSky by RMS",
-  "short_name": "SalesFlow",
-  "description": "Suivi des prospects et devis EcoSky by RMS",
+  "name": "Skyeco Admin — toutes mes demandes",
+  "short_name": "Skyeco Admin",
+  "description": "Toutes les demandes (clients RMS et prospects Skyeco) et toutes mes applis",
   "lang": "fr",
   "id": "/",
   "start_url": "/mobile",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#2e7d32",
+  "theme_color": "#1b5e20",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
