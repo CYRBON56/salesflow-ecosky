@@ -289,6 +289,40 @@ function Badge({ c, children }) {
   return <span style={{ fontSize: 12, fontWeight: 600, color: c, background: c + "18", padding: "3px 8px", borderRadius: 20 }}>{children}</span>;
 }
 
+// Bouton « Demander photos + adresse » : envoie le SMS automatique
+// (api/request-photos.js) avec le lien vers photos.html pour ce client.
+function DemandePhotos({ lead: l }) {
+  const [etat, setEtat] = useState(l.demande_photos_envoyee ? "deja" : "repos");
+  const envoyer = async () => {
+    setEtat("envoi");
+    try {
+      const r = await fetch("/api/request-photos", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(l.id && !l.cle ? { lead_id: l.id } : { telephone: l.telephone, nom: l.nom }),
+      });
+      const j = await r.json().catch(() => ({}));
+      setEtat(j.success ? "ok" : "erreur");
+    } catch (e) { setEtat("erreur"); }
+  };
+  const base = { ...btnAction, width: "100%", marginTop: 8, boxSizing: "border-box" };
+  if (etat === "ok") return <div style={{ ...base, background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" }}>✅ SMS envoyé : le client va recevoir le lien pour ses photos et son adresse</div>;
+  if (etat === "confirmer") return (
+    <div style={{ marginTop: 8, padding: 10, background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 12, fontSize: 14 }}>
+      Envoyer à {nomComplet(l)} ({telAffiche(l.telephone)}) un SMS avec le lien pour envoyer ses photos et son adresse exacte ?
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+        <button onClick={envoyer} style={{ ...btnAction, background: VERT, color: "#fff" }}>Oui, envoyer</button>
+        <button onClick={() => setEtat(l.demande_photos_envoyee ? "deja" : "repos")} style={btnAction}>Annuler</button>
+      </div>
+    </div>
+  );
+  return (
+    <button disabled={etat === "envoi"} onClick={() => setEtat("confirmer")} style={{ ...base, background: "#fff7ed", color: "#9a3412", border: "1px solid #fed7aa" }}>
+      {etat === "envoi" ? "Envoi en cours…" : etat === "erreur" ? "⚠️ Échec — réessayer l'envoi du SMS photos" : etat === "deja" ? "📷 Renvoyer le SMS « photos + adresse »" : "📷 Demander photos + adresse par SMS"}
+    </button>
+  );
+}
+
 function Fiche({ lead: l, devis, retour, modifier }) {
   const tel = telBrut(l.telephone);
   const adresse = [l.adresse_projet || l.adresse, l.code_postal].filter(Boolean).join(" ");
@@ -329,6 +363,7 @@ function Fiche({ lead: l, devis, retour, modifier }) {
           {l.email && <a href={`mailto:${l.email}`} style={btnAction}>✉️ Email</a>}
           {adresse && <a href={`https://maps.apple.com/?q=${encodeURIComponent(adresse)}`} style={btnAction}>📍 Itinéraire</a>}
         </div>
+        {tel.length >= 10 && <DemandePhotos lead={l} />}
         {l.callback_demande && (
           <div style={{ marginTop: 10, padding: 10, background: "#fef2f2", color: "#991b1b", borderRadius: 10, fontSize: 14 }}>
             📞 A demandé à être rappelé {ilYa(l.callback_demande_le)}
@@ -503,6 +538,7 @@ function FicheAutre({ a, retour, modifier }) {
           {tel.length >= 10 && <a href={`sms:${tel}`} style={btnAction}>💬 SMS</a>}
           {a.email && <a href={`mailto:${a.email}`} style={btnAction}>✉️ Email</a>}
         </div>
+        {tel.length >= 10 && a.famille === "rms" && <DemandePhotos lead={a} />}
         <Bloc titre="Coordonnées">
           <Ligne k="Entreprise" v={a.sous_titre} />
           <Ligne k="Téléphone" v={telAffiche(a.telephone)} />

@@ -36,7 +36,25 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).send("Method not allowed");
 
   try {
-    const { lead_id } = req.body || {};
+    let { lead_id, telephone, nom } = req.body || {};
+    // 25/11/2026 : depuis Skyeco Admin, une demande sans fiche « lead »
+    // (ex. appel à la secrétaire IA) : on retrouve la fiche par le numéro,
+    // ou on la crée, pour que photos.html puisse y rattacher photos + adresse.
+    if (!lead_id && telephone) {
+      const chiffres = String(telephone).replace(/\D/g, "");
+      const fin = chiffres.slice(-9);
+      if (fin.length < 9) return res.status(400).json({ success: false, error: "Numéro invalide." });
+      const trouves = await supabaseRequest(`leads?telephone=ilike.*${fin}&select=id&order=created_at.desc&limit=1`);
+      if (trouves?.[0]) {
+        lead_id = trouves[0].id;
+      } else {
+        const crees = await supabaseRequest("leads", {
+          method: "POST",
+          body: JSON.stringify({ nom: (nom || "Client").slice(0, 120), telephone: "0" + fin, source: "dashboard", statut: "nouveau" }),
+        });
+        lead_id = crees?.[0]?.id;
+      }
+    }
     if (!lead_id) {
       return res.status(400).json({ success: false, error: "lead_id requis." });
     }
