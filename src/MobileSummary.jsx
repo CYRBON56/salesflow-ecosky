@@ -56,8 +56,13 @@ function nomComplet(l) {
   const n = [l.prenom, l.nom].filter(Boolean).join(" ").trim();
   return n || "Sans nom";
 }
+// Le client a répondu par SMS depuis notre dernière action sur sa fiche
+function aReponduSms(l) {
+  if (!l.derniere_reponse_sms_at) return false;
+  return !l.reponse_sms_vue_at || new Date(l.derniere_reponse_sms_at) > new Date(l.reponse_sms_vue_at);
+}
 function estATraiter(l) {
-  return l.callback_demande || !l.statut || l.statut === "nouveau";
+  return l.callback_demande || aReponduSms(l) || !l.statut || l.statut === "nouveau";
 }
 function couleurSource(l) {
   const c = (l.canal || l.source || "").toLowerCase();
@@ -291,6 +296,7 @@ function Carte({ lead: l, nbDevis, ouvrir, archiver }) {
         {details && <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{details}</div>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
           <Badge c={coul}>{src}</Badge>
+          {aReponduSms(l) && <Badge c="#2563eb">💬 a répondu</Badge>}
           {l.callback_demande && <Badge c="#dc2626">📞 Veut être rappelé</Badge>}
           {l.rdv_date && <Badge c="#7c3aed">📅 {dateFr(l.rdv_date)}</Badge>}
           {l.estimation_pdf_url && <Badge c="#0d9488">Estimation</Badge>}
@@ -399,6 +405,20 @@ function Fiche({ lead: l, devis, retour, modifier }) {
           <div style={{ marginTop: 10, padding: 10, background: "#f5f3ff", color: "#5b21b6", borderRadius: 10, fontSize: 14 }}>
             📅 Rendez-vous : {dateFr(l.rdv_date)}
           </div>
+        )}
+
+        {Array.isArray(l.reponses_sms) && l.reponses_sms.length > 0 && (
+          <Bloc titre="💬 Ses réponses par SMS">
+            {[...l.reponses_sms].reverse().map((r, k) => (
+              <div key={k} style={{ padding: "8px 0", borderBottom: "1px solid #f1f5f9" }}>
+                <div style={{ fontSize: 12, color: "#94a3b8" }}>{dateFr(r.le)}</div>
+                <div style={{ fontSize: 15, color: "#0f172a", whiteSpace: "pre-wrap" }}>{r.message}</div>
+              </div>
+            ))}
+            {aReponduSms(l) && (
+              <button onClick={() => modifier(l.id, { reponse_sms_vue_at: new Date().toISOString() })} style={{ ...btnAction, width: "100%", marginTop: 8, boxSizing: "border-box" }}>✓ Marquer comme lu</button>
+            )}
+          </Bloc>
         )}
 
         <Bloc titre="Coordonnées">
