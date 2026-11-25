@@ -103,6 +103,7 @@ export default function MobileSummary() {
   const [onglet, setOnglet] = useState("traiter");
   const [recherche, setRecherche] = useState("");
   const [ouvertId, setOuvertId] = useState(null);
+  const [annulable, setAnnulable] = useState(null); // dernier archivage, pour « Annuler »
 
   const charger = async () => {
     setChargement(true);
@@ -135,7 +136,7 @@ export default function MobileSummary() {
 
   // Tableau de bord unique (25/11/2026) : leads SalesFlow + toutes les autres applis
   const elements = useMemo(() => {
-    const l1 = famille === "rms" ? leads.map((l) => ({ type: "lead", id: l.id, quand: l.created_at, aTraiter: estATraiter(l), l })) : [];
+    const l1 = famille === "rms" ? leads.filter((l) => !l.archive).map((l) => ({ type: "lead", id: l.id, quand: l.created_at, aTraiter: estATraiter(l), l })) : [];
     const l2 = autres.filter((a) => a.famille === famille).map((a) => ({ type: "autre", id: a.cle, quand: a.quand, aTraiter: autreATraiter(a), a }));
     return [...l1, ...l2].sort((x, y) => new Date(y.quand || 0) - new Date(x.quand || 0));
   }, [leads, autres, famille]);
@@ -189,6 +190,23 @@ export default function MobileSummary() {
     }
   };
 
+  // Archivage en un clic depuis la liste, avec « Annuler » pendant 6 s
+  const archiverDepuisListe = (e) => {
+    if (e.type === "lead") modifier(e.id, { archive: true });
+    else modifierAutre(e.id, { archive: true });
+    const nom = e.type === "lead" ? nomComplet(e.l) : e.a.nom;
+    setAnnulable({ e, nom });
+    clearTimeout(window.__sfAnnul);
+    window.__sfAnnul = setTimeout(() => setAnnulable(null), 6000);
+  };
+  const annulerArchive = () => {
+    if (!annulable) return;
+    const { e } = annulable;
+    if (e.type === "lead") modifier(e.id, { archive: false });
+    else { setAutres((as) => [...as, { ...e.a, archive: false }]); modifierAutre(e.id, { archive: false }); }
+    setAnnulable(null);
+  };
+
   if (ouvertAutre) {
     return <FicheAutre a={ouvertAutre} retour={() => setOuvertId(null)} modifier={modifierAutre} />;
   }
@@ -231,14 +249,20 @@ export default function MobileSummary() {
           </div>
         )}
         {filtres.map((e) => e.type === "lead" ? (
-          <Carte key={e.id} lead={e.l} nbDevis={(devisParLead[e.id] || []).length} ouvrir={() => { setOuvertId(e.id); window.scrollTo(0, 0); }} />
+          <Carte key={e.id} lead={e.l} nbDevis={(devisParLead[e.id] || []).length} ouvrir={() => { setOuvertId(e.id); window.scrollTo(0, 0); }} archiver={() => archiverDepuisListe(e)} />
         ) : (
-          <CarteAutre key={e.id} a={e.a} ouvrir={() => { setOuvertId(e.id); window.scrollTo(0, 0); }} />
+          <CarteAutre key={e.id} a={e.a} ouvrir={() => { setOuvertId(e.id); window.scrollTo(0, 0); }} archiver={() => archiverDepuisListe(e)} />
         ))}
       </div>}
       <div style={{ textAlign: "center", marginTop: 20 }}>
         <a href="/deconnexion" style={{ color: "#94a3b8", fontSize: 13 }}>Se déconnecter</a>
       </div>
+      {annulable && (
+        <div style={{ position: "fixed", left: 12, right: 12, bottom: "max(16px, env(safe-area-inset-bottom))", background: "#0f172a", color: "#fff", borderRadius: 12, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, zIndex: 50, boxShadow: "0 4px 16px rgba(0,0,0,.25)", fontSize: 14 }}>
+          <span>🗄️ {annulable.nom} archivé</span>
+          <button onClick={annulerArchive} style={{ background: "none", border: 0, color: "#86efac", fontWeight: 700, fontSize: 15 }}>Annuler</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -252,7 +276,7 @@ function Onglet({ actif, onClick, children }) {
   );
 }
 
-function Carte({ lead: l, nbDevis, ouvrir }) {
+function Carte({ lead: l, nbDevis, ouvrir, archiver }) {
   const [src, coul] = couleurSource(l);
   const details = [l.type_projet, l.surface_m2 ? `${l.surface_m2} m²` : null, l.code_postal].filter(Boolean).join(" · ");
   return (
@@ -280,6 +304,7 @@ function Carte({ lead: l, nbDevis, ouvrir }) {
           <span style={{ ...btnBas, color: "#94a3b8" }}>📞 —</span>
         )}
         <button onClick={ouvrir} style={{ ...btnBas, background: "#fff", color: VERT_FONCE, border: 0 }}>Voir la demande ›</button>
+        <button onClick={archiver} style={{ ...btnBas, flex: "0 0 auto", padding: "0 14px", background: "#fff", color: "#64748b", border: 0, borderLeft: "1px solid #f1f5f9" }}>🗄️ Archiver</button>
       </div>
     </div>
   );
@@ -484,7 +509,7 @@ function autreATraiter(a) {
   return !a.statut || a.statut === "nouveau" || a.statut === "à rappeler";
 }
 
-function CarteAutre({ a, ouvrir }) {
+function CarteAutre({ a, ouvrir, archiver }) {
   const c = a.couleur || "#64748b";
   return (
     <div style={{ background: "#fff", borderRadius: 14, marginBottom: 10, boxShadow: "0 1px 4px rgba(0,0,0,.06)", borderLeft: `4px solid ${a.statut === "à rappeler" ? "#dc2626" : autreATraiter(a) ? VERT : "#cbd5e1"}`, overflow: "hidden" }}>
@@ -511,6 +536,7 @@ function CarteAutre({ a, ouvrir }) {
           <span style={{ ...btnBas, color: "#94a3b8" }}>📞 —</span>
         )}
         <button onClick={ouvrir} style={{ ...btnBas, background: "#fff", color: VERT_FONCE, border: 0 }}>Voir ›</button>
+        <button onClick={archiver} style={{ ...btnBas, flex: "0 0 auto", padding: "0 14px", background: "#fff", color: "#64748b", border: 0, borderLeft: "1px solid #f1f5f9" }}>🗄️ Archiver</button>
       </div>
     </div>
   );
