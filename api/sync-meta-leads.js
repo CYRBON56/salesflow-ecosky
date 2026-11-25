@@ -74,7 +74,7 @@ async function sendSms(body) {
   }
 }
 
-function toE164(phone) {
+export function toE164(phone) {
   const d = String(phone || "").replace(/\D/g, "");
   if (!d) return null;
   if (d.startsWith("33")) return "+" + d;
@@ -84,19 +84,23 @@ function toE164(phone) {
 
 // Transforme field_data de Meta en champs SalesFlow. Tout ce qui n'est pas
 // reconnu (questions personnalisées du formulaire) part dans les notes.
-function mapFields(fieldData) {
+export function mapFields(fieldData) {
   const out = { extras: [] };
   for (const f of fieldData || []) {
     const name = String(f.name || "").toLowerCase();
     const val = (f.values || []).join(", ").trim();
     if (!val) continue;
+    // 25/11/2026 : Meta ajoute « phone_number_verified = true » après le
+    // numéro ; il écrasait le vrai téléphone. On l'ignore.
+    if (name.endsWith("_verified")) continue;
     if (name === "full_name") out.full_name = val;
     else if (name === "first_name" || name === "prénom" || name === "prenom") out.prenom = val;
     else if (name === "last_name" || name === "nom") out.nom = val;
     else if (name.includes("phone") || name.includes("téléphone") || name.includes("telephone")) out.telephone = val;
     else if (name.includes("email")) out.email = val;
     else if (name.includes("post") || name.includes("zip") || name.includes("code_postal")) out.code_postal = val;
-    else if (name === "city" || name.includes("ville")) out.ville = val;
+    // Ville : uniquement le vrai champ ville (pas « Décrivez votre projet (…, ville) »)
+    else if (name === "city" || name === "ville") out.ville = val;
     else out.extras.push(`${f.name.replace(/_/g, " ")} : ${val}`);
   }
   if (!out.nom && out.full_name) {
