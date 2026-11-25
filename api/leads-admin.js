@@ -10,6 +10,8 @@
 // contrairement aux autres routes /api/* qui doivent rester publiques pour
 // les clients).
 
+import { majSuivi } from "./_admin-sources.js";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
@@ -34,6 +36,14 @@ export default async function handler(req, res) {
 
   try {
     const { action } = req.body || {};
+
+    // Suivi des demandes venant des autres applis (tableau de bord unique, 25/11/2026)
+    if (action === "update_suivi") {
+      const { cle, patch } = req.body;
+      if (!cle || !patch) return res.status(400).json({ success: false, error: "cle et patch requis." });
+      await majSuivi(String(cle), patch);
+      return res.status(200).json({ success: true });
+    }
 
     if (action === "update_lead") {
       const { id, patch } = req.body;

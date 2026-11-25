@@ -96,6 +96,8 @@ function valeurLisible(v) {
 export default function MobileSummary() {
   const [leads, setLeads] = useState([]);
   const [devis, setDevis] = useState([]);
+  const [autres, setAutres] = useState([]);
+  const [famille, setFamille] = useState(() => { try { return localStorage.getItem("sf_famille") || "rms"; } catch (e) { return "rms"; } });
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [onglet, setOnglet] = useState("traiter");
@@ -111,6 +113,7 @@ export default function MobileSummary() {
       const d = await r.json();
       setLeads(d.leads || []);
       setDevis(d.devis || []);
+      setAutres(d.autres || []);
       setErreur("");
     } catch (e) {
       setErreur("Impossible de charger les demandes. Vérifie ta connexion puis appuie sur ↻.");
@@ -130,18 +133,46 @@ export default function MobileSummary() {
     return m;
   }, [devis]);
 
+  // Tableau de bord unique (25/11/2026) : leads SalesFlow + toutes les autres applis
+  const elements = useMemo(() => {
+    const l1 = famille === "rms" ? leads.map((l) => ({ type: "lead", id: l.id, quand: l.created_at, aTraiter: estATraiter(l), l })) : [];
+    const l2 = autres.filter((a) => a.famille === famille).map((a) => ({ type: "autre", id: a.cle, quand: a.quand, aTraiter: autreATraiter(a), a }));
+    return [...l1, ...l2].sort((x, y) => new Date(y.quand || 0) - new Date(x.quand || 0));
+  }, [leads, autres, famille]);
+
   const filtres = useMemo(() => {
     const q = recherche.trim().toLowerCase();
-    return leads.filter((l) => {
-      if (onglet === "traiter" && !estATraiter(l)) return false;
+    return elements.filter((e) => {
+      if (onglet === "traiter" && !e.aTraiter) return false;
       if (!q) return true;
-      return [l.nom, l.prenom, l.telephone, l.email, l.adresse_projet, l.adresse, l.code_postal, l.type_projet]
-        .filter(Boolean).join(" ").toLowerCase().includes(q) || telBrut(l.telephone).includes(q.replace(/\s/g, ""));
+      const champs = e.type === "lead"
+        ? [e.l.nom, e.l.prenom, e.l.telephone, e.l.email, e.l.adresse_projet, e.l.adresse, e.l.code_postal, e.l.type_projet]
+        : [e.a.nom, e.a.sous_titre, e.a.telephone, e.a.email, e.a.objet, e.a.source];
+      const tel = e.type === "lead" ? e.l.telephone : e.a.telephone;
+      return champs.filter(Boolean).join(" ").toLowerCase().includes(q) || (q.replace(/\s/g, "").length > 3 && telBrut(tel).includes(q.replace(/\s/g, "")));
     });
-  }, [leads, onglet, recherche]);
+  }, [elements, onglet, recherche]);
 
-  const nbATraiter = leads.filter(estATraiter).length;
+  const nbATraiter = elements.filter((e) => e.aTraiter).length;
+  const compte = (f) => (f === "rms" ? leads.filter(estATraiter).length : 0) + autres.filter((a) => a.famille === f && autreATraiter(a)).length;
+  const choisirFamille = (f) => { setFamille(f); try { localStorage.setItem("sf_famille", f); } catch (e) {} };
   const ouvert = leads.find((l) => l.id === ouvertId);
+  const ouvertAutre = autres.find((a) => a.cle === ouvertId);
+
+  const modifierAutre = async (cle, patch) => {
+    setAutres((as) => as.map((a) => (a.cle === cle ? { ...a, ...patch } : a)).filter((a) => !a.archive));
+    try {
+      const r = await fetch("/api/leads-admin", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update_suivi", cle, patch }),
+      });
+      if (!r.ok) throw new Error();
+    } catch (e) {
+      alert("La modification n'a pas été enregistrée. Réessaie.");
+      charger();
+    }
+  };
 
   const modifier = async (id, patch) => {
     setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
@@ -158,6 +189,9 @@ export default function MobileSummary() {
     }
   };
 
+  if (ouvertAutre) {
+    return <FicheAutre a={ouvertAutre} retour={() => setOuvertId(null)} modifier={modifierAutre} />;
+  }
   if (ouvert) {
     return <Fiche lead={ouvert} devis={devisParLead[ouvert.id] || []} retour={() => setOuvertId(null)} modifier={modifier} />;
   }
@@ -166,7 +200,7 @@ export default function MobileSummary() {
     <div style={{ minHeight: "100vh", background: FOND, fontFamily: "-apple-system, system-ui, Segoe UI, Roboto, sans-serif", paddingBottom: 40 }}>
       <div style={{ background: VERT, color: "#fff", padding: "max(14px, env(safe-area-inset-top)) 16px 12px", position: "sticky", top: 0, zIndex: 5 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontWeight: 700, fontSize: 19 }}>Mes demandes</div>
+          <div style={{ fontWeight: 700, fontSize: 19 }}>Tableau de bord</div>
           <button onClick={charger} aria-label="Actualiser" style={{ background: "rgba(255,255,255,.15)", border: 0, color: "#fff", fontSize: 20, width: 40, height: 40, borderRadius: 20 }}>
             <span style={{ display: "inline-block", animation: chargement ? "tourne 1s linear infinite" : "none" }}>↻</span>
           </button>
@@ -177,8 +211,12 @@ export default function MobileSummary() {
           style={{ width: "100%", boxSizing: "border-box", marginTop: 10, padding: "10px 12px", fontSize: 16, border: 0, borderRadius: 10 }}
         />
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <Onglet actif={famille === "rms"} onClick={() => choisirFamille("rms")}>🏠 Clients RMS ({compte("rms")})</Onglet>
+          <Onglet actif={famille === "skyeco"} onClick={() => choisirFamille("skyeco")}>🚀 Prospects Skyeco ({compte("skyeco")})</Onglet>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <Onglet actif={onglet === "traiter"} onClick={() => setOnglet("traiter")}>À traiter ({nbATraiter})</Onglet>
-          <Onglet actif={onglet === "toutes"} onClick={() => setOnglet("toutes")}>Toutes ({leads.length})</Onglet>
+          <Onglet actif={onglet === "toutes"} onClick={() => setOnglet("toutes")}>Toutes ({elements.length})</Onglet>
         </div>
       </div>
       <style>{`@keyframes tourne { to { transform: rotate(360deg); } }`}</style>
@@ -191,8 +229,10 @@ export default function MobileSummary() {
             {onglet === "traiter" ? "Rien à traiter 👍" : "Aucune demande trouvée"}
           </div>
         )}
-        {filtres.map((l) => (
-          <Carte key={l.id} lead={l} nbDevis={(devisParLead[l.id] || []).length} ouvrir={() => { setOuvertId(l.id); window.scrollTo(0, 0); }} />
+        {filtres.map((e) => e.type === "lead" ? (
+          <Carte key={e.id} lead={e.l} nbDevis={(devisParLead[e.id] || []).length} ouvrir={() => { setOuvertId(e.id); window.scrollTo(0, 0); }} />
+        ) : (
+          <CarteAutre key={e.id} a={e.a} ouvrir={() => { setOuvertId(e.id); window.scrollTo(0, 0); }} />
         ))}
       </div>
       <div style={{ textAlign: "center", marginTop: 20 }}>
@@ -401,3 +441,110 @@ function Ligne({ k, v }) {
 const btnBas = { flex: 1, textAlign: "center", padding: "12px 0", fontSize: 15, fontWeight: 700, textDecoration: "none", cursor: "pointer" };
 const btnAction = { display: "block", textAlign: "center", padding: "14px 8px", borderRadius: 12, background: "#fff", color: VERT_FONCE, fontWeight: 700, fontSize: 15, textDecoration: "none", boxShadow: "0 1px 4px rgba(0,0,0,.08)" };
 const lienDoc = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #f1f5f9", color: "#0f172a", textDecoration: "none", fontSize: 15, fontWeight: 600 };
+
+
+// ---------- demandes des autres applis (25/11/2026) ----------
+function autreATraiter(a) {
+  return !a.statut || a.statut === "nouveau" || a.statut === "à rappeler";
+}
+
+function CarteAutre({ a, ouvrir }) {
+  const c = a.couleur || "#64748b";
+  return (
+    <div style={{ background: "#fff", borderRadius: 14, marginBottom: 10, boxShadow: "0 1px 4px rgba(0,0,0,.06)", borderLeft: `4px solid ${a.statut === "à rappeler" ? "#dc2626" : autreATraiter(a) ? VERT : "#cbd5e1"}`, overflow: "hidden" }}>
+      <div onClick={ouvrir} style={{ padding: "12px 14px", cursor: "pointer" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{a.nom}</div>
+          <div style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>{ilYa(a.quand)}</div>
+        </div>
+        {a.sous_titre && <div style={{ fontSize: 13, color: "#475569" }}>{a.sous_titre}</div>}
+        <div style={{ fontSize: 14, color: "#334155", marginTop: 2 }}>{telAffiche(a.telephone) || a.email || <i style={{ color: "#94a3b8" }}>pas de coordonnées</i>}</div>
+        {a.objet && <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{a.objet}</div>}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+          <Badge c={c}>{a.source}</Badge>
+          {a.liens && a.liens.length > 0 && <Badge c="#b45309">{a.liens.length} document{a.liens.length > 1 ? "s" : ""}</Badge>}
+          {a.statut && a.statut !== "nouveau" && <Badge c={a.statut === "à rappeler" ? "#dc2626" : "#64748b"}>{a.statut}</Badge>}
+        </div>
+      </div>
+      <div style={{ display: "flex", borderTop: "1px solid #f1f5f9" }}>
+        {telValide(a.telephone) ? (
+          <a href={`tel:${telBrut(a.telephone)}`} style={{ ...btnBas, color: "#fff", background: VERT }}>📞 Appeler</a>
+        ) : a.email ? (
+          <a href={`mailto:${a.email}`} style={{ ...btnBas, color: "#fff", background: "#2563eb" }}>✉️ Écrire</a>
+        ) : (
+          <span style={{ ...btnBas, color: "#94a3b8" }}>📞 —</span>
+        )}
+        <button onClick={ouvrir} style={{ ...btnBas, background: "#fff", color: VERT_FONCE, border: 0 }}>Voir ›</button>
+      </div>
+    </div>
+  );
+}
+
+function FicheAutre({ a, retour, modifier }) {
+  const tel = telBrut(a.telephone);
+  const [note, setNote] = useState(a.note || "");
+  useEffect(() => {
+    const onBack = () => retour();
+    window.history.pushState({ fiche: true }, "");
+    window.addEventListener("popstate", onBack);
+    return () => window.removeEventListener("popstate", onBack);
+  }, []);
+  return (
+    <div style={{ minHeight: "100vh", background: FOND, fontFamily: "-apple-system, system-ui, Segoe UI, Roboto, sans-serif", paddingBottom: 40 }}>
+      <div style={{ background: VERT, color: "#fff", padding: "max(12px, env(safe-area-inset-top)) 12px 14px", position: "sticky", top: 0, zIndex: 5 }}>
+        <button onClick={() => window.history.back()} style={{ background: "none", border: 0, color: "#fff", fontSize: 16, padding: "4px 0" }}>‹ Retour</button>
+        <div style={{ fontWeight: 700, fontSize: 21, marginTop: 4 }}>{a.nom}</div>
+        <div style={{ fontSize: 13, opacity: .85 }}>Reçu {dateFr(a.quand)} · {a.source}</div>
+      </div>
+      <div style={{ padding: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {tel.length >= 10 && <a href={`tel:${tel}`} style={{ ...btnAction, background: VERT, color: "#fff", gridColumn: "1 / -1", fontSize: 18 }}>📞 Appeler {telAffiche(a.telephone)}</a>}
+          {tel.length >= 10 && <a href={`sms:${tel}`} style={btnAction}>💬 SMS</a>}
+          {a.email && <a href={`mailto:${a.email}`} style={btnAction}>✉️ Email</a>}
+        </div>
+        <Bloc titre="Coordonnées">
+          <Ligne k="Entreprise" v={a.sous_titre} />
+          <Ligne k="Téléphone" v={telAffiche(a.telephone)} />
+          <Ligne k="Email" v={a.email} />
+        </Bloc>
+        <Bloc titre="La demande">
+          <Ligne k="Objet" v={a.objet} />
+          {(a.lignes || []).map(([k, v]) => <Ligne key={k} k={k} v={v} />)}
+        </Bloc>
+        {(a.liens || []).length > 0 && (
+          <Bloc titre="Documents et liens">
+            {a.liens.map(([lib, url]) => (
+              <a key={url} href={url} target="_blank" rel="noreferrer" style={lienDoc}>📑 {lib} <span style={{ color: "#94a3b8" }}>›</span></a>
+            ))}
+          </Bloc>
+        )}
+        {(a.photos || []).length > 0 && (
+          <Bloc titre={`Photos (${a.photos.length})`}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+              {a.photos.map((u) => (
+                <a key={u} href={u} target="_blank" rel="noreferrer"><img src={u} alt="" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 8 }} /></a>
+              ))}
+            </div>
+          </Bloc>
+        )}
+        <Bloc titre="Suivi">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {["nouveau", "à rappeler", "rappelé", "devis envoyé", "gagné", "perdu"].map((st) => (
+              <button key={st} onClick={() => modifier(a.cle, { statut: st })}
+                style={{ padding: "8px 12px", fontSize: 14, borderRadius: 20, border: `1px solid ${a.statut === st ? VERT : "#cbd5e1"}`, background: a.statut === st ? VERT : "#fff", color: a.statut === st ? "#fff" : "#334155", fontWeight: 600 }}>
+                {st}
+              </button>
+            ))}
+          </div>
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => note !== (a.note || "") && modifier(a.cle, { note })}
+            placeholder="Note (ex. rappeler jeudi, intéressé par…)" rows={3}
+            style={{ width: "100%", boxSizing: "border-box", marginTop: 12, padding: 10, fontSize: 15, borderRadius: 10, border: "1px solid #e2e8f0" }} />
+          <button onClick={() => { if (confirm("Archiver cette demande ? Elle disparaîtra de la liste.")) { modifier(a.cle, { archive: true }); window.history.back(); } }}
+            style={{ marginTop: 14, width: "100%", padding: 12, fontSize: 15, borderRadius: 10, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b" }}>
+            Archiver la demande
+          </button>
+        </Bloc>
+      </div>
+    </div>
+  );
+}

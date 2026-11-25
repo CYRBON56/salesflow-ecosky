@@ -7,6 +7,8 @@
 // dashboard (voir middleware.js) et refuse de répondre si ce mot de passe
 // n'est pas configuré.
 
+import { autresDemandes } from "./_admin-sources.js";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
@@ -55,11 +57,13 @@ export default async function handler(req, res) {
     // Appli mobile "Demandes" : toutes les demandes de devis non archivées
     // + les devis rattachés (le téléphone fait la jointure).
     if (view === "demandes") {
-      const [leads, devis] = await Promise.all([
+      const [leads, devis, autres] = await Promise.all([
         sb("leads?select=*&archive=not.is.true&order=created_at.desc&limit=300"),
         safe(sb("devis?select=id,lead_id,numero,pdf_url,pdf_signe_url,montant_ttc,statut,type_document,created_at,envoye_email_at,envoye_sms_at,date_signature&archive=not.is.true&order=created_at.desc&limit=500")),
+        // Toutes les autres applis (25/11/2026) : skyeco.fr, secrétaire, MAP, Contact Chantier…
+        autresDemandes().catch(() => []),
       ]);
-      return res.status(200).json({ leads, devis });
+      return res.status(200).json({ leads, devis, autres });
     }
 
     if (view === "whatsapp") {
