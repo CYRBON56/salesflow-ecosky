@@ -273,9 +273,10 @@ export default function MobileSummary() {
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
           <Onglet actif={famille === "rms"} onClick={() => choisirFamille("rms")}>🏠 RMS ({compte("rms")})</Onglet>
           <Onglet actif={famille === "skyeco"} onClick={() => choisirFamille("skyeco")}>🚀 Skyeco ({compte("skyeco")})</Onglet>
+          <Onglet actif={famille === "devis"} onClick={() => choisirFamille("devis")}>📑 Devis</Onglet>
           <Onglet actif={famille === "applis"} onClick={() => choisirFamille("applis")}>🧰 Applis</Onglet>
         </div>
-        {famille !== "applis" && <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        {famille !== "applis" && famille !== "devis" && <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <Onglet actif={onglet === "traiter"} onClick={() => setOnglet("traiter")}>À traiter ({nbATraiter})</Onglet>
           <Onglet actif={onglet === "toutes"} onClick={() => setOnglet("toutes")}>Toutes ({elements.length})</Onglet>
         </div>}
@@ -285,7 +286,7 @@ export default function MobileSummary() {
       {feuille}
       {erreur && <div style={{ margin: 16, padding: 12, background: "#fef2f2", color: "#991b1b", borderRadius: 10, fontSize: 14 }}>{erreur}</div>}
 
-      {famille === "applis" ? <MesApplis /> : <div style={{ padding: "12px 12px 0" }}>
+      {famille === "devis" ? <DevisEnCours /> : famille === "applis" ? <MesApplis /> : <div style={{ padding: "12px 12px 0" }}>
         {!chargement && filtres.length === 0 && !erreur && (
           <div style={{ textAlign: "center", color: "#64748b", padding: 30, fontSize: 15 }}>
             {onglet === "traiter" ? "Rien à traiter 👍" : "Aucune demande trouvée"}
@@ -352,6 +353,110 @@ function Carte({ lead: l, nbDevis, ouvrir, archiver, appeler }) {
         <button onClick={ouvrir} style={{ ...btnBas, background: "#fff", color: VERT_FONCE, border: 0 }}>Voir la demande ›</button>
         <button onClick={archiver} style={{ ...btnBas, flex: "0 0 auto", padding: "0 14px", background: "#fff", color: "#64748b", border: 0, borderLeft: "1px solid #f1f5f9" }}>🗄️ Archiver</button>
       </div>
+    </div>
+  );
+}
+
+// ---------- Devis en cours (Pennylane) — 26/11/2026 ----------
+// Devis signés et en attente, à ranger par ordre d'intervention (↑ ↓),
+// avec une date d'intervention et un bouton « Terminé ».
+function DevisEnCours() {
+  const [devis, setDevis] = useState([]);
+  const [etat, setEtat] = useState("chargement");
+  const [vue, setVue] = useState("signe");
+
+  const charger = async () => {
+    setEtat("chargement");
+    try {
+      const r = await fetch("/api/devis-en-cours", { credentials: "same-origin", cache: "no-store" });
+      if (r.status === 401 || r.redirected) { window.location.href = "/connexion?next=/mobile"; return; }
+      const d = await r.json();
+      if (!d.success) throw new Error();
+      setDevis(d.devis || []); setEtat("ok");
+    } catch (e) { setEtat("erreur"); }
+  };
+  useEffect(() => { charger(); }, []);
+
+  const envoyer = async (corps) => {
+    try {
+      const r = await fetch("/api/devis-en-cours", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps),
+      });
+      if (!r.ok) throw new Error();
+    } catch (e) { alert("La modification n'a pas été enregistrée. Réessaie."); charger(); }
+  };
+
+  // Ordre d'intervention : ordre choisi, puis les nouveaux (date d'intervention, puis date du devis)
+  const trier = (a, b) => {
+    if (a.ordre != null || b.ordre != null) return (a.ordre ?? 1e9) - (b.ordre ?? 1e9);
+    if (a.date_intervention || b.date_intervention) return (a.date_intervention || "9999").localeCompare(b.date_intervention || "9999");
+    return (a.date || "").localeCompare(b.date || "");
+  };
+  const liste = devis.filter((d) => d.statut === vue).sort(trier);
+  const nb = (s) => devis.filter((d) => d.statut === s).length;
+
+  const deplacer = (i, sens) => {
+    const j = i + sens;
+    if (j < 0 || j >= liste.length) return;
+    const n = [...liste];
+    [n[i], n[j]] = [n[j], n[i]];
+    const ordre = Object.fromEntries(n.map((d, k) => [d.id, k + 1]));
+    setDevis((ds) => ds.map((d) => (d.id in ordre ? { ...d, ordre: ordre[d.id] } : d)));
+    envoyer({ action: "ordre", ids: n.map((d) => d.id) });
+  };
+  const maj = (id, patch) => {
+    setDevis((ds) => ds.map((d) => (d.id === id ? { ...d, ...patch } : d)).filter((d) => !d.termine));
+    envoyer({ action: "maj", id, patch });
+  };
+  const trierParDate = () => {
+    const n = [...liste].sort((a, b) => (a.date_intervention || "9999").localeCompare(b.date_intervention || "9999"));
+    const ordre = Object.fromEntries(n.map((d, k) => [d.id, k + 1]));
+    setDevis((ds) => ds.map((d) => (d.id in ordre ? { ...d, ordre: ordre[d.id] } : d)));
+    envoyer({ action: "ordre", ids: n.map((d) => d.id) });
+  };
+
+  return (
+    <div style={{ padding: "12px 12px 0" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button onClick={() => setVue("signe")} style={{ ...btnAction, flex: 1, padding: "10px 4px", background: vue === "signe" ? VERT : "#fff", color: vue === "signe" ? "#fff" : VERT_FONCE, border: 0 }}>✅ Signés ({nb("signe")})</button>
+        <button onClick={() => setVue("attente")} style={{ ...btnAction, flex: 1, padding: "10px 4px", background: vue === "attente" ? VERT : "#fff", color: vue === "attente" ? "#fff" : VERT_FONCE, border: 0 }}>⏳ En attente ({nb("attente")})</button>
+      </div>
+      {etat === "chargement" && <div style={{ textAlign: "center", color: "#64748b", padding: 20 }}>Lecture des devis Pennylane…</div>}
+      {etat === "erreur" && <div style={{ padding: 12, background: "#fef2f2", color: "#991b1b", borderRadius: 10, fontSize: 14 }}>Impossible de lire les devis Pennylane. <button onClick={charger} style={{ border: 0, background: "none", color: "#991b1b", fontWeight: 700, textDecoration: "underline" }}>Réessayer</button></div>}
+      {etat === "ok" && liste.length === 0 && <div style={{ textAlign: "center", color: "#64748b", padding: 30 }}>Aucun devis ici 👍</div>}
+      {etat === "ok" && liste.length > 1 && (
+        <button onClick={trierParDate} style={{ ...btnAction, width: "100%", boxSizing: "border-box", marginBottom: 10, padding: "10px", fontSize: 14, border: 0 }}>📅 Ranger par date d'intervention</button>
+      )}
+      {etat === "ok" && liste.map((d, i) => (
+        <div key={d.id} style={{ background: "#fff", borderRadius: 14, marginBottom: 10, boxShadow: "0 1px 4px rgba(0,0,0,.06)", borderLeft: `4px solid ${d.date_intervention ? "#7c3aed" : vue === "signe" ? VERT : "#cbd5e1"}`, padding: "12px 12px 10px" }}>
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <button aria-label="Monter" disabled={i === 0} onClick={() => deplacer(i, -1)} style={{ width: 40, height: 36, borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", fontSize: 16, opacity: i === 0 ? .3 : 1 }}>▲</button>
+              <div style={{ textAlign: "center", fontWeight: 700, color: "#64748b", fontSize: 13 }}>{i + 1}</div>
+              <button aria-label="Descendre" disabled={i === liste.length - 1} onClick={() => deplacer(i, 1)} style={{ width: 40, height: 36, borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", fontSize: 16, opacity: i === liste.length - 1 ? .3 : 1 }}>▼</button>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{d.client}</div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: VERT_FONCE, whiteSpace: "nowrap" }}>{euros(d.ttc)}</div>
+              </div>
+              <div style={{ fontSize: 13, color: "#64748b" }}>{d.numero} · du {dateFr(d.date, false)}</div>
+              {d.objet && <div style={{ fontSize: 13, color: "#334155", marginTop: 2 }}>{d.objet}</div>}
+              <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 14, color: d.date_intervention ? "#5b21b6" : "#475569", fontWeight: 600 }}>
+                📅 Intervention
+                <input type="date" value={d.date_intervention || ""} onChange={(e) => maj(d.id, { date_intervention: e.target.value || null })}
+                  style={{ flex: 1, fontSize: 15, padding: "6px 8px", border: "1px solid #cbd5e1", borderRadius: 8, background: "#fff" }} />
+              </label>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                {d.pdf && <a href={d.pdf} target="_blank" rel="noreferrer" style={{ ...btnAction, flex: 1, padding: "9px 4px", fontSize: 14 }}>📄 Voir le devis</a>}
+                <button onClick={() => { if (confirm(`Marquer le devis ${d.numero} (${d.client}) comme terminé ? Il disparaîtra de la liste.`)) maj(d.id, { termine: true }); }}
+                  style={{ ...btnAction, flex: 1, padding: "9px 4px", fontSize: 14, border: 0, color: "#64748b" }}>✔️ Terminé</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

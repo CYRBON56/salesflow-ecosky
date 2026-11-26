@@ -29,6 +29,7 @@ export const config = {
     "/api/leads-anc-en-attente",
     "/api/valider-estimation-anc",
     "/api/dashboard-data",
+    "/api/devis-en-cours",
     "/api/radar/dashboard",
     "/api/carrousel",
   ],
