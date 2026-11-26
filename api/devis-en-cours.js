@@ -7,13 +7,12 @@
 //        { action: "ordre", ids: [pennylane_id, ...] }  (nouvel ordre d'intervention)
 // Protégé par le mot de passe du tableau de bord (middleware.js).
 
+import { tousLesDevis, sequenceDevis } from "./_pennylane.js";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 // Clé publique « anon » du projet (publique par nature) : sert seulement à passer
 // la passerelle des fonctions Supabase ; la vraie protection est la clé x-cle.
-const ANON_JWT =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrbGRkd3VtaXJrZGprYnh2enlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTMzNDksImV4cCI6MjA5ODc4OTM0OX0._2cVv3rmhHb-7VLTCqiMRq0F2S30NMnD8qRhTiBM7nc";
-
 async function sb(path, options = {}) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...options,
@@ -29,17 +28,6 @@ async function sb(path, options = {}) {
   return t ? JSON.parse(t) : null;
 }
 
-async function pennylane(path, cle) {
-  const r = await fetch(`${SUPABASE_URL}/functions/v1/pennylane-devis`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON_JWT}`, "x-cle": cle },
-    body: JSON.stringify({ action: "api", method: "GET", path }),
-  });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok || d.status !== 200) throw new Error(`Pennylane ${r.status}/${d.status}: ${JSON.stringify(d).slice(0, 200)}`);
-  return d.data;
-}
-
 // "Devis-Guillaume Achard-RESINE MARBRE SOL-D-2026-11-168.pdf" -> "Guillaume Achard"
 function nomClient(q) {
   const f = (q.filename || "").replace(/\.pdf$/i, "");
@@ -48,25 +36,22 @@ function nomClient(q) {
 }
 
 async function lireDevis() {
-  const cles = await sb("cles_internes?select=valeur&nom=eq.pennylane_fn");
-  const cle = cles?.[0]?.valeur;
-  if (!cle) throw new Error("Clé pennylane_fn introuvable");
-  const tous = [];
-  let cursor = null;
-  for (let page = 0; page < 6; page++) {
-    const path = `/quotes?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
-    const d = await pennylane(path, cle);
-    tous.push(...(d.items || []));
-    if (!d.has_more || !d.next_cursor) break;
-    cursor = d.next_cursor;
-  }
+  const [tous, signesSf] = await Promise.all([
+    tousLesDevis(),
+    sb("devis?select=numero&statut=eq.signe&type_document=eq.devis"),
+  ]);
+  // Devis signés sur la page de signature SalesFlow : comptés comme signés
+  // même si Pennylane ne les a pas (encore) passés en « accepté ».
+  const seqSignes = new Set((signesSf || []).map((x) => sequenceDevis(x.numero)).filter(Boolean));
   return tous
-    .filter((q) => ["accepted", "pending"].includes(q.status) && !q.archived_at)
+    .filter((q) => !q.archived_at)
+    .map((q) => ({ ...q, signeSf: seqSignes.has(sequenceDevis(q.quote_number || q.label)) }))
+    .filter((q) => ["accepted", "pending"].includes(q.status) || (q.signeSf && q.status === "expired"))
     .map((q) => ({
       id: q.id,
       numero: q.quote_number || q.label,
       client: nomClient(q),
-      statut: q.status === "accepted" ? "signe" : "attente",
+      statut: q.status === "accepted" || q.signeSf ? "signe" : "attente",
       date: q.date,
       validite: q.deadline,
       ttc: q.amount != null ? Number(q.amount) : null,

@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js';
 import { PDFDocument } from 'pdf-lib';
 import pdfParse from 'pdf-parse';
 import { Resend } from 'resend';
+import { marquerAccepteDansPennylane } from './_pennylane.js';
 
 const RIB_URL = 'https://salesflow-ecosky.vercel.app/rib-ecosky.pdf';
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -92,6 +93,17 @@ async function handlePost(req, res) {
   if (updateError) {
     console.error(updateError);
     return res.status(500).json({ error: 'Erreur enregistrement' });
+  }
+
+  // 26/11/2026 : le devis signé ici passe aussi en « accepté » dans Pennylane
+  // (il apparaît ainsi dans l'onglet Devis > Signés du tableau de bord).
+  if (devis.type_document !== 'facture') {
+    try {
+      const r = await marquerAccepteDansPennylane(devis.numero);
+      if (!r.ok) console.error('Pennylane accepté non fait:', devis.numero, r.raison);
+    } catch (e) {
+      console.error('Pennylane accepté échoué:', devis.numero, e.message);
+    }
   }
 
   const acompte = await extraireAcompte(devis.pdf_url, devis.montant_ttc);
