@@ -181,14 +181,14 @@ export async function autresDemandes() {
   // Suivi
   const s = Object.fromEntries(suivi.map((x) => [x.cle, x]));
   return out
-    .map((it) => ({ ...it, statut: s[it.cle]?.statut || "nouveau", note: s[it.cle]?.note || "", archive: !!s[it.cle]?.archive }))
+    .map((it) => ({ ...it, statut: s[it.cle]?.statut || "nouveau", note: s[it.cle]?.note || "", archive: !!s[it.cle]?.archive, appels: s[it.cle]?.appels || [] }))
     .filter((it) => !it.archive)
     .sort((a, b) => new Date(b.quand || 0) - new Date(a.quand || 0));
 }
 
 export async function majSuivi(cle, patch) {
   const ligne = { cle, maj: new Date().toISOString() };
-  for (const k of ["statut", "note", "archive"]) if (k in patch) ligne[k] = patch[k];
+  for (const k of ["statut", "note", "archive", "appels"]) if (k in patch) ligne[k] = patch[k];
   const r = await fetch(`${SUPABASE_URL}/rest/v1/admin_suivi?on_conflict=cle`, {
     method: "POST",
     headers: {

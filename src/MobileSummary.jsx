@@ -109,6 +109,10 @@ export default function MobileSummary() {
   const [recherche, setRecherche] = useState("");
   const [ouvertId, setOuvertId] = useState(null);
   const [annulable, setAnnulable] = useState(null); // dernier archivage, pour « Annuler »
+  // Journal des appels (26/11/2026) : au retour dans l'appli après un appel,
+  // on demande « a répondu / pas de réponse » et on l'enregistre avec la date.
+  const [appelEnCours, setAppelEnCours] = useState(() => { try { return JSON.parse(localStorage.getItem("sf_appel") || "null"); } catch (e) { return null; } });
+  const [demanderResultat, setDemanderResultat] = useState(false);
 
   const charger = async () => {
     setChargement(true);
@@ -195,6 +199,37 @@ export default function MobileSummary() {
     }
   };
 
+  const debutAppel = (type, id, nom) => {
+    const a = { type, id, nom, le: new Date().toISOString() };
+    setAppelEnCours(a); setDemanderResultat(false);
+    try { localStorage.setItem("sf_appel", JSON.stringify(a)); } catch (e) {}
+  };
+  useEffect(() => {
+    const surRetour = () => { if (document.visibilityState === "visible" && appelEnCours) setDemanderResultat(true); };
+    document.addEventListener("visibilitychange", surRetour);
+    window.addEventListener("focus", surRetour);
+    // Appli rouverte après l'appel (iPhone recharge parfois la page)
+    if (appelEnCours && Date.now() - new Date(appelEnCours.le).getTime() > 3000) setDemanderResultat(true);
+    return () => { document.removeEventListener("visibilitychange", surRetour); window.removeEventListener("focus", surRetour); };
+  }, [appelEnCours]);
+
+  const noterAppel = (type, id, resultat, le = new Date().toISOString()) => {
+    const entree = { le, resultat };
+    if (type === "lead") {
+      const l = leads.find((x) => x.id === id);
+      if (l) modifier(id, { appels: [...(l.appels || []), entree] });
+    } else {
+      const a = autres.find((x) => x.cle === id);
+      if (a) modifierAutre(id, { appels: [...(a.appels || []), entree] });
+    }
+  };
+  const finAppel = (resultat) => {
+    if (resultat && appelEnCours) noterAppel(appelEnCours.type, appelEnCours.id, resultat, appelEnCours.le);
+    setAppelEnCours(null); setDemanderResultat(false);
+    try { localStorage.removeItem("sf_appel"); } catch (e) {}
+  };
+  const feuille = demanderResultat && appelEnCours ? <FeuilleAppel appel={appelEnCours} choisir={finAppel} /> : null;
+
   // Archivage en un clic depuis la liste, avec « Annuler » pendant 6 s
   const archiverDepuisListe = (e) => {
     if (e.type === "lead") modifier(e.id, { archive: true });
@@ -213,10 +248,12 @@ export default function MobileSummary() {
   };
 
   if (ouvertAutre) {
-    return <FicheAutre a={ouvertAutre} retour={() => setOuvertId(null)} modifier={modifierAutre} />;
+    return <>{feuille}<FicheAutre a={ouvertAutre} retour={() => setOuvertId(null)} modifier={modifierAutre}
+      appeler={() => debutAppel("autre", ouvertAutre.cle, ouvertAutre.nom)} noterAppel={(r) => noterAppel("autre", ouvertAutre.cle, r)} /></>;
   }
   if (ouvert) {
-    return <Fiche lead={ouvert} devis={devisParLead[ouvert.id] || []} retour={() => setOuvertId(null)} modifier={modifier} />;
+    return <>{feuille}<Fiche lead={ouvert} devis={devisParLead[ouvert.id] || []} retour={() => setOuvertId(null)} modifier={modifier}
+      appeler={() => debutAppel("lead", ouvert.id, nomComplet(ouvert))} noterAppel={(r) => noterAppel("lead", ouvert.id, r)} /></>;
   }
 
   return (
@@ -245,6 +282,7 @@ export default function MobileSummary() {
       </div>
       <style>{`@keyframes tourne { to { transform: rotate(360deg); } }`}</style>
 
+      {feuille}
       {erreur && <div style={{ margin: 16, padding: 12, background: "#fef2f2", color: "#991b1b", borderRadius: 10, fontSize: 14 }}>{erreur}</div>}
 
       {famille === "applis" ? <MesApplis /> : <div style={{ padding: "12px 12px 0" }}>
@@ -254,9 +292,9 @@ export default function MobileSummary() {
           </div>
         )}
         {filtres.map((e) => e.type === "lead" ? (
-          <Carte key={e.id} lead={e.l} nbDevis={(devisParLead[e.id] || []).length} ouvrir={() => { setOuvertId(e.id); window.scrollTo(0, 0); }} archiver={() => archiverDepuisListe(e)} />
+          <Carte key={e.id} lead={e.l} appeler={() => debutAppel("lead", e.id, nomComplet(e.l))} nbDevis={(devisParLead[e.id] || []).length} ouvrir={() => { setOuvertId(e.id); window.scrollTo(0, 0); }} archiver={() => archiverDepuisListe(e)} />
         ) : (
-          <CarteAutre key={e.id} a={e.a} ouvrir={() => { setOuvertId(e.id); window.scrollTo(0, 0); }} archiver={() => archiverDepuisListe(e)} />
+          <CarteAutre key={e.id} a={e.a} appeler={() => debutAppel("autre", e.id, e.a.nom)} ouvrir={() => { setOuvertId(e.id); window.scrollTo(0, 0); }} archiver={() => archiverDepuisListe(e)} />
         ))}
       </div>}
       <div style={{ textAlign: "center", marginTop: 20 }}>
@@ -281,7 +319,7 @@ function Onglet({ actif, onClick, children }) {
   );
 }
 
-function Carte({ lead: l, nbDevis, ouvrir, archiver }) {
+function Carte({ lead: l, nbDevis, ouvrir, archiver, appeler }) {
   const [src, coul] = couleurSource(l);
   const details = [l.type_projet, l.surface_m2 ? `${l.surface_m2} m²` : null, l.code_postal].filter(Boolean).join(" · ");
   return (
@@ -296,6 +334,7 @@ function Carte({ lead: l, nbDevis, ouvrir, archiver }) {
         {details && <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{details}</div>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
           <Badge c={coul}>{src}</Badge>
+          <BadgeAppels appels={l.appels} />
           {aReponduSms(l) && <Badge c="#2563eb">💬 a répondu</Badge>}
           {l.callback_demande && <Badge c="#dc2626">📞 Veut être rappelé</Badge>}
           {l.rdv_date && <Badge c="#7c3aed">📅 {dateFr(l.rdv_date)}</Badge>}
@@ -306,12 +345,58 @@ function Carte({ lead: l, nbDevis, ouvrir, archiver }) {
       </div>
       <div style={{ display: "flex", borderTop: "1px solid #f1f5f9" }}>
         {telValide(l.telephone) ? (
-          <a href={`tel:${telBrut(l.telephone)}`} style={{ ...btnBas, color: "#fff", background: VERT }}>📞 Appeler</a>
+          <a href={`tel:${telBrut(l.telephone)}`} onClick={appeler} style={{ ...btnBas, color: "#fff", background: VERT }}>📞 Appeler</a>
         ) : (
           <span style={{ ...btnBas, color: "#94a3b8" }}>📞 —</span>
         )}
         <button onClick={ouvrir} style={{ ...btnBas, background: "#fff", color: VERT_FONCE, border: 0 }}>Voir la demande ›</button>
         <button onClick={archiver} style={{ ...btnBas, flex: "0 0 auto", padding: "0 14px", background: "#fff", color: "#64748b", border: 0, borderLeft: "1px solid #f1f5f9" }}>🗄️ Archiver</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Journal des appels ----------
+function BadgeAppels({ appels }) {
+  if (!Array.isArray(appels) || !appels.length) return null;
+  const dernier = appels[appels.length - 1];
+  if (dernier.resultat === "repondu") return <Badge c={VERT}>✅ Joint {dateFr(dernier.le)}</Badge>;
+  // nombre d'appels sans réponse depuis le dernier contact réussi
+  let n = 0;
+  for (let i = appels.length - 1; i >= 0 && appels[i].resultat !== "repondu"; i--) n++;
+  return <Badge c="#dc2626">📵 {n > 1 ? `${n} appels sans réponse` : "Sans réponse"} · {dateFr(dernier.le)}</Badge>;
+}
+
+function JournalAppels({ appels, noter }) {
+  const liste = Array.isArray(appels) ? appels : [];
+  return (
+    <Bloc titre="📞 Mes appels">
+      {liste.length === 0 && <div style={{ color: "#94a3b8", fontSize: 14 }}>Aucun appel noté pour l'instant.</div>}
+      {[...liste].reverse().map((a, k) => (
+        <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #f1f5f9", fontSize: 15 }}>
+          <span>{dateFr(a.le)}</span>
+          <b style={{ color: a.resultat === "repondu" ? VERT : "#dc2626" }}>{a.resultat === "repondu" ? "✅ A répondu" : "📵 Sans réponse"}</b>
+        </div>
+      ))}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
+        <button onClick={() => noter("sans_reponse")} style={{ ...btnAction, color: "#dc2626" }}>+ 📵 Sans réponse</button>
+        <button onClick={() => noter("repondu")} style={{ ...btnAction, color: VERT }}>+ ✅ A répondu</button>
+      </div>
+    </Bloc>
+  );
+}
+
+function FeuilleAppel({ appel, choisir }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", zIndex: 100, display: "flex", alignItems: "flex-end" }}>
+      <div style={{ background: "#fff", width: "100%", borderRadius: "18px 18px 0 0", padding: "18px 16px max(18px, env(safe-area-inset-bottom))", fontFamily: "-apple-system, system-ui, Segoe UI, Roboto, sans-serif" }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: "#0f172a" }}>Appel à {appel.nom}</div>
+        <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{dateFr(appel.le)}</div>
+        <div style={{ display: "grid", gap: 8, marginTop: 14 }}>
+          <button onClick={() => choisir("sans_reponse")} style={{ ...btnAction, background: "#dc2626", color: "#fff", fontSize: 17 }}>📵 Pas de réponse</button>
+          <button onClick={() => choisir("repondu")} style={{ ...btnAction, background: VERT, color: "#fff", fontSize: 17 }}>✅ A répondu</button>
+          <button onClick={() => choisir(null)} style={{ ...btnAction, color: "#64748b" }}>Ne rien noter</button>
+        </div>
       </div>
     </div>
   );
@@ -355,7 +440,7 @@ function DemandePhotos({ lead: l }) {
   );
 }
 
-function Fiche({ lead: l, devis, retour, modifier }) {
+function Fiche({ lead: l, devis, retour, modifier, appeler, noterAppel }) {
   const tel = telBrut(l.telephone);
   const adresse = [l.adresse_projet || l.adresse, l.code_postal].filter(Boolean).join(" ");
   const reponses = l.reponses_estimation && typeof l.reponses_estimation === "object" ? l.reponses_estimation : null;
@@ -390,12 +475,13 @@ function Fiche({ lead: l, devis, retour, modifier }) {
       <div style={{ padding: 12 }}>
         {/* Actions de contact */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          {tel.length >= 10 && <a href={`tel:${tel}`} style={{ ...btnAction, background: VERT, color: "#fff", gridColumn: "1 / -1", fontSize: 18 }}>📞 Appeler {telAffiche(l.telephone)}</a>}
+          {tel.length >= 10 && <a href={`tel:${tel}`} onClick={appeler} style={{ ...btnAction, background: VERT, color: "#fff", gridColumn: "1 / -1", fontSize: 18 }}>📞 Appeler {telAffiche(l.telephone)}</a>}
           {tel.length >= 10 && <a href={`sms:${tel}`} style={btnAction}>💬 SMS</a>}
           {l.email && <a href={`mailto:${l.email}`} style={btnAction}>✉️ Email</a>}
           {adresse && <a href={`https://maps.apple.com/?q=${encodeURIComponent(adresse)}`} style={btnAction}>📍 Itinéraire</a>}
         </div>
         {tel.length >= 10 && <DemandePhotos lead={l} />}
+        <JournalAppels appels={l.appels} noter={noterAppel} />
         {l.callback_demande && (
           <div style={{ marginTop: 10, padding: 10, background: "#fef2f2", color: "#991b1b", borderRadius: 10, fontSize: 14 }}>
             📞 A demandé à être rappelé {ilYa(l.callback_demande_le)}
@@ -530,7 +616,7 @@ function autreATraiter(a) {
   return !a.statut || a.statut === "nouveau" || a.statut === "à rappeler";
 }
 
-function CarteAutre({ a, ouvrir, archiver }) {
+function CarteAutre({ a, ouvrir, archiver, appeler }) {
   const c = a.couleur || "#64748b";
   return (
     <div style={{ background: "#fff", borderRadius: 14, marginBottom: 10, boxShadow: "0 1px 4px rgba(0,0,0,.06)", borderLeft: `4px solid ${a.statut === "à rappeler" ? "#dc2626" : autreATraiter(a) ? VERT : "#cbd5e1"}`, overflow: "hidden" }}>
@@ -545,13 +631,14 @@ function CarteAutre({ a, ouvrir, archiver }) {
         {a.objet && <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>{a.objet}</div>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
           <Badge c={c}>{a.source}</Badge>
+          <BadgeAppels appels={a.appels} />
           {a.liens && a.liens.length > 0 && <Badge c="#b45309">{a.liens.length} document{a.liens.length > 1 ? "s" : ""}</Badge>}
           {a.statut && a.statut !== "nouveau" && <Badge c={a.statut === "à rappeler" ? "#dc2626" : "#64748b"}>{a.statut}</Badge>}
         </div>
       </div>
       <div style={{ display: "flex", borderTop: "1px solid #f1f5f9" }}>
         {telValide(a.telephone) ? (
-          <a href={`tel:${telBrut(a.telephone)}`} style={{ ...btnBas, color: "#fff", background: VERT }}>📞 Appeler</a>
+          <a href={`tel:${telBrut(a.telephone)}`} onClick={appeler} style={{ ...btnBas, color: "#fff", background: VERT }}>📞 Appeler</a>
         ) : a.email ? (
           <a href={`mailto:${a.email}`} style={{ ...btnBas, color: "#fff", background: "#2563eb" }}>✉️ Écrire</a>
         ) : (
@@ -564,7 +651,7 @@ function CarteAutre({ a, ouvrir, archiver }) {
   );
 }
 
-function FicheAutre({ a, retour, modifier }) {
+function FicheAutre({ a, retour, modifier, appeler, noterAppel }) {
   const tel = telBrut(a.telephone);
   const [note, setNote] = useState(a.note || "");
   useEffect(() => {
@@ -582,11 +669,12 @@ function FicheAutre({ a, retour, modifier }) {
       </div>
       <div style={{ padding: 12 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          {tel.length >= 10 && <a href={`tel:${tel}`} style={{ ...btnAction, background: VERT, color: "#fff", gridColumn: "1 / -1", fontSize: 18 }}>📞 Appeler {telAffiche(a.telephone)}</a>}
+          {tel.length >= 10 && <a href={`tel:${tel}`} onClick={appeler} style={{ ...btnAction, background: VERT, color: "#fff", gridColumn: "1 / -1", fontSize: 18 }}>📞 Appeler {telAffiche(a.telephone)}</a>}
           {tel.length >= 10 && <a href={`sms:${tel}`} style={btnAction}>💬 SMS</a>}
           {a.email && <a href={`mailto:${a.email}`} style={btnAction}>✉️ Email</a>}
         </div>
         {tel.length >= 10 && a.famille === "rms" && <DemandePhotos lead={a} />}
+        <JournalAppels appels={a.appels} noter={noterAppel} />
         <Bloc titre="Coordonnées">
           <Ligne k="Entreprise" v={a.sous_titre} />
           <Ligne k="Téléphone" v={telAffiche(a.telephone)} />
