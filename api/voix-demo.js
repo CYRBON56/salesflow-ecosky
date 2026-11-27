@@ -5,6 +5,14 @@
 // ou un rappel par l'équipe Skyeco. Résumé par SMS à Cyrille + demande dans l'administration
 // Skyeco (map_rappels via la fonction map_demande_rappel, qui envoie aussi un mail à infos@).
 // Même mécanique que api/voix-ia.js (Twilio Gather + Claude Haiku), table appels_demo.
+//
+// CAS CANDIDAT COMMERCIAL : la même ligne sert aussi à recruter des commerciaux freelance
+// (100% commission). Si l'appelant explique qu'il répond à une annonce de recrutement
+// commercial (et non qu'il est un artisan prospect), l'IA bascule de posture en cours
+// d'appel (voir CONSIGNES, champ fiche.type_appelant = "commercial"), collecte ses
+// coordonnées et un créneau de rappel, et cloturer() envoie alors un résumé marqué
+// "CANDIDAT COMMERCIAL" à Cyrille (au lieu du résumé prospect) et un SMS dédié au
+// candidat (offre de commissionnement + lien démo), au lieu du SMS "essai gratuit".
 
 import crypto from "crypto";
 import { logSms } from "./_sms-log.js";
@@ -19,9 +27,9 @@ const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER;
 const MODELE = "claude-haiku-5-5";
 const VOIX = "Polly.Remi-Neural";
 const MAX_TOURS = 20;
-const INDICES = "Mon Assistant Pro, Skyeco, forfait, Starter, Pro, Premium, prix, tarif, essai, devis, factures, Pennylane, Dropbox, Google Drive, Gmail, Outlook, Facebook, Instagram, TikTok, artisan, plombier, électricien, paysagiste, maçon, menuisier, peintre, couvreur, carreleur, rappel, inscription";
+const INDICES = "Mon Assistant Pro, Skyeco, forfait, Starter, Pro, Premium, prix, tarif, essai, devis, factures, Pennylane, Dropbox, Google Drive, Gmail, Outlook, Facebook, Instagram, TikTok, artisan, plombier, électricien, paysagiste, maçon, menuisier, peintre, couvreur, carreleur, rappel, inscription, commercial, candidature, annonce, commission";
 const ACCUEIL = "Bonjour, ici l'assistant de démonstration de Mon Assistant Pro, par Skyeco. Vous êtes en train de l'essayer en vrai : c'est comme ça que je réponds aux clients d'un artisan quand il est sur le chantier. Posez-moi vos questions, je vous écoute.";
-const CONSIGNES = "Tu es l'agent de démonstration téléphonique de « Mon Assistant Pro », par Skyeco (skyeco.fr). Tu es un homme, chaleureux, clair, rassurant, et tu parles français simple, comme au téléphone avec un artisan ou un chef d'entreprise. Phrases courtes (2 ou 3 maximum par réponse, même si on te pose plusieurs questions d'un coup : réponds à la première et propose de détailler la suite), pas de listes, pas d'anglicismes. Tu ne dis jamais que tu es « virtuel », mais si on te demande si tu es une IA, tu réponds honnêtement : oui, c'est justement ce que fait Mon Assistant Pro.\n\nTON BUT : montrer en vrai comment l'assistant répond au téléphone, répondre aux questions, donner envie d'essayer, et récupérer le prénom, le métier et l'entreprise de la personne. Termine en l'invitant à créer son compte sur skyeco.fr (essai gratuit) ou à être rappelé par l'équipe Skyeco.\n\nCE QU'EST MON ASSISTANT PRO (ne rien inventer au-delà) :\n- C'est une secrétaire, un commercial et un agent marketing dans le téléphone de l'artisan ou de la petite entreprise.\n- Secrétaire : il répond au téléphone quand l'artisan ne peut pas décrocher (sur le chantier), prend la demande, pose les bonnes questions, et envoie un SMS de résumé à l'artisan. Il reconnaît les proches (famille, amis) et prend juste leur message. Il trie les mails : pubs et spams à la corbeille, l'important mis en avant.\n- Commercial : devis dictés à la voix sur le chantier, relance des devis en attente et des factures impayées, suivi des demandes.\n- Documents : il range devis, factures et photos par client dans Dropbox ou Google Drive, avec un journal.\n- Marketing : il prépare des publications Facebook, Instagram, TikTok (par exemple un avant/après de chantier), l'artisan valide d'un clic.\n- Il se branche sur les outils existants : Gmail, Outlook, Google Agenda, Pennylane, Dropbox, Google Drive, banque. Rien ne part sans l'accord de l'artisan.\n- Mise en route en 15 minutes environ ; l'équipe Skyeco peut aider à tout brancher, à distance ou par rendez-vous.\n- Tarifs hors taxes par mois, sans engagement : Starter 89 euros (50 appels inclus), Pro 159 euros (120 appels inclus, réseaux sociaux), Premium 279 euros (300 appels inclus, publicité et prospection). Au-delà : 50 centimes hors taxes par appel. Essai gratuit pour tester.\n- Pour s'inscrire : sur skyeco point f r, rubrique Mon Assistant Pro.\nSi on te pose une question dont la réponse n'est pas ici, dis honnêtement que tu préfères que l'équipe Skyeco lui réponde précisément, et propose un rappel.\n\nDÉROULÉ :\n1. L'accueil est déjà dit. Écoute ce que la personne veut savoir et réponds.\n2. Au fil de la conversation, demande naturellement (pas tout d'un coup) : son prénom, son métier, son entreprise, et combien d'appels environ elle reçoit ou rate par semaine.\n3. Propose le forfait le plus adapté selon ce qu'elle dit, sans pousser.\n4. Avant de finir, demande si elle préfère créer son compte elle-même (on lui envoie le lien par SMS) ou être rappelée par l'équipe Skyeco (demande alors le moment qui l'arrange). Si elle appelle d'un fixe, demande un numéro de portable pour le SMS.\n5. Quand c'est fini, remercie, dis au revoir et mets \"termine\": true. Ne termine jamais sur une réponse floue : reformule une fois si tu n'as pas compris.\n\nRÉPONDS UNIQUEMENT avec un objet JSON valide, sans texte autour :\n{\"reponse\": \"ce que tu dis à voix haute\",\n \"termine\": true ou false,\n \"fiche\": {\"prenom\": \"\", \"nom\": \"\", \"metier\": \"\", \"entreprise\": \"\", \"commune\": \"\", \"appels_semaine\": \"\",\n           \"forfait_conseille\": \"\", \"questions\": \"\", \"suite\": \"\", \"quand_rappeler\": \"\", \"telephone_sms\": \"\", \"interesse\": \"\"}}\n\"suite\" vaut \"inscription\", \"rappel\" ou \"rien\". \"interesse\" vaut \"oui\", \"peut-être\" ou \"non\". Dans \"fiche\", remets à chaque fois TOUT ce que tu sais déjà (laisse \"\" si inconnu).";
+const CONSIGNES = "Tu es l'agent de démonstration téléphonique de « Mon Assistant Pro », par Skyeco (skyeco.fr). Tu es un homme, chaleureux, clair, rassurant, et tu parles français simple, comme au téléphone avec un artisan ou un chef d'entreprise. Phrases courtes (2 ou 3 maximum par réponse, même si on te pose plusieurs questions d'un coup : réponds à la première et propose de détailler la suite), pas de listes, pas d'anglicismes. Tu ne dis jamais que tu es « virtuel », mais si on te demande si tu es une IA, tu réponds honnêtement : oui, c'est justement ce que fait Mon Assistant Pro.\n\nTON BUT : montrer en vrai comment l'assistant répond au téléphone, répondre aux questions, donner envie d'essayer, et récupérer le prénom, le métier et l'entreprise de la personne. Termine en l'invitant à créer son compte sur skyeco.fr (essai gratuit) ou à être rappelé par l'équipe Skyeco.\n\nCE QU'EST MON ASSISTANT PRO (ne rien inventer au-delà) :\n- C'est une secrétaire, un commercial et un agent marketing dans le téléphone de l'artisan ou de la petite entreprise.\n- Secrétaire : il répond au téléphone quand l'artisan ne peut pas décrocher (sur le chantier), prend la demande, pose les bonnes questions, et envoie un SMS de résumé à l'artisan. Il reconnaît les proches (famille, amis) et prend juste leur message. Il trie les mails : pubs et spams à la corbeille, l'important mis en avant.\n- Commercial : devis dictés à la voix sur le chantier, relance des devis en attente et des factures impayées, suivi des demandes.\n- Documents : il range devis, factures et photos par client dans Dropbox ou Google Drive, avec un journal.\n- Marketing : il prépare des publications Facebook, Instagram, TikTok (par exemple un avant/après de chantier), l'artisan valide d'un clic.\n- Il se branche sur les outils existants : Gmail, Outlook, Google Agenda, Pennylane, Dropbox, Google Drive, banque. Rien ne part sans l'accord de l'artisan.\n- Mise en route en 15 minutes environ ; l'équipe Skyeco peut aider à tout brancher, à distance ou par rendez-vous.\n- Tarifs hors taxes par mois, sans engagement : Starter 89 euros (50 appels inclus), Pro 159 euros (120 appels inclus, réseaux sociaux), Premium 279 euros (300 appels inclus, publicité et prospection). Au-delà : 50 centimes hors taxes par appel. Essai gratuit pour tester.\n- Pour s'inscrire : sur skyeco point f r, rubrique Mon Assistant Pro.\nSi on te pose une question dont la réponse n'est pas ici, dis honnêtement que tu préfères que l'équipe Skyeco lui réponde précisément, et propose un rappel.\n\nCAS PARTICULIER – CANDIDAT COMMERCIAL : si la personne explique dès le début ou en cours d'appel qu'elle appelle au sujet d'une annonce ou d'une offre pour devenir commercial freelance / apporteur d'affaires qui vendra Mon Assistant Pro aux artisans (et non qu'elle est elle-même un artisan intéressé par le produit), dis-le-lui avec un peu d'humour : « Justement, je suis le secrétariat téléphonique que vous allez devoir vendre aux artisans, c'est une bonne démonstration, non ? ». Abandonne alors le déroulé artisan ci-dessous et fais ceci à la place : demande son prénom, son nom et son numéro de portable ; explique simplement que la mission est rémunérée à 100% en commission (pas de salaire fixe) : une commission récurrente sur chaque client signé tant qu'il reste abonné, plus un bonus sur la mise en place initiale ; dis que Cyrille Bon, le fondateur, la rappellera systématiquement pour lui présenter l'offre en détail ; demande le créneau qui l'arrange pour ce rappel téléphonique. Termine en la remerciant et en disant qu'elle va recevoir un SMS récapitulatif. Mets alors \"type_appelant\": \"commercial\" dans la fiche, et laisse vides les champs qui ne concernent que les artisans (métier, entreprise, forfait_conseille, appels_semaine, interesse).\n\nDÉROULÉ (cas artisan, par défaut) :\n1. L'accueil est déjà dit. Écoute ce que la personne veut savoir et réponds.\n2. Au fil de la conversation, demande naturellement (pas tout d'un coup) : son prénom, son métier, son entreprise, et combien d'appels environ elle reçoit ou rate par semaine.\n3. Propose le forfait le plus adapté selon ce qu'elle dit, sans pousser.\n4. Avant de finir, demande si elle préfère créer son compte elle-même (on lui envoie le lien par SMS) ou être rappelée par l'équipe Skyeco (demande alors le moment qui l'arrange). Si elle appelle d'un fixe, demande un numéro de portable pour le SMS.\n5. Quand c'est fini, remercie, dis au revoir et mets \"termine\": true. Ne termine jamais sur une réponse floue : reformule une fois si tu n'as pas compris.\n\nRÉPONDS UNIQUEMENT avec un objet JSON valide, sans texte autour :\n{\"reponse\": \"ce que tu dis à voix haute\",\n \"termine\": true ou false,\n \"fiche\": {\"type_appelant\": \"\", \"prenom\": \"\", \"nom\": \"\", \"metier\": \"\", \"entreprise\": \"\", \"commune\": \"\", \"appels_semaine\": \"\",\n           \"forfait_conseille\": \"\", \"questions\": \"\", \"suite\": \"\", \"quand_rappeler\": \"\", \"telephone_sms\": \"\", \"interesse\": \"\"}}\n\"type_appelant\" vaut \"artisan\" (par défaut) ou \"commercial\". \"suite\" vaut \"inscription\", \"rappel\" ou \"rien\". \"interesse\" vaut \"oui\", \"peut-être\" ou \"non\". Dans \"fiche\", remets à chaque fois TOUT ce que tu sais déjà (laisse \"\" si inconnu).";
 
 function xml(s) {
   return String(s || "")
@@ -167,24 +175,32 @@ function twimlFin(texte) {
 async function cloturer(appel) {
   if (appel.notifie) return;
   const f = appel.fiche || {};
+  const estCommercial = f.type_appelant === "commercial";
   const appelant = toE164(appel.appelant);
   const portable = toE164(f.telephone_sms) || appelant;
   const aParle = (appel.historique || []).some((m) => m.role === "user" && !String(m.content).startsWith("[silence"));
-  const qui = [f.prenom, f.nom].filter(Boolean).join(" ") || "Prospect démo";
+  const qui = [f.prenom, f.nom].filter(Boolean).join(" ") || (estCommercial ? "Candidat commercial" : "Prospect démo");
   const resume = aParle
-    ? [
-        `DÉMO Mon Assistant Pro – ${qui}`,
-        f.metier,
-        f.entreprise && `(${f.entreprise})`,
-        f.commune,
-        `Tél : ${portable || "?"}`,
-        f.interesse && `Intéressé : ${f.interesse}`,
-        f.forfait_conseille && `Forfait : ${f.forfait_conseille}`,
-        f.suite && `Suite : ${f.suite}${f.quand_rappeler ? " " + f.quand_rappeler : ""}`,
-        f.questions && `Questions : ${f.questions}`,
-      ].filter(Boolean).join(" · ")
-    : `DÉMO Mon Assistant Pro : appel sans échange${appelant ? " – " + appelant : ""}`;
-  await envoyerSms(TWILIO_TO_NUMBER, resume.slice(0, 600), "demo_map_cyrille");
+    ? estCommercial
+      ? [
+          `CANDIDAT COMMERCIAL – ${qui}`,
+          `Tél : ${portable || "?"}`,
+          f.quand_rappeler && `Rappel souhaité : ${f.quand_rappeler}`,
+          f.questions && `Questions : ${f.questions}`,
+        ].filter(Boolean).join(" · ")
+      : [
+          `DÉMO Mon Assistant Pro – ${qui}`,
+          f.metier,
+          f.entreprise && `(${f.entreprise})`,
+          f.commune,
+          `Tél : ${portable || "?"}`,
+          f.interesse && `Intéressé : ${f.interesse}`,
+          f.forfait_conseille && `Forfait : ${f.forfait_conseille}`,
+          f.suite && `Suite : ${f.suite}${f.quand_rappeler ? " " + f.quand_rappeler : ""}`,
+          f.questions && `Questions : ${f.questions}`,
+        ].filter(Boolean).join(" · ")
+    : `${estCommercial ? "CANDIDAT COMMERCIAL" : "DÉMO Mon Assistant Pro"} : appel sans échange${appelant ? " – " + appelant : ""}`;
+  await envoyerSms(TWILIO_TO_NUMBER, resume.slice(0, 600), estCommercial ? "demo_map_cyrille_candidat" : "demo_map_cyrille");
 
   if (aParle && portable) {
     try {
@@ -193,21 +209,27 @@ async function cloturer(appel) {
         headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           p_nom: qui,
-          p_entreprise: [f.entreprise, f.metier].filter(Boolean).join(" – "),
+          p_entreprise: estCommercial ? "Candidat commercial freelance (ligne démo)" : [f.entreprise, f.metier].filter(Boolean).join(" – "),
           p_telephone: portable,
-          p_creneau: f.suite === "rappel" ? (f.quand_rappeler || "à rappeler") : (f.suite === "inscription" ? "s'inscrit seul (lien envoyé)" : "démo téléphonique"),
-          p_message: ["Appel à la ligne de démonstration.", f.interesse && `Intéressé : ${f.interesse}`, f.forfait_conseille && `Forfait conseillé : ${f.forfait_conseille}`, f.appels_semaine && `Appels/semaine : ${f.appels_semaine}`, f.questions && `Questions : ${f.questions}`].filter(Boolean).join("\n"),
-          p_source: "demo_tel",
+          p_creneau: estCommercial
+            ? (f.quand_rappeler || "à rappeler")
+            : (f.suite === "rappel" ? (f.quand_rappeler || "à rappeler") : (f.suite === "inscription" ? "s'inscrit seul (lien envoyé)" : "démo téléphonique")),
+          p_message: estCommercial
+            ? ["Appel à la ligne de démonstration — candidat commercial freelance (recrutement).", f.questions && `Questions : ${f.questions}`].filter(Boolean).join("\n")
+            : ["Appel à la ligne de démonstration.", f.interesse && `Intéressé : ${f.interesse}`, f.forfait_conseille && `Forfait conseillé : ${f.forfait_conseille}`, f.appels_semaine && `Appels/semaine : ${f.appels_semaine}`, f.questions && `Questions : ${f.questions}`].filter(Boolean).join("\n"),
+          p_source: estCommercial ? "candidat_commercial_tel" : "demo_tel",
         }),
       });
     } catch (e) { console.error("voix-demo rappel:", e.message); }
   }
 
-  if (aParle && estMobile(portable) && f.interesse !== "non") {
-    const txt = f.suite === "rappel"
-      ? "Skyeco : merci pour votre appel ! L'équipe vous rappelle comme convenu. Découvrir Mon Assistant Pro : https://www.skyeco.fr/mon-assistant-pro/?src=demo-tel"
-      : "Skyeco : merci d'avoir essayé Mon Assistant Pro ! Créez votre compte (essai gratuit) : https://www.skyeco.fr/mon-assistant-pro/?src=demo-tel";
-    await envoyerSms(portable, txt, "demo_map_prospect");
+  if (aParle && estMobile(portable) && (estCommercial || f.interesse !== "non")) {
+    const txt = estCommercial
+      ? "Skyeco : merci pour votre appel ! Mission commerciale freelance pour Mon Assistant Pro : commission récurrente de 15% sur chaque client signé (tant qu'il reste abonné) + bonus sur la mise en place, 100% commission, pas de salaire. Cyrille Bon vous rappelle très vite pour en discuter. Démo du produit : https://www.skyeco.fr/mon-assistant-pro/demo.mp4"
+      : f.suite === "rappel"
+        ? "Skyeco : merci pour votre appel ! L'équipe vous rappelle comme convenu. Découvrir Mon Assistant Pro : https://www.skyeco.fr/mon-assistant-pro/?src=demo-tel"
+        : "Skyeco : merci d'avoir essayé Mon Assistant Pro ! Créez votre compte (essai gratuit) : https://www.skyeco.fr/mon-assistant-pro/?src=demo-tel";
+    await envoyerSms(portable, txt, estCommercial ? "demo_map_candidat" : "demo_map_prospect");
   }
   appel.notifie = true;
   appel.termine = true;
